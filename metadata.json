@@ -1,0 +1,6 @@
+{
+  "name": "NCF PREDICT - SAF & Budget Management System",
+  "description": "Comprehensive student activity fund collection, double-entry accounting, proposal workflows, event attendance penalties, and departmental budget tracking with Supabase integration.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
