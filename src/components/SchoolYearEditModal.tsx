@@ -24,12 +24,19 @@ export const SchoolYearEditModal: React.FC<SchoolYearEditModalProps> = ({ isOpen
 
   if (!isOpen) return null;
 
-  const handleSave = (e: React.FormEvent) => {
+  const [error, setError] = useState('');
+
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!syLabel.trim() || !semName.trim()) return;
-    updateActiveSemester(syLabel.trim(), semName.trim());
-    setSaved(true);
-    setTimeout(() => onClose(), 600);
+    setError('');
+    try {
+      await updateActiveSemester(syLabel.trim(), semName.trim());
+      setSaved(true);
+      setTimeout(() => onClose(), 600);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to save. You may not have permission to change the school year.');
+    }
   };
 
   return (
@@ -49,6 +56,11 @@ export const SchoolYearEditModal: React.FC<SchoolYearEditModalProps> = ({ isOpen
           {saved && (
             <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4" /> Updated!
+            </div>
+          )}
+          {error && (
+            <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs">
+              {error}
             </div>
           )}
 

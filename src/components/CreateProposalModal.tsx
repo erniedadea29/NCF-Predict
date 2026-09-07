@@ -99,7 +99,7 @@ export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({ isOpen
 
   const totalCalculatedBudget = lineItems.reduce((sum, i) => sum + (i.estimated_amount || 0), 0);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) {
       alert('Please enter a budget proposal title.');
@@ -112,7 +112,7 @@ export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({ isOpen
 
     const selectedEv = events.find(e => e.id === selectedEventId);
 
-    createProposal({
+    await createProposal({
       budget_title: title.trim(),
       budget_description: description.trim() || 'No additional description provided.',
       department,

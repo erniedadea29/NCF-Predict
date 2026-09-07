@@ -17,8 +17,12 @@ export const StudentDashboardView: React.FC = () => {
     safRecords,
     attendances,
     activeSemester,
-    currentUser
+    currentUser,
+    generateClearance
   } = useApp();
+
+  const [clearanceError, setClearanceError] = React.useState('');
+  const [generatingClearance, setGeneratingClearance] = React.useState(false);
 
   // Always resolve strictly to the logged-in student's own record — students
   // can only ever view their own data, never anyone else's.
@@ -36,14 +40,28 @@ export const StudentDashboardView: React.FC = () => {
 
   const isClearedForExam = studentSaf?.paid && totalUnpaidPenalty === 0;
 
-  const printClearanceSlip = () => {
+  const printClearanceSlip = async () => {
+    if (!activeStudent) return;
+    setClearanceError('');
+    setGeneratingClearance(true);
+    // Generates (or refreshes) a real, stored clearance record first — the
+    // printed slip below is no longer purely client-side; it reflects an
+    // actual row cashier/adviser/dean/admin can also see, with a real code.
+    const record = await generateClearance(activeStudent.id);
+    setGeneratingClearance(false);
+    if (!record) {
+      setClearanceError('Could not generate your clearance record right now. Please try again.');
+      return;
+    }
+
     const slip = `
 ============================================================
              NAGA COLLEGE FOUNDATION (NCF)
           OFFICIAL STUDENT CLEARANCE CERTIFICATE
 ============================================================
+Clearance Code: ${record.clearance_code}
 Academic Year: ${activeSemester.school_year_label} • ${activeSemester.semester_name}
-Date Generated: ${new Date().toLocaleDateString()}
+Date Generated: ${new Date(record.generated_at).toLocaleString()}
 ------------------------------------------------------------
 Student ID   : ${activeStudent?.student_number}
 Student Name : ${activeStudent?.first_name} ${activeStudent?.last_name}
@@ -52,25 +70,25 @@ Course & Yr  : ${activeStudent?.course} (${activeStudent?.year_level})
 Section      : ${activeStudent?.section}
 ------------------------------------------------------------
 CLEARANCE STATUS BREAKDOWN:
-1. Student Activity Fund (SAF): ${studentSaf?.paid ? 'CLEARED / PAID (₱250.00)' : 'UNPAID (₱250.00)'}
+1. Student Activity Fund (SAF): ${record.saf_paid ? 'CLEARED / PAID (₱250.00)' : 'UNPAID (₱250.00)'}
    Receipt Code: ${studentSaf?.receipt_no || 'N/A'}
    Double-Entry: ${studentSaf?.double_entry.reference_no || 'N/A'}
 
-2. Event Attendance & Fines  : ${totalUnpaidPenalty === 0 ? 'CLEARED (₱0.00 Outstanding)' : `UNPAID FINES (₱${totalUnpaidPenalty.toFixed(2)})`}
-   Total Penalties Incurred  : ${studentPenalties.length} Records
+2. Event Attendance & Fines  : ${record.unpaid_penalties_count === 0 ? 'CLEARED (₱0.00 Outstanding)' : `UNPAID FINES (₱${record.unpaid_penalties_amount.toFixed(2)}, ${record.unpaid_penalties_count} record(s))`}
 
 ------------------------------------------------------------
 FINAL EXAMINATION CLEARANCE:
-${isClearedForExam ? '>>> [ OFFICIALLY CLEARED & VALIDATED ] <<<' : '>>> [ HOLD - SETTLE UNPAID DUES AT TREASURY ] <<<'}
+${record.status === 'CLEARED' ? '>>> [ OFFICIALLY CLEARED & VALIDATED ] <<<' : '>>> [ HOLD - SETTLE UNPAID DUES AT TREASURY ] <<<'}
 ============================================================
 Validated by Naga College Foundation Supreme Student Council
+Verify this clearance code with the Treasury/Adviser office if needed.
 `;
 
     const blob = new Blob([slip], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `NCF_Clearance_${activeStudent?.student_number}.txt`;
+    a.download = `NCF_Clearance_${activeStudent?.student_number}_${record.clearance_code}.txt`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -151,12 +169,16 @@ Validated by Naga College Foundation Supreme Student Council
 
             <button
               onClick={printClearanceSlip}
-              className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl border border-slate-200 transition cursor-pointer"
-              title="Print Official Clearance Slip"
+              disabled={generatingClearance}
+              className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl border border-slate-200 transition cursor-pointer disabled:opacity-50"
+              title="Generate & Print Official Clearance Slip"
             >
-              <Printer className="w-4 h-4" />
+              <Printer className={`w-4 h-4 ${generatingClearance ? 'animate-pulse' : ''}`} />
             </button>
           </div>
+          {clearanceError && (
+            <p className="text-[11px] text-rose-600 font-semibold mt-2">{clearanceError}</p>
+          )}
         </div>
 
         {/* Academic Details (read-only) */}

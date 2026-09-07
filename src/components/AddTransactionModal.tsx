@@ -45,6 +45,8 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ isOpen
 
     const todayStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
+    // No status passed — context decides Pending vs. Completed based on the
+    // creator's role, so admin/adviser have something to review.
     addTransaction({
       title: title.trim(),
       department: isDepartmentRestricted ? userDepartment : department,
@@ -52,7 +54,6 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ isOpen
       date: todayStr,
       amount: numAmount,
       type,
-      status: 'Completed',
       description: description.trim() || undefined
     });
 

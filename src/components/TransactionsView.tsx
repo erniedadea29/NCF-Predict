@@ -6,34 +6,43 @@ import {
   DepartmentCode 
 } from '../types';
 import { DEPARTMENTS } from '../data/mockData';
-import { 
-  Plus, 
-  Download, 
-  Edit3, 
-  Trash2, 
-  Archive, 
-  RotateCcw, 
-  FileText, 
-  Filter, 
+import {
+  Plus,
+  Download,
+  Edit3,
+  Trash2,
+  Archive,
+  RotateCcw,
+  FileText,
+  Filter,
   Search,
-  CheckCircle2
+  CheckCircle2,
+  XCircle,
+  Clock
 } from 'lucide-react';
 
 interface TransactionsViewProps {
   onOpenAddModal: () => void;
 }
 
+const REVIEWER_ROLES = ['admin', 'csc_adviser', 'dean'];
+
 export const TransactionsView: React.FC<TransactionsViewProps> = ({ onOpenAddModal }) => {
-  const { 
-    transactions, 
+  const {
+    transactions,
     scopedTransactions,
-    toggleArchiveTransaction, 
-    deleteTransaction, 
+    toggleArchiveTransaction,
+    deleteTransaction,
+    reviewTransaction,
     activeSemester,
     userDepartment,
     isDepartmentRestricted,
-    scopedDepartmentInfo
+    scopedDepartmentInfo,
+    currentUser,
+    isReadOnlyStudent
   } = useApp();
+
+  const canReview = REVIEWER_ROLES.includes(currentUser.role);
 
   const [selectedCategory, setSelectedCategory] = useState<TransactionCategory>('All');
   const [showArchived, setShowArchived] = useState<boolean>(false);
@@ -210,14 +219,18 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ onOpenAddMod
           </div>
           <div>
             <h3 className="font-bold text-slate-800 text-base">No transaction</h3>
-            <p className="text-xs text-slate-500 mt-1">Tap + to create a budget entry or transaction</p>
+            <p className="text-xs text-slate-500 mt-1">
+              {isReadOnlyStudent ? 'Nothing recorded yet for your department.' : 'Tap + to create a budget entry or transaction'}
+            </p>
           </div>
-          <button
-            onClick={onOpenAddModal}
-            className="px-4 py-2 bg-[#00873E] hover:bg-[#007033] text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer"
-          >
-            + Add Transaction
-          </button>
+          {!isReadOnlyStudent && (
+            <button
+              onClick={onOpenAddModal}
+              className="px-4 py-2 bg-[#00873E] hover:bg-[#007033] text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer"
+            >
+              + Add Transaction
+            </button>
+          )}
         </div>
       ) : (
         <div className="space-y-3">
@@ -253,6 +266,16 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ onOpenAddMod
                       <span className="text-[10px] text-slate-400 font-mono hidden md:inline">
                         • {tx.reference_code}
                       </span>
+                      {tx.status === 'Pending' && (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 flex items-center gap-1">
+                          <Clock className="w-2.5 h-2.5" /> Pending Review
+                        </span>
+                      )}
+                      {tx.status === 'Rejected' && (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 flex items-center gap-1">
+                          <XCircle className="w-2.5 h-2.5" /> Rejected
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -267,6 +290,26 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ onOpenAddMod
                   </div>
 
                   <div className="flex items-center gap-1.5">
+                    {/* Approve / Reject — only for the reviewer roles, only on Pending rows */}
+                    {canReview && tx.status === 'Pending' && (
+                      <>
+                        <button
+                          onClick={() => reviewTransaction(tx.id, 'Completed')}
+                          className="flex items-center gap-1 px-2.5 h-8 rounded-xl bg-emerald-100 hover:bg-emerald-200 text-emerald-800 text-[11px] font-bold transition cursor-pointer"
+                          title="Approve transaction"
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5" /> Approve
+                        </button>
+                        <button
+                          onClick={() => reviewTransaction(tx.id, 'Rejected')}
+                          className="flex items-center gap-1 px-2.5 h-8 rounded-xl bg-rose-100 hover:bg-rose-200 text-rose-800 text-[11px] font-bold transition cursor-pointer"
+                          title="Reject transaction"
+                        >
+                          <XCircle className="w-3.5 h-3.5" /> Reject
+                        </button>
+                      </>
+                    )}
+
                     {/* Download Receipt/Voucher */}
                     <button
                       onClick={() => exportSingleTransactionReceipt(tx)}
@@ -276,23 +319,27 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ onOpenAddMod
                       <Download className="w-4 h-4" />
                     </button>
 
-                    {/* Archive / Restore Button */}
-                    <button
-                      onClick={() => toggleArchiveTransaction(tx.id)}
-                      className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center transition cursor-pointer"
-                      title={tx.is_archived ? 'Restore transaction' : 'Archive transaction'}
-                    >
-                      {tx.is_archived ? <RotateCcw className="w-4 h-4 text-emerald-600" /> : <Archive className="w-4 h-4" />}
-                    </button>
+                    {!isReadOnlyStudent && (
+                      <>
+                        {/* Archive / Restore Button */}
+                        <button
+                          onClick={() => toggleArchiveTransaction(tx.id)}
+                          className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center transition cursor-pointer"
+                          title={tx.is_archived ? 'Restore transaction' : 'Archive transaction'}
+                        >
+                          {tx.is_archived ? <RotateCcw className="w-4 h-4 text-emerald-600" /> : <Archive className="w-4 h-4" />}
+                        </button>
 
-                    {/* Delete button */}
-                    <button
-                      onClick={() => deleteTransaction(tx.id)}
-                      className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-rose-100 text-slate-500 hover:text-rose-600 flex items-center justify-center transition cursor-pointer"
-                      title="Delete record"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                        {/* Delete button */}
+                        <button
+                          onClick={() => deleteTransaction(tx.id)}
+                          className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-rose-100 text-slate-500 hover:text-rose-600 flex items-center justify-center transition cursor-pointer"
+                          title="Delete record"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -302,15 +349,17 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ onOpenAddMod
       )}
 
       {/* Floating / Bottom Sticky Action Button matching PDF screenshots */}
-      <div className="fixed bottom-6 right-6 z-30">
-        <button
-          onClick={onOpenAddModal}
-          className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-[#00873E] hover:bg-[#007033] text-white font-bold text-sm shadow-xl transition transform hover:scale-105 active:scale-95 cursor-pointer"
-        >
-          <Plus className="w-4 h-4" />
-          <span>+ Add Transaction</span>
-        </button>
-      </div>
+      {!isReadOnlyStudent && (
+        <div className="fixed bottom-6 right-6 z-30">
+          <button
+            onClick={onOpenAddModal}
+            className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-[#00873E] hover:bg-[#007033] text-white font-bold text-sm shadow-xl transition transform hover:scale-105 active:scale-95 cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>+ Add Transaction</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 };

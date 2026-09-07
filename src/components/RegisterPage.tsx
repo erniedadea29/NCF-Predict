@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
+import { getSupabase } from '../lib/supabaseClient';
 import { UserRole, DepartmentCode } from '../types';
 import { DEPARTMENTS } from '../data/mockData';
 import {
@@ -76,7 +77,8 @@ const POSITIONS_BY_TYPE: Record<AccountType, PositionOption[]> = {
     { id: 'gov_vice', title: 'Vice Governor', role: 'officer_governor', description: 'Assists the Governor in leading department programs.' },
     { id: 'council_pres', title: 'Student Council President', role: 'officer_governor', description: 'Overall council leadership and resolution sign-off.' },
     { id: 'council_rep', title: 'Council Representative', role: 'council_member', description: 'Votes and comments on budget proposal resolutions.' },
-    { id: 'council_sec', title: 'Council Secretary', role: 'council_member', description: 'Documents meetings, resolutions, and event attendance.' }
+    { id: 'council_sec', title: 'Council Secretary', role: 'council_member', description: 'Documents meetings, resolutions, and event attendance.' },
+    { id: 'saf_cashier', title: 'SAF Cashier', role: 'cashier', description: 'Collects and verifies Student Activity Fee (SAF) payments.' }
   ],
   admin: [
     { id: 'dean_college', title: 'College Dean', role: 'dean', description: 'Final approval and fund-release authorization.' },
@@ -120,7 +122,25 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onGoToLogin }) => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [studentIdAvailable, setStudentIdAvailable] = useState<boolean | null>(null);
+  const [checkingStudentId, setCheckingStudentId] = useState(false);
+
+  const checkStudentIdAvailability = async (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      setStudentIdAvailable(null);
+      return;
+    }
+    setCheckingStudentId(true);
+    try {
+      const { data, error: rpcError } = await getSupabase().rpc('check_student_number_available', { p_student_number: trimmed });
+      setStudentIdAvailable(rpcError ? null : Boolean(data));
+    } finally {
+      setCheckingStudentId(false);
+    }
+  };
 
   const currentPositions = POSITIONS_BY_TYPE[accountType];
   const currentPosition = currentPositions.find(p => p.id === selectedPositionId) || currentPositions[0];
@@ -137,7 +157,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onGoToLogin }) => {
     setSection(`${dept}-1A`);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
@@ -149,31 +169,41 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onGoToLogin }) => {
       setError('Please enter a valid email address.');
       return;
     }
-    if (password && password !== confirmPassword) {
+    if (!password || password.length < 6) {
+      setError('Please enter a password of at least 6 characters.');
+      return;
+    }
+    if (password !== confirmPassword) {
       setError('Password and Confirm Password do not match.');
+      return;
+    }
+    if (studentIdAvailable === false) {
+      setError('That Student / Employee ID is already taken. Please use a different one.');
       return;
     }
 
     setIsSubmitting(true);
-    setTimeout(() => {
-      const res = registerUser({
-        name: `${firstName.trim()} ${lastName.trim()}`,
-        email: email.trim(),
-        role: currentPosition.role,
-        department,
-        student_number: studentNumber.trim() || undefined,
-        officer_position: currentPosition.title,
-        course,
-        year_level: yearLevel,
-        section,
-        password: password || undefined
-      });
-      setIsSubmitting(false);
-      if (!res.success) {
-        setError(res.message);
-      }
-      // On success, isAuthenticated flips to true in context and the app renders the dashboard automatically.
-    }, 350);
+    const res = await registerUser({
+      name: `${firstName.trim()} ${lastName.trim()}`,
+      email: email.trim(),
+      role: currentPosition.role,
+      department,
+      student_number: studentNumber.trim() || undefined,
+      officer_position: currentPosition.title,
+      course,
+      year_level: yearLevel,
+      section,
+      password
+    });
+    setIsSubmitting(false);
+    if (!res.success) {
+      setError(res.message);
+      return;
+    }
+    // Registration no longer auto-logs-in — show the success message, then
+    // send the user to the login page instead of straight into the dashboard.
+    setSuccessMessage(res.message);
+    setTimeout(() => onGoToLogin(), 1800);
   };
 
   return (
@@ -192,6 +222,12 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onGoToLogin }) => {
             <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2.5 mb-4">
               <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
               <span>{error}</span>
+            </div>
+          )}
+          {successMessage && (
+            <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-start gap-2.5 mb-4">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+              <span>{successMessage} Redirecting to login&hellip;</span>
             </div>
           )}
 
@@ -295,9 +331,24 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onGoToLogin }) => {
                 <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1">
                   <IdCard className="w-3.5 h-3.5 text-slate-400" /> Student / Employee ID
                 </label>
-                <input type="text" value={studentNumber} onChange={(e) => setStudentNumber(e.target.value)}
+                <input type="text" value={studentNumber}
+                  onChange={(e) => { setStudentNumber(e.target.value); setStudentIdAvailable(null); }}
+                  onBlur={(e) => checkStudentIdAvailability(e.target.value)}
                   placeholder={accountType === 'admin' || accountType === 'adviser' ? 'e.g. EMP-4029' : 'e.g. 2024-00142'}
-                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#00873E]" />
+                  className={`w-full px-3 py-2 text-sm border rounded-xl focus:ring-2 focus:ring-[#00873E] ${
+                    studentIdAvailable === false ? 'border-rose-400' : 'border-slate-300'
+                  }`} />
+                {checkingStudentId && (
+                  <p className="text-[11px] text-slate-400 mt-1">Checking availability&hellip;</p>
+                )}
+                {studentIdAvailable === false && !checkingStudentId && (
+                  <p className="text-[11px] text-rose-600 font-semibold mt-1 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3" /> This ID is already taken. Please use a different one.
+                  </p>
+                )}
+                {studentIdAvailable === true && !checkingStudentId && (
+                  <p className="text-[11px] text-emerald-600 font-semibold mt-1">✓ Available</p>
+                )}
               </div>
             </div>
 
@@ -354,11 +405,11 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onGoToLogin }) => {
 
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || Boolean(successMessage)}
               className="w-full py-3 px-4 bg-[#00873E] hover:bg-[#007033] text-white font-bold text-sm rounded-xl shadow-xs transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
             >
               <CheckCircle2 className="w-4 h-4" />
-              <span>{isSubmitting ? 'Creating account...' : 'Complete Registration & Log In'}</span>
+              <span>{isSubmitting ? 'Creating account...' : 'Complete Registration'}</span>
             </button>
           </form>
 

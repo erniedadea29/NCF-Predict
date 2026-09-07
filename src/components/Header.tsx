@@ -6,10 +6,14 @@ import {
   Monitor,
   ChevronDown,
   LogOut,
-  Pencil
+  Pencil,
+  UserCog
 } from 'lucide-react';
 import { UserRole } from '../types';
 import { SchoolYearEditModal } from './SchoolYearEditModal';
+import { EditProfileModal } from './EditProfileModal';
+
+const STAFF_ROLES: UserRole[] = ['csc_adviser', 'dean', 'admin'];
 
 export const Header: React.FC = () => {
   const {
@@ -25,6 +29,7 @@ export const Header: React.FC = () => {
 
   const [roleMenuOpen, setRoleMenuOpen] = useState(false);
   const [isSyModalOpen, setIsSyModalOpen] = useState(false);
+  const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
 
   const getRoleBadge = (role: UserRole) => {
     switch (role) {
@@ -38,25 +43,35 @@ export const Header: React.FC = () => {
         return { label: 'Adviser', color: 'bg-emerald-100 text-emerald-800 border-emerald-300' };
       case 'dean':
         return { label: 'Admin', color: 'bg-rose-100 text-rose-800 border-rose-300' };
+      case 'admin':
+        return { label: 'System Admin', color: 'bg-rose-100 text-rose-800 border-rose-300' };
+      case 'cashier':
+        return { label: 'Cashier', color: 'bg-teal-100 text-teal-800 border-teal-300' };
       case 'student':
         return { label: 'Student', color: 'bg-slate-100 text-slate-800 border-slate-300' };
     }
   };
 
   const roleInfo = getRoleBadge(currentUser.role);
+  const isStaff = STAFF_ROLES.includes(currentUser.role);
 
-  // Role-aware navigation. Students get a limited, view-only nav.
+  // Role-aware navigation. Students get a limited, view-only nav; staff
+  // (adviser/dean/admin) additionally get a Manage Users tab.
   const fullNav = [
     { id: 'home', label: 'Home' },
     { id: 'transactions', label: 'Transactions' },
     { id: 'budget', label: 'Budget, Proposals & Reimbursement' },
+    { id: 'liquidation_reports', label: 'Liquidation Reports' },
     { id: 'saf_students', label: 'SAF & Students' },
     { id: 'events_attendance', label: 'Events & Penalties' },
-    { id: 'forecast', label: 'ML Forecast' }
+    { id: 'forecast', label: 'ML Forecast' },
+    ...(isStaff ? [{ id: 'manage_users', label: 'Manage Users' }] : [])
   ];
 
   const studentNav = [
     { id: 'student_portal', label: 'My Student Portal' },
+    { id: 'budget', label: 'Budget' },
+    { id: 'expenses', label: 'Expenses' },
     { id: 'events_attendance', label: 'Events & Penalties' }
   ];
 
@@ -137,6 +152,13 @@ export const Header: React.FC = () => {
 
                 <div className="p-1">
                   <button
+                    onClick={() => { setIsEditProfileOpen(true); setRoleMenuOpen(false); }}
+                    className="w-full text-left px-3 py-1.5 text-xs rounded-lg hover:bg-slate-50 text-slate-700 font-semibold flex items-center gap-2 transition cursor-pointer"
+                  >
+                    <UserCog className="w-3.5 h-3.5 text-slate-500" />
+                    <span>Edit Profile</span>
+                  </button>
+                  <button
                     onClick={() => { logoutUser(); setRoleMenuOpen(false); }}
                     className="w-full text-left px-3 py-1.5 text-xs rounded-lg hover:bg-rose-50 text-rose-700 font-semibold flex items-center gap-2 transition cursor-pointer"
                   >
@@ -170,6 +192,7 @@ export const Header: React.FC = () => {
       </div>
 
       <SchoolYearEditModal isOpen={isSyModalOpen} onClose={() => setIsSyModalOpen(false)} />
+      <EditProfileModal isOpen={isEditProfileOpen} onClose={() => setIsEditProfileOpen(false)} />
     </header>
   );
 };

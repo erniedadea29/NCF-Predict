@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { X, Upload, Check, DollarSign, FileText, Receipt, ArrowRight } from 'lucide-react';
+import { ReceiptUploadField, UploadedReceipt } from './ReceiptUploadField';
 
 interface BudgetRequestExpensesModalProps {
   proposalId: string | null;
@@ -19,7 +20,7 @@ export const BudgetRequestExpensesModal: React.FC<BudgetRequestExpensesModalProp
   // Cashout Form State
   const [cashoutAmount, setCashoutAmount] = useState('');
   const [cashoutPurpose, setCashoutPurpose] = useState('');
-  const [proofFileName, setProofFileName] = useState('Official_Dean_Approved_Letter.pdf');
+  const [cashoutReceipt, setCashoutReceipt] = useState<UploadedReceipt | null>(null);
   const [proofDocType, setProofDocType] = useState('Letter');
 
   // Expense Form State
@@ -27,7 +28,7 @@ export const BudgetRequestExpensesModal: React.FC<BudgetRequestExpensesModalProp
   const [expenseCategory, setExpenseCategory] = useState('Materials & Supplies');
   const [expenseAmount, setExpenseAmount] = useState('');
   const [invoiceNumber, setInvoiceNumber] = useState(`INV-${Math.floor(10000 + Math.random() * 90000)}`);
-  const [expenseReceiptName, setExpenseReceiptName] = useState('Official_Receipt_Scanned.jpg');
+  const [expenseReceipt, setExpenseReceipt] = useState<UploadedReceipt | null>(null);
 
   if (!isOpen || !proposalId) return null;
 
@@ -54,15 +55,16 @@ export const BudgetRequestExpensesModal: React.FC<BudgetRequestExpensesModalProp
 
     requestCashout(targetProposal.id, num, cashoutPurpose.trim() || `Disbursal for ${targetProposal.budget_title}`, [
       {
-        name: proofFileName,
+        name: cashoutReceipt?.name || 'No document attached',
         type: proofDocType,
-        url: '#',
+        url: cashoutReceipt?.url || '#',
         date: new Date().toISOString().slice(0, 10)
       }
     ]);
 
     setCashoutAmount('');
     setCashoutPurpose('');
+    setCashoutReceipt(null);
     onClose();
   };
 
@@ -79,14 +81,15 @@ export const BudgetRequestExpensesModal: React.FC<BudgetRequestExpensesModalProp
     }
 
     addExpense(targetProposal.id, expenseDesc.trim(), expenseCategory, num, {
-      name: expenseReceiptName,
+      name: expenseReceipt?.name || 'No receipt attached',
       type: 'Invoice / Receipt',
-      url: '#',
+      url: expenseReceipt?.url || '#',
       invoice_number: invoiceNumber
     });
 
     setExpenseDesc('');
     setExpenseAmount('');
+    setExpenseReceipt(null);
     onClose();
   };
 
@@ -162,34 +165,27 @@ export const BudgetRequestExpensesModal: React.FC<BudgetRequestExpensesModalProp
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                    Proof Document Type
-                  </label>
-                  <select
-                    value={proofDocType}
-                    onChange={(e) => setProofDocType(e.target.value)}
-                    className="w-full px-3 py-2 text-xs bg-slate-50 rounded-xl border border-slate-200"
-                  >
-                    <option value="Letter">Approval Letter / Endorsement</option>
-                    <option value="Billing">Supplier Billing Statement</option>
-                    <option value="Invoice">Proforma Invoice</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                    Attached Document Reference
-                  </label>
-                  <input
-                    type="text"
-                    value={proofFileName}
-                    onChange={(e) => setProofFileName(e.target.value)}
-                    className="w-full px-3 py-2 text-xs bg-slate-50 rounded-xl border border-slate-200"
-                  />
-                </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  Proof Document Type
+                </label>
+                <select
+                  value={proofDocType}
+                  onChange={(e) => setProofDocType(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 rounded-xl border border-slate-200"
+                >
+                  <option value="Letter">Approval Letter / Endorsement</option>
+                  <option value="Billing">Supplier Billing Statement</option>
+                  <option value="Invoice">Proforma Invoice</option>
+                </select>
               </div>
+
+              <ReceiptUploadField
+                label="Attached Document (scan or photo)"
+                pathPrefix={`${targetProposal.department}/${targetProposal.id}`}
+                value={cashoutReceipt}
+                onChange={setCashoutReceipt}
+              />
 
               <div className="pt-3">
                 <button
@@ -252,32 +248,25 @@ export const BudgetRequestExpensesModal: React.FC<BudgetRequestExpensesModalProp
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                    Official Receipt / Invoice #
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={invoiceNumber}
-                    onChange={(e) => setInvoiceNumber(e.target.value)}
-                    className="w-full px-3 py-2 text-xs bg-slate-50 rounded-xl border border-slate-200 font-mono"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                    Proof Attachment File
-                  </label>
-                  <input
-                    type="text"
-                    value={expenseReceiptName}
-                    onChange={(e) => setExpenseReceiptName(e.target.value)}
-                    className="w-full px-3 py-2 text-xs bg-slate-50 rounded-xl border border-slate-200 font-mono"
-                  />
-                </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  Official Receipt / Invoice #
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={invoiceNumber}
+                  onChange={(e) => setInvoiceNumber(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 rounded-xl border border-slate-200 font-mono"
+                />
               </div>
+
+              <ReceiptUploadField
+                label="Proof Attachment (scan or photo)"
+                pathPrefix={`${targetProposal.department}/${targetProposal.id}`}
+                value={expenseReceipt}
+                onChange={setExpenseReceipt}
+              />
 
               <div className="pt-3">
                 <button

@@ -1,52 +1,53 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-// Safe retrieval of credentials from environment or localStorage
-const getSupabaseConfig = () => {
-  const envUrl = (import.meta as any).env?.VITE_SUPABASE_URL;
-  const envKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY;
-  
-  const savedUrl = typeof window !== 'undefined' ? localStorage.getItem('ncf_supabase_url') : null;
-  const savedKey = typeof window !== 'undefined' ? localStorage.getItem('ncf_supabase_key') : null;
-
-  return {
-    url: savedUrl || envUrl || 'https://mock-ncf-predict.supabase.co',
-    key: savedKey || envKey || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.mock-key',
-    isConfigured: Boolean((savedUrl || envUrl) && (savedKey || envKey))
-  };
-};
+// Credentials come from .env (see .env.example) and point at the NCF Predict
+// Supabase project (https://crldynueekbzdirietkq.supabase.co). No localStorage
+// override and no mock fallback here — this always talks to that one project.
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 export const isSupabaseLiveConfigured = (): boolean => {
-  const { isConfigured, url } = getSupabaseConfig();
-  return isConfigured && !url.includes('mock-ncf-predict');
+  return Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
 };
+
+if (!isSupabaseLiveConfigured()) {
+  console.warn(
+    '[supabaseClient] VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY are not set. ' +
+    'Copy .env.example to .env and fill them in to connect to Supabase.'
+  );
+}
 
 let supabaseInstance: SupabaseClient | null = null;
 
 export const getSupabase = (): SupabaseClient => {
   if (!supabaseInstance) {
-    const { url, key } = getSupabaseConfig();
-    try {
-      supabaseInstance = createClient(url, key, {
+    supabaseInstance = createClient(
+      SUPABASE_URL || 'https://placeholder.invalid',
+      SUPABASE_ANON_KEY || 'placeholder-anon-key',
+      {
         auth: {
           persistSession: true,
           autoRefreshToken: true,
-        }
-      });
-    } catch {
-      supabaseInstance = createClient('https://mock-ncf-predict.supabase.co', 'mock-key');
-    }
+        },
+      }
+    );
   }
   return supabaseInstance;
 };
 
-export const updateSupabaseCredentials = (url: string, key: string) => {
-  if (typeof window !== 'undefined') {
-    localStorage.setItem('ncf_supabase_url', url);
-    localStorage.setItem('ncf_supabase_key', key);
-    try {
-      supabaseInstance = createClient(url, key);
-    } catch (e) {
-      console.error('Failed to initialize Supabase client with new credentials', e);
+// A fresh, throwaway client with no persisted session — used only for
+// "an already-logged-in staff member creates a new account for someone
+// else" (calling supabase.auth.signUp on the shared singleton client would
+// replace the caller's own session with the new user's).
+export const getIsolatedSupabase = (): SupabaseClient => {
+  return createClient(
+    SUPABASE_URL || 'https://placeholder.invalid',
+    SUPABASE_ANON_KEY || 'placeholder-anon-key',
+    {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      },
     }
-  }
+  );
 };

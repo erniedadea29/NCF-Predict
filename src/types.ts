@@ -13,13 +13,15 @@ export interface DepartmentInfo {
   usedPercentage: number;
 }
 
-export type UserRole = 
+export type UserRole =
   | 'officer_treasurer'      // Role 1: Treasurer (Draft, Line Items, SAF Cash-in)
   | 'officer_governor'       // Role 2: Governor/Vice Gov - Executive Committee (Review)
   | 'council_member'         // Role 3: Council Members (Resolution/Voting/Comment notes)
   | 'csc_adviser'            // Role 4: Student Council Advisers (Approval)
   | 'dean'                   // Role 5: Dean (Approval/Fund Release/Overall)
-  | 'student';               // Student (View SAF, Attendance, Penalties)
+  | 'student'                // Student (View SAF, Attendance, Penalties)
+  | 'admin'                  // System Administrator (full access, mirrors Supabase profiles.role)
+  | 'cashier';                // SAF Cashier (collect/verify SAF payments, additive alongside treasurer)
 
 export interface User {
   id: string;
@@ -33,9 +35,31 @@ export interface User {
   year_level?: string;
   section?: string;
   avatar?: string;
-  password?: string;
   contact_number?: string;
   registered_at?: string;
+  is_active?: boolean;
+}
+
+export interface UserAccountSummary {
+  id: string;
+  full_name: string;
+  email: string;
+  role: UserRole;
+  department?: DepartmentCode;
+  is_active: boolean;
+}
+
+export interface ClearanceRecord {
+  id: string;
+  student_id: string;
+  semester_id?: string;
+  clearance_code: string;
+  saf_paid: boolean;
+  unpaid_penalties_count: number;
+  unpaid_penalties_amount: number;
+  status: 'CLEARED' | 'HOLD';
+  generated_by?: string;
+  generated_at: string;
 }
 
 export interface SchoolYear {
@@ -116,9 +140,11 @@ export interface DepartmentTransaction {
   amount: number;
   type: 'INCOME' | 'EXPENSE';
   is_archived: boolean;
-  status: 'Completed' | 'Pending' | 'Processing';
+  status: 'Completed' | 'Pending' | 'Processing' | 'Rejected';
   reference_code: string;
   description?: string;
+  reviewed_by?: string;
+  reviewed_at?: string;
 }
 
 export interface SchoolEvent {
@@ -232,7 +258,7 @@ export interface ReimbursementRecord {
   budget_id: string;
   amount_spent: number;
   date_submitted: string;
-  reimbursement_status: 'Pending' | 'Approved' | 'Paid';
+  reimbursement_status: 'Pending' | 'Approved' | 'Paid' | 'Rejected';
   remarks: string;
   officer_name: string;
   receipt_ref: string;

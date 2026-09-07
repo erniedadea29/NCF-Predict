@@ -46,14 +46,15 @@ export const BudgetProposalWorkflow: React.FC<BudgetProposalWorkflowProps> = ({
     userDepartment,
     isDepartmentRestricted,
     scopedDepartmentInfo,
-    currentUser, 
-    activeSemester, 
+    currentUser,
+    activeSemester,
     submitProposalForReview,
     executiveReviewProposal,
     voteOnProposal,
     addProposalNote,
     adviserApproveProposal,
-    deanApproveProposal
+    deanApproveProposal,
+    isReadOnlyStudent
   } = useApp();
 
   const displayProposals = isDepartmentRestricted ? scopedProposals : proposals;
@@ -109,15 +110,17 @@ export const BudgetProposalWorkflow: React.FC<BudgetProposalWorkflowProps> = ({
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={onOpenCreateProposal}
-            className="flex items-center gap-1.5 px-4 py-2 bg-[#00873E] hover:bg-[#007033] text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            <span>+ Draft New Proposal</span>
-          </button>
-        </div>
+        {!isReadOnlyStudent && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onOpenCreateProposal}
+              className="flex items-center gap-1.5 px-4 py-2 bg-[#00873E] hover:bg-[#007033] text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>+ Draft New Proposal</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Active Role Perspective Bar */}
@@ -149,12 +152,14 @@ export const BudgetProposalWorkflow: React.FC<BudgetProposalWorkflowProps> = ({
               <div className="text-center py-8 px-3 bg-slate-50 rounded-xl border border-dashed border-slate-200 space-y-2">
                 <FileText className="w-8 h-8 text-slate-300 mx-auto" />
                 <p className="text-xs text-slate-500 font-medium">No proposals drafted yet for {userDepartment}.</p>
-                <button
-                  onClick={onOpenCreateProposal}
-                  className="px-3 py-1.5 bg-[#00873E] text-white text-xs font-bold rounded-lg shadow-xs cursor-pointer hover:bg-[#007033]"
-                >
-                  + Draft {userDepartment} Proposal
-                </button>
+                {!isReadOnlyStudent && (
+                  <button
+                    onClick={onOpenCreateProposal}
+                    className="px-3 py-1.5 bg-[#00873E] text-white text-xs font-bold rounded-lg shadow-xs cursor-pointer hover:bg-[#007033]"
+                  >
+                    + Draft {userDepartment} Proposal
+                  </button>
+                )}
               </div>
             ) : (
               <div className="space-y-2 max-h-[600px] overflow-y-auto pr-1">
@@ -473,7 +478,7 @@ export const BudgetProposalWorkflow: React.FC<BudgetProposalWorkflowProps> = ({
                 )}
 
                 {/* Post-Approval Financial Flow Actions (Budget Requests, Expenses, Reimbursements, Liquidation, Return) */}
-                {activeProposal.budget_status === 'APPROVED_RELEASED' && (
+                {!isReadOnlyStudent && activeProposal.budget_status === 'APPROVED_RELEASED' && (
                   <div className="p-4 bg-slate-900 text-white rounded-2xl space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-xs text-emerald-400 flex items-center gap-1.5">
@@ -545,24 +550,26 @@ export const BudgetProposalWorkflow: React.FC<BudgetProposalWorkflowProps> = ({
                   ))}
                 </div>
 
-                {/* Add Note Form */}
-                <form onSubmit={handleAddNote} className="flex gap-2">
-                  <input
-                    type="text"
-                    required
-                    placeholder="Type note or remark (e.g. KUNG MAY NOTES KAMO IDAGDAG INI SA NOTES...)"
-                    value={newComment}
-                    onChange={(e) => setNewComment(e.target.value)}
-                    className="flex-1 px-3.5 py-2 text-xs bg-slate-50 focus:bg-white rounded-xl border border-slate-200 focus:outline-emerald-500 font-medium"
-                  />
-                  <button
-                    type="submit"
-                    className="px-4 py-2 bg-[#00873E] hover:bg-[#007033] text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer flex items-center gap-1"
-                  >
-                    <Send className="w-3.5 h-3.5" />
-                    <span>Add Note</span>
-                  </button>
-                </form>
+                {/* Add Note Form — students see the notes above read-only */}
+                {!isReadOnlyStudent && (
+                  <form onSubmit={handleAddNote} className="flex gap-2">
+                    <input
+                      type="text"
+                      required
+                      placeholder="Type note or remark (e.g. KUNG MAY NOTES KAMO IDAGDAG INI SA NOTES...)"
+                      value={newComment}
+                      onChange={(e) => setNewComment(e.target.value)}
+                      className="flex-1 px-3.5 py-2 text-xs bg-slate-50 focus:bg-white rounded-xl border border-slate-200 focus:outline-emerald-500 font-medium"
+                    />
+                    <button
+                      type="submit"
+                      className="px-4 py-2 bg-[#00873E] hover:bg-[#007033] text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer flex items-center gap-1"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      <span>Add Note</span>
+                    </button>
+                  </form>
+                )}
               </div>
             </div>
           </div>

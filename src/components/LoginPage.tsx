@@ -17,7 +17,7 @@ interface LoginPageProps {
 }
 
 export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
-  const { loginUser, users } = useApp();
+  const { loginUser } = useApp();
 
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
@@ -25,7 +25,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
@@ -33,24 +33,17 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
       setError('Please enter your Email Address or Student/Officer ID.');
       return;
     }
+    if (!password) {
+      setError('Please enter your password.');
+      return;
+    }
 
     setIsLoading(true);
-    // Simulate a real network round-trip so the flow feels like an actual login request.
-    setTimeout(() => {
-      const res = loginUser(identifier.trim(), password);
-      setIsLoading(false);
-      if (!res.success) {
-        setError(res.message);
-      }
-    }, 350);
-  };
-
-  const handleQuickLogin = (email: string) => {
-    setError('');
-    setIdentifier(email);
-    setPassword('');
-    const res = loginUser(email);
-    if (!res.success) setError(res.message);
+    const res = await loginUser(identifier.trim(), password);
+    setIsLoading(false);
+    if (!res.success) {
+      setError(res.message);
+    }
   };
 
   return (
@@ -163,27 +156,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
             </button>
           </div>
 
-          <div className="pt-5 mt-5 border-t border-slate-200">
-            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Quick Demo Accounts</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {users.slice(0, 4).map(u => (
-                <button
-                  key={u.id}
-                  type="button"
-                  onClick={() => handleQuickLogin(u.email)}
-                  className="p-2.5 rounded-xl border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/60 transition text-left flex items-center gap-2.5 cursor-pointer bg-slate-50/50"
-                >
-                  <div className="w-7 h-7 rounded-lg bg-[#00873E] text-white font-bold flex items-center justify-center text-xs shrink-0">
-                    {u.name.charAt(0)}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="font-bold text-slate-800 text-xs truncate">{u.name}</p>
-                    <p className="text-[10px] text-slate-500 truncate">{u.officer_position || u.role}</p>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
         </div>
       </div>
     </div>

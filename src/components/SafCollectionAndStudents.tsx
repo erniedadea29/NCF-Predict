@@ -6,21 +6,24 @@ import {
   DepartmentCode 
 } from '../types';
 import { DEPARTMENTS } from '../data/mockData';
-import { 
-  Receipt, 
-  Search, 
-  Plus, 
-  CheckCircle2, 
-  Clock, 
-  CreditCard, 
-  DollarSign, 
-  Printer, 
-  UserCheck, 
+import {
+  Receipt,
+  Search,
+  Plus,
+  CheckCircle2,
+  Clock,
+  CreditCard,
+  DollarSign,
+  Printer,
+  UserCheck,
   ArrowRight,
   Filter,
   UserPlus,
   FileText,
-  AlertCircle
+  AlertCircle,
+  ShieldCheck,
+  ShieldAlert,
+  RefreshCw
 } from 'lucide-react';
 
 interface SafCollectionAndStudentsProps {
@@ -28,21 +31,24 @@ interface SafCollectionAndStudentsProps {
 }
 
 export const SafCollectionAndStudents: React.FC<SafCollectionAndStudentsProps> = () => {
-  const { 
-    students, 
-    safRecords, 
+  const {
+    students,
+    safRecords,
     scopedStudents,
     scopedSafRecords,
     userDepartment,
     isDepartmentRestricted,
     scopedDepartmentInfo,
-    recordSafPayment, 
-    addStudent, 
-    activeSemester, 
-    currentUser
+    recordSafPayment,
+    addStudent,
+    activeSemester,
+    currentUser,
+    clearances,
+    generateClearance
   } = useApp();
 
-  const [activeSubTab, setActiveSubTab] = useState<'saf_ledger' | 'students_dir' | 'new_student'>('saf_ledger');
+  const [activeSubTab, setActiveSubTab] = useState<'saf_ledger' | 'students_dir' | 'new_student' | 'clearances'>('saf_ledger');
+  const [generatingFor, setGeneratingFor] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [deptFilter, setDeptFilter] = useState<DepartmentCode | 'ALL'>(() => isDepartmentRestricted ? userDepartment : 'ALL');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'PAID' | 'UNPAID'>('ALL');
@@ -119,6 +125,12 @@ export const SafCollectionAndStudents: React.FC<SafCollectionAndStudentsProps> =
     setNewLastName('');
     setNewEmail('');
     setActiveSubTab('saf_ledger');
+  };
+
+  const handleGenerateClearance = async (studentId: string) => {
+    setGeneratingFor(studentId);
+    await generateClearance(studentId);
+    setGeneratingFor(null);
   };
 
   const printOfficialReceipt = (rec: SAFRecord) => {
@@ -250,6 +262,15 @@ Thank you for supporting student council activities & projects.
           }`}
         >
           + Enroll {isDepartmentRestricted ? userDepartment : 'New'} Student
+        </button>
+
+        <button
+          onClick={() => setActiveSubTab('clearances')}
+          className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+            activeSubTab === 'clearances' ? 'bg-[#00873E] text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          SAF Clearance
         </button>
       </div>
 
@@ -563,6 +584,77 @@ Thank you for supporting student council activities & projects.
               Enroll Student & Initialize SAF Record (₱250.00)
             </button>
           </form>
+        </div>
+      )}
+
+      {/* TAB 4: SAF CLEARANCE */}
+      {activeSubTab === 'clearances' && (
+        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">
+          <div>
+            <h3 className="text-base font-bold text-slate-900">SAF Clearance Status</h3>
+            <p className="text-xs text-slate-500">
+              Cleared = SAF fully paid AND no unpaid event penalties. This is the same record a future graduation/enrollment
+              clearance check would read from.
+            </p>
+          </div>
+
+          {displayStudents.length === 0 ? (
+            <div className="text-center py-8 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+              <p className="text-xs text-slate-500 font-medium">No students to clear yet.</p>
+            </div>
+          ) : (
+            <div className="border border-slate-200 rounded-xl overflow-hidden">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200">
+                  <tr>
+                    <th className="py-2.5 px-3">Student</th>
+                    <th className="py-2.5 px-3">Clearance Code</th>
+                    <th className="py-2.5 px-3 text-center">Status</th>
+                    <th className="py-2.5 px-3 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {displayStudents.map(stud => {
+                    const record = clearances.find(c => c.student_id === stud.id);
+                    return (
+                      <tr key={stud.id} className="hover:bg-slate-50/80 transition">
+                        <td className="py-2.5 px-3">
+                          <p className="font-bold text-slate-900">{stud.first_name} {stud.last_name}</p>
+                          <p className="text-[11px] font-mono text-slate-500">{stud.student_number}</p>
+                        </td>
+                        <td className="py-2.5 px-3 font-mono text-[11px] text-slate-600">
+                          {record?.clearance_code || 'Not generated yet'}
+                        </td>
+                        <td className="py-2.5 px-3 text-center">
+                          {!record ? (
+                            <span className="text-[10px] text-slate-400">—</span>
+                          ) : record.status === 'CLEARED' ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                              <ShieldCheck className="w-3 h-3" /> Cleared
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-100 text-rose-800 border border-rose-300">
+                              <ShieldAlert className="w-3 h-3" /> Hold ({record.unpaid_penalties_count} unpaid)
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-3 text-right">
+                          <button
+                            onClick={() => handleGenerateClearance(stud.id)}
+                            disabled={generatingFor === stud.id}
+                            className="flex items-center gap-1 ml-auto px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-bold transition cursor-pointer disabled:opacity-50"
+                          >
+                            <RefreshCw className={`w-3.5 h-3.5 ${generatingFor === stud.id ? 'animate-spin' : ''}`} />
+                            {record ? 'Refresh' : 'Generate'}
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 
