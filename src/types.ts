@@ -263,7 +263,7 @@ export interface ProposalNote {
   author_id: string;
   author_name: string;
   author_role: string;
-  note_content: string; // "KUNG MAY NOTES KAMO IDAGDAG INI SA NOTES"
+  note_content: string;
   created_at: string;
   is_official: boolean;
 }

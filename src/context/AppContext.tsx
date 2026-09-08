@@ -2081,7 +2081,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       );
     }
 
-    const initialNoteContent = proposalData.treasurer_notes || 'KUNG MAY NOTES KAMO IDAGDAG INI SA NOTES: Draft budget proposal created.';
+    const initialNoteContent = proposalData.treasurer_notes || 'Draft budget proposal created.';
     if (currentUser.id !== 'guest') {
       await client.from('proposal_notes').insert({
         proposal_id: row.id,

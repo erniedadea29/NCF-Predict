@@ -1,26 +1,17 @@
 import React, { useState } from 'react';
+import { jsPDF } from 'jspdf';
 import { useApp } from '../context/AppContext';
-import { 
-  Student, 
-  SAFRecord, 
-  DepartmentCode 
+import {
+  SAFRecord,
+  DepartmentCode
 } from '../types';
 import { DEPARTMENTS } from '../data/mockData';
 import {
   Receipt,
   Search,
-  Plus,
   CheckCircle2,
   Clock,
-  CreditCard,
-  DollarSign,
   Printer,
-  UserCheck,
-  ArrowRight,
-  Filter,
-  UserPlus,
-  FileText,
-  AlertCircle,
   ShieldCheck,
   ShieldAlert,
   RefreshCw
@@ -40,7 +31,6 @@ export const SafCollectionAndStudents: React.FC<SafCollectionAndStudentsProps> =
     isDepartmentRestricted,
     scopedDepartmentInfo,
     recordSafPayment,
-    addStudent,
     activeSemester,
     currentUser,
     clearances,
@@ -48,26 +38,18 @@ export const SafCollectionAndStudents: React.FC<SafCollectionAndStudentsProps> =
     isViewOnlyReviewer
   } = useApp();
 
-  const [activeSubTab, setActiveSubTab] = useState<'saf_ledger' | 'students_dir' | 'new_student' | 'clearances'>('saf_ledger');
+  // Students land in the SAF ledger automatically the moment they register
+  // under a course (create_student_with_saf runs during registration) —
+  // there's no manual "Enroll Student" step here any more.
+  const [activeSubTab, setActiveSubTab] = useState<'saf_ledger' | 'students_dir' | 'clearances'>('saf_ledger');
   const [generatingFor, setGeneratingFor] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [deptFilter, setDeptFilter] = useState<DepartmentCode | 'ALL'>(() => isDepartmentRestricted ? userDepartment : 'ALL');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'PAID' | 'UNPAID'>('ALL');
 
-  // Selected SAF record for payment modal
+  // Selected SAF record for payment modal — Cash-only (Section 9)
   const [payingSafRecord, setPayingSafRecord] = useState<SAFRecord | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'Online / Bank' | 'G-Cash'>('Cash');
   const [paymentNotes, setPaymentNotes] = useState('');
-
-  // New student form state
-  const [newStudNumber, setNewStudNumber] = useState('');
-  const [newFirstName, setNewFirstName] = useState('');
-  const [newLastName, setNewLastName] = useState('');
-  const [newCourse, setNewCourse] = useState(userDepartment === 'CAF' ? 'BS Accountancy' : 'BS Information Technology');
-  const [newYearLvl, setNewYearLvl] = useState('1st Year');
-  const [newSection, setNewSection] = useState(userDepartment === 'CAF' ? 'BSA-1A' : 'BSIT-1A');
-  const [newEmail, setNewEmail] = useState('');
-  const [newDept, setNewDept] = useState<DepartmentCode>(userDepartment);
 
   // Filter SAF Records
   const baseSaf = isDepartmentRestricted ? scopedSafRecords : safRecords;
@@ -95,37 +77,9 @@ export const SafCollectionAndStudents: React.FC<SafCollectionAndStudentsProps> =
   const handleProcessPayment = (e: React.FormEvent) => {
     e.preventDefault();
     if (!payingSafRecord) return;
-    recordSafPayment(payingSafRecord.id, paymentMethod, paymentNotes);
+    recordSafPayment(payingSafRecord.id, 'Cash', paymentNotes);
     setPayingSafRecord(null);
     setPaymentNotes('');
-  };
-
-  const handleCreateStudent = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newStudNumber.trim() || !newFirstName.trim() || !newLastName.trim()) {
-      alert('Please fill in all required student details.');
-      return;
-    }
-
-    addStudent({
-      student_number: newStudNumber.trim(),
-      first_name: newFirstName.trim(),
-      last_name: newLastName.trim(),
-      course: newCourse,
-      year_level: newYearLvl,
-      section: newSection,
-      email: newEmail.trim() || `${newStudNumber.trim().replace('-', '')}@gbox.ncf.edu.ph`,
-      department: isDepartmentRestricted ? userDepartment : newDept,
-      activesem_id: activeSemester.id,
-      school_year: activeSemester.school_year_label
-    });
-
-    // Reset & switch to ledger
-    setNewStudNumber('');
-    setNewFirstName('');
-    setNewLastName('');
-    setNewEmail('');
-    setActiveSubTab('saf_ledger');
   };
 
   const handleGenerateClearance = async (studentId: string) => {
@@ -134,42 +88,79 @@ export const SafCollectionAndStudents: React.FC<SafCollectionAndStudentsProps> =
     setGeneratingFor(null);
   };
 
+  // Official SAF receipt as a real PDF (was a plain-text .txt download).
+  // Works regardless of whether an auto-generated copy already exists in
+  // Storage from Cash-In (see AppContext.buildSafReceiptPdf) — this always
+  // produces one on the spot from the record's own data.
   const printOfficialReceipt = (rec: SAFRecord) => {
-    const slip = `
-============================================================
-              NAGA COLLEGE FOUNDATION (NCF)
-         STUDENT ACTIVITY FUND (SAF) CASH RECEIPT
-============================================================
-Official Receipt #: ${rec.receipt_no || 'PENDING'}
-Date: ${rec.payment_date || new Date().toLocaleString()}
-School Year: ${rec.school_year} • Semester: ${activeSemester.semester_name}
-------------------------------------------------------------
-Student Number : ${rec.student_number}
-Student Name   : ${rec.student_name}
-Course & Year  : ${rec.course} - ${rec.year_level}
-Section        : ${rec.section}
-Department     : ${rec.department} (${DEPARTMENTS[rec.department]?.name})
-------------------------------------------------------------
-Credit : ${rec.double_entry.credit_account} - ₱${rec.amount.toFixed(2)}
-------------------------------------------------------------
-Payment Method : ${rec.payment_method || 'Cash'}
-Amount Paid    : ₱${rec.amount.toFixed(2)} PHP
-Status         : PAID & VALIDATED FOR EXAMINATION CLEARANCE
-Collected By   : ${rec.collected_by}
-Notes          : ${rec.notes || 'Enrollment SAF clearance granted'}
-============================================================
-Thank you for supporting student council activities & projects.
-`;
+    const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const centerX = pageWidth / 2;
+    let y = 60;
 
-    const blob = new Blob([slip], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `NCF_SAF_Receipt_${rec.student_number}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.text('NAGA COLLEGE FOUNDATION (NCF)', centerX, y, { align: 'center' });
+    y += 18;
+    doc.setFontSize(11);
+    doc.text('Supreme Student Council — Student Activity Fund (SAF)', centerX, y, { align: 'center' });
+    y += 12;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.text('Official Cash Receipt', centerX, y, { align: 'center' });
+    y += 20;
+    doc.setDrawColor(0, 135, 62);
+    doc.setLineWidth(1.5);
+    doc.line(60, y, pageWidth - 60, y);
+    y += 30;
+
+    const row = (label: string, value: string) => {
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.text(label, 70, y);
+      doc.setFont('helvetica', 'normal');
+      doc.text(value, 260, y);
+      y += 22;
+    };
+
+    row('Receipt No.:', rec.receipt_no || 'PENDING');
+    row('Date Issued:', rec.payment_date || new Date().toLocaleString());
+    row('School Year:', `${rec.school_year} • ${activeSemester.semester_name}`);
+    row('Student Name:', rec.student_name);
+    row('Student Number:', rec.student_number);
+    row('Course / Section:', `${rec.course} - ${rec.section} (${rec.year_level})`);
+    row('Department:', `${rec.department} (${DEPARTMENTS[rec.department]?.name || ''})`);
+    row('Payment Method:', rec.payment_method || 'Cash');
+    row('Reference No.:', rec.double_entry.reference_no);
+
+    y += 10;
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.5);
+    doc.line(60, y, pageWidth - 60, y);
+    y += 30;
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.text('CREDIT: Cash on Hand', 70, y);
+    doc.setFontSize(16);
+    doc.text(`Amount Paid: PHP ${rec.amount.toFixed(2)}`, 70, y + 24);
+    y += 60;
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.text('This receipt certifies that the above Student Activity Fund (SAF) payment has been', 70, y);
+    y += 14;
+    doc.text('received, validated for examination clearance, and recorded in the NCF Predict', 70, y);
+    y += 14;
+    doc.text('treasury ledger.', 70, y);
+    y += 30;
+    doc.text(`Collected by: ${rec.collected_by}`, 70, y);
+    y += 14;
+    doc.text(`Notes: ${rec.notes || 'Enrollment SAF clearance granted'}`, 70, y);
+    y += 20;
+    doc.text('Thank you for supporting student council activities & projects.', 70, y);
+
+    doc.save(`NCF_SAF_Receipt_${rec.student_number}.pdf`);
   };
 
   return (
@@ -185,18 +176,6 @@ Thank you for supporting student council activities & projects.
             <span className="font-bold text-slate-800">CREDIT: Cash on Hand</span> ({activeSemester.school_year_label})
           </p>
         </div>
-
-        {!isViewOnlyReviewer && (
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setActiveSubTab('new_student')}
-              className="flex items-center gap-1.5 px-3.5 py-2 bg-[#00873E] hover:bg-[#007033] text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer"
-            >
-              <UserPlus className="w-4 h-4" />
-              <span>+ Enroll Student</span>
-            </button>
-          </div>
-        )}
       </div>
 
       {/* SAF Double Entry Metric Cards */}
@@ -236,7 +215,7 @@ Thank you for supporting student council activities & projects.
         </div>
       </div>
 
-      {/* Sub Tabs: SAF Ledger vs Student Directory vs Register New Student */}
+      {/* Sub Tabs: Ledger vs Student Directory vs SAF Clearance */}
       <div className="flex border-b border-slate-200 bg-white rounded-2xl p-1 shadow-2xs">
         <button
           onClick={() => setActiveSubTab('saf_ledger')}
@@ -244,7 +223,7 @@ Thank you for supporting student council activities & projects.
             activeSubTab === 'saf_ledger' ? 'bg-[#00873E] text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
           }`}
         >
-          {isDepartmentRestricted ? `${userDepartment} SAF Ledger (${filteredSaf.length})` : `Detailed SAF Collection Ledger (${filteredSaf.length})`}
+          Ledger ({filteredSaf.length})
         </button>
 
         <button
@@ -253,19 +232,8 @@ Thank you for supporting student council activities & projects.
             activeSubTab === 'students_dir' ? 'bg-[#00873E] text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
           }`}
         >
-          {isDepartmentRestricted ? `${userDepartment} Students Directory (${displayStudents.length})` : `Student Master Directory (${students.length})`}
+          Student Directory ({displayStudents.length})
         </button>
-
-        {!isViewOnlyReviewer && (
-          <button
-            onClick={() => setActiveSubTab('new_student')}
-            className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer ${
-              activeSubTab === 'new_student' ? 'bg-[#00873E] text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            + Enroll {isDepartmentRestricted ? userDepartment : 'New'} Student
-          </button>
-        )}
 
         <button
           onClick={() => setActiveSubTab('clearances')}
@@ -423,9 +391,7 @@ Thank you for supporting student council activities & projects.
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-base font-bold text-slate-900">
-                  {isDepartmentRestricted ? `${userDepartment} - ${scopedDepartmentInfo.name} Students` : 'Enrolled Student Directory'}
-                </h3>
+                <h3 className="text-base font-bold text-slate-900">Student Directory</h3>
                 {isDepartmentRestricted && (
                   <span className="text-[10px] bg-blue-100 text-blue-900 font-bold px-1.5 py-0.5 rounded">
                     {userDepartment} ONLY
@@ -437,14 +403,9 @@ Thank you for supporting student council activities & projects.
           </div>
 
           {displayStudents.length === 0 ? (
-            <div className="text-center py-8 bg-slate-50 rounded-xl border border-dashed border-slate-200 space-y-2">
-              <p className="text-xs text-slate-500 font-medium">No students enrolled yet under {userDepartment}.</p>
-              <button
-                onClick={() => setActiveSubTab('new_student')}
-                className="px-3 py-1.5 bg-[#00873E] text-white text-xs font-bold rounded-lg shadow-xs cursor-pointer hover:bg-[#007033]"
-              >
-                + Enroll First {userDepartment} Student
-              </button>
+            <div className="text-center py-8 bg-slate-50 rounded-xl border border-dashed border-slate-200 space-y-1">
+              <p className="text-xs text-slate-500 font-medium">No students registered yet under {userDepartment}.</p>
+              <p className="text-[11px] text-slate-400">Students appear here automatically once they register for a course in this department.</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -477,122 +438,7 @@ Thank you for supporting student council activities & projects.
         </div>
       )}
 
-      {/* TAB 3: ENROLL NEW STUDENT */}
-      {activeSubTab === 'new_student' && !isViewOnlyReviewer && (
-        <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-xs max-w-2xl mx-auto space-y-5">
-          <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-            <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
-              <UserPlus className="w-4 h-4" />
-            </div>
-            <div>
-              <h3 className="font-extrabold text-slate-900 text-base">Enroll Student & Generate SAF Record</h3>
-              <p className="text-xs text-slate-500">School ID, Course, Section, Year Level, & Initial SAF Receivable</p>
-            </div>
-          </div>
-
-          <form onSubmit={handleCreateStudent} className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700">Student Number / School ID *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. 2024-00912"
-                  value={newStudNumber}
-                  onChange={(e) => setNewStudNumber(e.target.value)}
-                  className="w-full px-3 py-2 text-xs bg-slate-50 focus:bg-white rounded-xl border border-slate-200 font-bold"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700">Department *</label>
-                <select
-                  value={newDept}
-                  onChange={(e) => setNewDept(e.target.value as DepartmentCode)}
-                  className="w-full px-3 py-2 text-xs bg-slate-50 rounded-xl border border-slate-200 font-medium"
-                >
-                  {Object.keys(DEPARTMENTS).map(code => (
-                    <option key={code} value={code}>{code} - {DEPARTMENTS[code as DepartmentCode].name}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700">First Name *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="First name"
-                  value={newFirstName}
-                  onChange={(e) => setNewFirstName(e.target.value)}
-                  className="w-full px-3 py-2 text-xs bg-slate-50 rounded-xl border border-slate-200 font-medium"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700">Last Name *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Last name"
-                  value={newLastName}
-                  onChange={(e) => setNewLastName(e.target.value)}
-                  className="w-full px-3 py-2 text-xs bg-slate-50 rounded-xl border border-slate-200 font-medium"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700">Course</label>
-                <input
-                  type="text"
-                  required
-                  value={newCourse}
-                  onChange={(e) => setNewCourse(e.target.value)}
-                  className="w-full px-3 py-2 text-xs bg-slate-50 rounded-xl border border-slate-200"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700">Year Level</label>
-                <select
-                  value={newYearLvl}
-                  onChange={(e) => setNewYearLvl(e.target.value)}
-                  className="w-full px-3 py-2 text-xs bg-slate-50 rounded-xl border border-slate-200"
-                >
-                  <option value="1st Year">1st Year</option>
-                  <option value="2nd Year">2nd Year</option>
-                  <option value="3rd Year">3rd Year</option>
-                  <option value="4th Year">4th Year</option>
-                </select>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700">Section</label>
-                <input
-                  type="text"
-                  required
-                  value={newSection}
-                  onChange={(e) => setNewSection(e.target.value)}
-                  className="w-full px-3 py-2 text-xs bg-slate-50 rounded-xl border border-slate-200 font-mono"
-                />
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              className="w-full py-3 bg-[#00873E] hover:bg-[#007033] text-white text-xs font-bold rounded-2xl shadow-md transition cursor-pointer"
-            >
-              Enroll Student & Initialize SAF Record (₱500.00)
-            </button>
-          </form>
-        </div>
-      )}
-
-      {/* TAB 4: SAF CLEARANCE */}
+      {/* TAB 3: SAF CLEARANCE */}
       {activeSubTab === 'clearances' && (
         <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">
           <div>
@@ -689,21 +535,11 @@ Thank you for supporting student council activities & projects.
               </div>
 
               <div className="space-y-1">
-                <label className="font-bold text-slate-700">Payment Channel / Method</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {(['Cash', 'G-Cash', 'Online / Bank'] as const).map(m => (
-                    <button
-                      type="button"
-                      key={m}
-                      onClick={() => setPaymentMethod(m)}
-                      className={`py-2 rounded-xl text-xs font-bold border transition cursor-pointer ${
-                        paymentMethod === m ? 'bg-slate-900 text-white' : 'bg-white text-slate-700 border-slate-200'
-                      }`}
-                    >
-                      {m}
-                    </button>
-                  ))}
+                <label className="font-bold text-slate-700">Payment Method</label>
+                <div className="py-2 px-3 rounded-xl text-xs font-bold bg-slate-900 text-white text-center">
+                  Cash
                 </div>
+                <p className="text-[10px] text-slate-400">SAF payments are collected on a cash basis only.</p>
               </div>
 
               <div className="space-y-1">
@@ -718,7 +554,7 @@ Thank you for supporting student council activities & projects.
               </div>
 
               <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-[11px] font-mono text-emerald-900 space-y-0.5">
-                <p><strong>CREDIT:</strong> {paymentMethod === 'Cash' ? 'Cash on Hand (Treasury)' : 'Cash in Bank'}</p>
+                <p><strong>CREDIT:</strong> Cash on Hand (Treasury)</p>
               </div>
 
               <button

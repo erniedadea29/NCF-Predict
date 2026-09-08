@@ -164,11 +164,11 @@ export const PrintableProposalModal: React.FC<PrintableProposalModalProps> = ({ 
             </div>
           </div>
 
-          {/* Official Notes Section ("KUNG MAY NOTES KAMO IDAGDAG INI SA NOTES") */}
+          {/* Official Notes Section */}
           {proposal.notes && proposal.notes.length > 0 && (
             <div className="space-y-2 font-sans">
               <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800">
-                II. Council Remarks & Official Notes ("KUNG MAY NOTES KAMO IDAGDAG INI SA NOTES")
+                II. Council Remarks & Official Notes
               </h4>
               <div className="space-y-1.5 border border-slate-200 rounded-lg p-3 bg-amber-50/30 text-xs">
                 {proposal.notes.map((n) => (

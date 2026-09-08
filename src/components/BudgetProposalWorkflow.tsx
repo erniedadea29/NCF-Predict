@@ -523,12 +523,12 @@ export const BudgetProposalWorkflow: React.FC<BudgetProposalWorkflowProps> = ({
                 )}
               </div>
 
-              {/* Collaborative Notes & Comments Section ("KUNG MAY NOTES KAMO IDAGDAG INI SA NOTES") */}
+              {/* Collaborative Notes & Comments Section */}
               <div className="space-y-3 pt-3 border-t border-slate-100">
                 <div className="flex items-center justify-between">
                   <h4 className="text-xs font-black uppercase text-slate-800 tracking-wider flex items-center gap-1.5">
                     <MessageSquare className="w-4 h-4 text-amber-500" />
-                    Council Notes & Remarks ("KUNG MAY NOTES KAMO IDAGDAG INI SA NOTES")
+                    Council Notes & Remarks
                   </h4>
                   <span className="text-[11px] text-slate-400">{activeProposal.notes.length} Notes</span>
                 </div>
@@ -552,7 +552,7 @@ export const BudgetProposalWorkflow: React.FC<BudgetProposalWorkflowProps> = ({
                     <input
                       type="text"
                       required
-                      placeholder="Type note or remark (e.g. KUNG MAY NOTES KAMO IDAGDAG INI SA NOTES...)"
+                      placeholder="Type a note or remark..."
                       value={newComment}
                       onChange={(e) => setNewComment(e.target.value)}
                       className="flex-1 px-3.5 py-2 text-xs bg-slate-50 focus:bg-white rounded-xl border border-slate-200 focus:outline-emerald-500 font-medium"

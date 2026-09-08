@@ -1036,7 +1036,7 @@ export const MOCK_PROPOSALS: BudgetProposal[] = [
         author_id: 'usr_caf_governor',
         author_name: 'Gov. Rafael Mendoza',
         author_role: 'Governor',
-        note_content: 'KUNG MAY NOTES KAMO IDAGDAG INI SA NOTES: We coordinated with the Audio-Visual room to save on external projector rentals.',
+        note_content: 'We coordinated with the Audio-Visual room to save on external projector rentals.',
         created_at: '2024-08-23 03:15 PM',
         is_official: true
       }
@@ -1260,7 +1260,7 @@ export const MOCK_PROPOSALS: BudgetProposal[] = [
         author_id: 'usr_governor',
         author_name: 'Gov. Clarisse Mendoza',
         author_role: 'Governor',
-        note_content: 'KUNG MAY NOTES KAMO IDAGDAG INI SA NOTES: Paki-check po ang sound system rental baka pwede hiramin sa MIS office para makatipid.',
+        note_content: 'Paki-check po ang sound system rental baka pwede hiramin sa MIS office para makatipid.',
         created_at: '2024-08-22 02:40 PM',
         is_official: true
       },
@@ -1341,7 +1341,7 @@ export const MOCK_PROPOSALS: BudgetProposal[] = [
         author_id: 'usr_adviser',
         author_name: 'Prof. Ramon Villanueva',
         author_role: 'CSC Adviser',
-        note_content: 'KUNG MAY NOTES KAMO IDAGDAG INI SA NOTES: Ensure inventory property tags are stickered on all equipment upon delivery.',
+        note_content: 'Ensure inventory property tags are stickered on all equipment upon delivery.',
         created_at: '2024-08-17',
         is_official: true
       }
@@ -1499,7 +1499,7 @@ export const MOCK_PROPOSALS: BudgetProposal[] = [
         author_id: 'usr_treasurer',
         author_name: 'Ernie Dela Cruz',
         author_role: 'Treasurer',
-        note_content: 'KUNG MAY NOTES KAMO IDAGDAG INI SA NOTES: Scantron machine at registrar will be used without fee.',
+        note_content: 'Scantron machine at registrar will be used without fee.',
         created_at: '2024-08-21',
         is_official: true
       }

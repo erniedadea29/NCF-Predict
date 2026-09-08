@@ -23,7 +23,7 @@ export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({ isOpen
   const [description, setDescription] = useState('');
   const [department, setDepartment] = useState<DepartmentCode>(userDepartment);
   const [linkedSemester, setLinkedSemester] = useState<string>('');
-  const [treasurerNotes, setTreasurerNotes] = useState('KUNG MAY NOTES KAMO IDAGDAG INI SA NOTES: Verified unit costs against campus supplier price quotations.');
+  const [treasurerNotes, setTreasurerNotes] = useState('Verified unit costs against campus supplier price quotations.');
 
   // Line items for requirements & price evaluation
   const [lineItems, setLineItems] = useState<BudgetLineItem[]>([
@@ -334,11 +334,11 @@ export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({ isOpen
             </div>
           </div>
 
-          {/* Collaborative Notes Section ("KUNG MAY NOTES KAMO IDAGDAG INI SA NOTES") */}
+          {/* Collaborative Notes Section */}
           <div className="space-y-1.5 pt-2 border-t border-slate-100">
             <label className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
               <span className="px-2 py-0.5 bg-amber-100 text-amber-900 rounded text-[10px]">NOTES</span>
-              Initial Officer Notes ("KUNG MAY NOTES KAMO IDAGDAG INI SA NOTES")
+              Initial Officer Notes
             </label>
             <textarea
               rows={2}
