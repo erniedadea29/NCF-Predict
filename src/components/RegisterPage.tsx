@@ -88,7 +88,6 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onGoToLogin }) => {
   const [studentNumber, setStudentNumber] = useState('');
   const [department, setDepartment] = useState<DepartmentCode>('CAF');
   const [course, setCourse] = useState<string>(DEFAULT_COURSES.CAF[0]);
-  const [courseId, setCourseId] = useState<number | undefined>(undefined);
   const [yearLevel, setYearLevel] = useState<string>('1st Year');
   const [section, setSection] = useState<string>('CAF-1A');
   const [password, setPassword] = useState('');
@@ -112,10 +111,12 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onGoToLogin }) => {
   }, [courses, department]);
 
   const takenSlotKeyForType: Record<string, string> = { adviser: 'adviser', dean: 'dean', admin: 'admin' };
-  const isCourseTakenForRole = (cId: number) => {
+  // Staff (Admin/Dean/Adviser) no longer pick a course — they're scoped to
+  // their whole Department instead, so uniqueness is checked at that level.
+  const isDeptTakenForRole = () => {
     const slotKey = takenSlotKeyForType[accountType];
     if (!slotKey) return false;
-    return takenRoleSlots.some(s => s.course_id === cId && s.slot_key === slotKey);
+    return takenRoleSlots.some(s => s.department_code === department && s.slot_key === slotKey);
   };
 
   const checkStudentIdAvailability = async (value: string) => {
@@ -132,13 +133,11 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onGoToLogin }) => {
 
   const handleAccountTypeChange = (type: AccountType) => {
     setAccountType(type);
-    setCourseId(undefined);
     setError('');
   };
 
   const handleDepartmentChange = (dept: DepartmentCode) => {
     setDepartment(dept);
-    setCourseId(undefined);
     const defaults = DEFAULT_COURSES[dept];
     if (defaults?.length) setCourse(defaults[0]);
     setSection(`${dept}-1A`);
@@ -166,8 +165,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onGoToLogin }) => {
     if (isStaffType) {
       if (isGbox) { setError('Admin, Dean, and Adviser accounts must use an @ncf.edu.ph email address, not @gbox.ncf.edu.ph.'); return; }
       if (!isNcf) { setError('Admin, Dean, and Adviser accounts must use an @ncf.edu.ph email address.'); return; }
-      if (!courseId) { setError('Please select which course you are registering for.'); return; }
-      if (isCourseTakenForRole(courseId)) { setError(`That course already has a registered ${meta.label} this school year.`); return; }
+      if (isDeptTakenForRole()) { setError(`That department already has a registered ${meta.label} this school year.`); return; }
     }
     if (!password || password.length < 6) {
       setError('Please enter a password of at least 6 characters.');
@@ -192,7 +190,6 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onGoToLogin }) => {
       email: cleanEmail,
       role: meta.role,
       department,
-      course_id: courseId,
       student_number: accountType === 'student' ? (studentNumber.trim() || undefined) : undefined,
       officer_position: meta.label,
       course: accountType === 'student' ? course : undefined,
@@ -289,40 +286,30 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onGoToLogin }) => {
               </div>
             </div>
 
-            {/* Course — for staff roles, this IS the scoping unit (one
-                Admin/Dean/Adviser slot per course per school year); taken
-                combinations are disabled. For students it's just their
-                program. */}
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Course / Program *</label>
-              <select
-                value={isStaffType ? (courseId ?? '') : course}
-                onChange={(e) => {
-                  if (isStaffType) {
-                    setCourseId(Number(e.target.value));
-                  } else {
-                    setCourse(e.target.value);
-                  }
-                }}
-                required={isStaffType}
-                className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#00873E] bg-white cursor-pointer"
-              >
-                {isStaffType && <option value="" disabled>Select a course&hellip;</option>}
-                {coursesInDept.map(c => {
-                  const taken = isStaffType && c.id > 0 && isCourseTakenForRole(c.id);
-                  return (
-                    <option key={c.id} value={isStaffType ? c.id : c.name} disabled={taken}>
-                      {c.name}{taken ? ` — ${meta.label} already registered` : ''}
-                    </option>
-                  );
-                })}
-              </select>
-              {isStaffType && (
-                <p className="text-[11px] text-slate-400 mt-1">
-                  Only one {meta.label} may register per course each school year. Courses already filled are disabled above.
+            {/* Course — students only. Admin/Dean/Adviser are scoped to their
+                whole Department instead (one per department per school
+                year, checked above via isDeptTakenForRole), so they never
+                see a course picker at all. */}
+            {isStaffType ? (
+              isDeptTakenForRole() && (
+                <p className="text-[11px] text-rose-600 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2">
+                  {department} already has a registered {meta.label} this school year — choose a different department, or contact that department's {meta.label} if this is a mistake.
                 </p>
-              )}
-            </div>
+              )
+            ) : (
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Course / Program *</label>
+                <select
+                  value={course}
+                  onChange={(e) => setCourse(e.target.value)}
+                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#00873E] bg-white cursor-pointer"
+                >
+                  {coursesInDept.map(c => (
+                    <option key={c.id} value={c.name}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {/* Name & Email */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

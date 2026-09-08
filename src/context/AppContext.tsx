@@ -121,7 +121,7 @@ interface AppContextType {
 
   // Courses & role-slot availability (needed pre-auth for registration)
   courses: Course[];
-  takenRoleSlots: { course_id: number; slot_key: string }[];
+  takenRoleSlots: { course_id: number | null; department_code?: string | null; slot_key: string }[];
 
   // Officer promotion (Adviser-only)
   promoteToOfficer: (studentProfileId: string, slotKey: OfficerSlotKey) => Promise<{ success: boolean; message: string }>;
@@ -290,7 +290,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState<boolean>(false);
 
   const [courses, setCourses] = useState<Course[]>([]);
-  const [takenRoleSlots, setTakenRoleSlots] = useState<{ course_id: number; slot_key: string }[]>([]);
+  const [takenRoleSlots, setTakenRoleSlots] = useState<{ course_id: number | null; department_code?: string | null; slot_key: string }[]>([]);
 
   // Fetched unconditionally (not gated on isAuthenticated) — the registration
   // form needs both of these before anyone is logged in. Both are backed by
@@ -2460,12 +2460,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Department Scoping Logic
   const userDepartment: DepartmentCode = currentUser.department || 'CAF';
-  // Cross-department oversight roles see everything; everyone else
-  // (including cashier and student, now that students can view Budget/
-  // Expenses) is locked to their own department. (Previously this was
-  // `Boolean(userDepartment)`, which is always true — a pre-existing bug
-  // that made every role, including admin/dean, incorrectly dept-locked.)
-  const isDepartmentRestricted = !(['csc_adviser', 'dean', 'admin'] as UserRole[]).includes(currentUser.role);
+  // Every role is locked to its own registered department — Adviser, Dean,
+  // and Student explicitly included (a CCS Adviser must never see COE's
+  // events/transactions/SAF/students/proposals, etc.). Only Admin stays
+  // unrestricted, since it's a system-management role with no department
+  // of its own and its nav no longer surfaces any of these scoped views
+  // anyway (trimmed to Manage Users only). Previously Adviser/Dean were
+  // deliberately excluded here for a "cross-department oversight" design
+  // that has since been superseded by course/department-scoped staff
+  // accounts — every `scopedX` list below now honors this for all of
+  // them.
+  const isDepartmentRestricted = currentUser.role !== 'admin';
 
   const scopedDepartmentInfo: DepartmentInfo = departments[userDepartment] || departments.CAF;
 

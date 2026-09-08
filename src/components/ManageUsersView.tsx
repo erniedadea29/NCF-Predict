@@ -149,7 +149,13 @@ const OfficerPromotionPanel: React.FC = () => {
 };
 
 export const ManageUsersView: React.FC = () => {
-  const { userAccounts, addUserAccount, deactivateUser, reactivateUser, currentUser } = useApp();
+  const { userAccounts, addUserAccount, deactivateUser, reactivateUser, currentUser, isDepartmentRestricted, userDepartment } = useApp();
+
+  // Dean/Adviser only manage accounts within their own registered
+  // department — Admin (unrestricted) still sees everyone system-wide.
+  const scopedUserAccounts = isDepartmentRestricted
+    ? userAccounts.filter(u => u.department === userDepartment)
+    : userAccounts;
 
   const [showAddForm, setShowAddForm] = useState(false);
   const [name, setName] = useState('');
@@ -163,7 +169,7 @@ export const ManageUsersView: React.FC = () => {
   const [copied, setCopied] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  const filteredUsers = userAccounts.filter(u => {
+  const filteredUsers = scopedUserAccounts.filter(u => {
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase();
     return u.full_name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
@@ -206,7 +212,9 @@ export const ManageUsersView: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs">
         <div>
           <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">Manage Users</h2>
-          <p className="text-xs text-slate-500 mt-0.5">{userAccounts.length} account(s) on record</p>
+          <p className="text-xs text-slate-500 mt-0.5">
+            {scopedUserAccounts.length} account(s) on record{isDepartmentRestricted ? ` in ${userDepartment}` : ''}
+          </p>
         </div>
         <button
           onClick={() => { setShowAddForm(true); resetForm(); }}
