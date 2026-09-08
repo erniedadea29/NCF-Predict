@@ -103,10 +103,21 @@ interface AppContextType {
     password: string;
     contact_number?: string;
   }) => Promise<{ success: boolean; message: string; user?: User }>;
-  loginWithGoogle: () => Promise<void>;
   requestPasswordReset: (email: string) => Promise<{ success: boolean; message: string }>;
   updatePassword: (newPassword: string) => Promise<{ success: boolean; message: string }>;
   isPasswordRecovery: boolean;
+
+  // Two-Factor Authentication (TOTP) — replaces the earlier SSO plan.
+  // Enrolled factors for the current user, and the login-time challenge
+  // flow: signInWithPassword succeeds but access is withheld (isAuthenticated
+  // stays false) until mfaVerifyLogin succeeds when a factor is enrolled.
+  mfaFactors: { id: string; friendly_name?: string; status: string }[];
+  mfaChallengePending: boolean;
+  mfaEnrollStart: () => Promise<{ success: boolean; message: string; factorId?: string; qrCode?: string; secret?: string }>;
+  mfaEnrollConfirm: (factorId: string, code: string) => Promise<{ success: boolean; message: string }>;
+  mfaUnenroll: (factorId: string) => Promise<{ success: boolean; message: string }>;
+  mfaVerifyLogin: (code: string) => Promise<{ success: boolean; message: string }>;
+  cancelMfaChallenge: () => void;
 
   // Courses & role-slot availability (needed pre-auth for registration)
   courses: Course[];
@@ -996,6 +1007,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // separate account type) — course/year/section come from that row.
   const STUDENT_LINKED_ROLES: UserRole[] = ['student', 'officer_treasurer', 'officer_governor', 'council_member'];
 
+  // Two-Factor Authentication (TOTP) — a signInWithPassword (or restored
+  // session) can land at Supabase's "aal1" assurance level even though the
+  // account has a verified second factor; the app must withhold access
+  // until a second-factor challenge is completed ("aal2"). This holds the
+  // pending factorId while that gate is up; the UI (LoginPage) shows a
+  // code-entry screen instead of the credentials form whenever it's set.
+  const [mfaChallenge, setMfaChallenge] = useState<{ factorId: string } | null>(null);
+
+  // Returns 'ok' if no further factor is needed, or 'challenge_required' (and
+  // sets mfaChallenge) if the account has a verified TOTP factor pending
+  // verification for this session.
+  const checkAndHandleMfa = async (): Promise<'ok' | 'challenge_required'> => {
+    const client = getSupabase();
+    const { data: aal } = await client.auth.mfa.getAuthenticatorAssuranceLevel();
+    if (aal && aal.nextLevel === 'aal2' && aal.currentLevel !== aal.nextLevel) {
+      const { data: factorsData } = await client.auth.mfa.listFactors();
+      const totpFactor = factorsData?.totp?.find(f => f.status === 'verified') || factorsData?.totp?.[0];
+      if (totpFactor) {
+        setMfaChallenge({ factorId: totpFactor.id });
+        return 'challenge_required';
+      }
+    }
+    return 'ok';
+  };
+
   const buildUserFromSession = async (authUser: { id: string; email?: string | null }): Promise<User> => {
     const client = getSupabase();
     const { data: profile } = await client
@@ -1050,6 +1086,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     client.auth.getSession().then(async ({ data }) => {
       if (cancelled) return;
       if (data.session?.user) {
+        const mfaResult = await checkAndHandleMfa();
+        if (cancelled) return;
+        if (mfaResult === 'challenge_required') {
+          // A restored session that still needs its second factor —
+          // leave isAuthenticated false; LoginPage shows the code screen.
+          setIsAuthLoading(false);
+          return;
+        }
         const user = await buildUserFromSession(data.session.user);
         if (cancelled) return;
         if (user.is_active === false) {
@@ -1073,6 +1117,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return;
       }
       if (session?.user) {
+        const mfaResult = await checkAndHandleMfa();
+        if (mfaResult === 'challenge_required') return;
         const user = await buildUserFromSession(session.user);
         if (user.is_active === false) {
           await client.auth.signOut();
@@ -1083,6 +1129,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       } else {
         setCurrentUser(GUEST_USER);
         setIsAuthenticated(false);
+        setMfaChallenge(null);
       }
     });
 
@@ -1109,9 +1156,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       email = resolvedEmail;
     }
 
-    const { data, error } = await client.auth.signInWithPassword({ email, password });
-    if (error || !data.user) {
-      return { success: false, message: 'Maling email/ID o password. Pakisubukang muli.' };
+    // Suppressed so the global onAuthStateChange listener doesn't race this
+    // function's own explicit MFA-gate handling below.
+    suppressAuthEventsRef.current = true;
+    let data: Awaited<ReturnType<typeof client.auth.signInWithPassword>>['data'];
+    try {
+      const res = await client.auth.signInWithPassword({ email, password });
+      if (res.error || !res.data.user) {
+        return { success: false, message: 'Maling email/ID o password. Pakisubukang muli.' };
+      }
+      data = res.data;
+
+      // Two-Factor Authentication gate: a password-correct sign-in still
+      // withholds access if the account has a verified TOTP factor —
+      // the caller (LoginPage) sees mfaRequired and shows a code screen.
+      const mfaResult = await checkAndHandleMfa();
+      if (mfaResult === 'challenge_required') {
+        return { success: true, message: 'Enter your 6-digit authenticator code to continue.' };
+      }
+    } finally {
+      suppressAuthEventsRef.current = false;
     }
 
     const user = await buildUserFromSession(data.user);
@@ -1136,18 +1200,91 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // onAuthStateChange also handles this, but flip immediately for a snappy UI.
     setCurrentUser(GUEST_USER);
     setIsAuthenticated(false);
+    setMfaChallenge(null);
     setIsAuthModalOpen(true);
     setAuthModalMode('login');
   };
 
-  // Non-functional until a Google OAuth Client ID/Secret is configured in
-  // the Supabase dashboard (Authentication -> Providers -> Google) — the
-  // button that calls this should say so until then.
-  const loginWithGoogle = async () => {
-    await getSupabase().auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo: window.location.origin }
+  // ============================================================
+  // Two-Factor Authentication (TOTP)
+  // ============================================================
+  const mfaVerifyLogin = async (code: string): Promise<{ success: boolean; message: string }> => {
+    if (!mfaChallenge) return { success: false, message: 'No pending verification — please log in again.' };
+    const client = getSupabase();
+    const { data: challengeData, error: challengeError } = await client.auth.mfa.challenge({ factorId: mfaChallenge.factorId });
+    if (challengeError || !challengeData) {
+      return { success: false, message: challengeError?.message || 'Failed to start verification. Please try again.' };
+    }
+    const { data: verifyData, error: verifyError } = await client.auth.mfa.verify({
+      factorId: mfaChallenge.factorId, challengeId: challengeData.id, code: code.trim()
     });
+    if (verifyError || !verifyData) {
+      return { success: false, message: 'Invalid code. Please check your authenticator app and try again.' };
+    }
+
+    setMfaChallenge(null);
+    const user = await buildUserFromSession(verifyData.user);
+    if (user.is_active === false) {
+      await client.auth.signOut();
+      return { success: false, message: 'Your account has been deactivated. Please contact your adviser or admin.' };
+    }
+    setCurrentUser(user);
+    setIsAuthenticated(true);
+    setActiveTab(user.role === 'student' ? 'student_portal' : 'home');
+    setIsAuthModalOpen(false);
+    return { success: true, message: `Maligayang pagbabalik, ${user.name}!` };
+  };
+
+  // Backing out of a pending 2FA challenge leaves a dangling aal1 session —
+  // sign out entirely so the person lands back on a clean login screen.
+  const cancelMfaChallenge = () => {
+    setMfaChallenge(null);
+    getSupabase().auth.signOut();
+  };
+
+  const [mfaFactors, setMfaFactors] = useState<{ id: string; friendly_name?: string; status: string }[]>([]);
+
+  const refreshMfaFactors = async () => {
+    if (!isAuthenticated) { setMfaFactors([]); return; }
+    const { data } = await getSupabase().auth.mfa.listFactors();
+    setMfaFactors((data?.totp || []).map(f => ({ id: f.id, friendly_name: f.friendly_name, status: f.status })));
+  };
+
+  useEffect(() => {
+    refreshMfaFactors();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated]);
+
+  const mfaEnrollStart = async (): Promise<{ success: boolean; message: string; factorId?: string; qrCode?: string; secret?: string }> => {
+    const client = getSupabase();
+    const { data, error } = await client.auth.mfa.enroll({
+      factorType: 'totp',
+      friendlyName: `NCF Predict (${currentUser.email})`
+    });
+    if (error || !data) return { success: false, message: error?.message || 'Failed to start 2FA setup.' };
+    return { success: true, message: '', factorId: data.id, qrCode: data.totp.qr_code, secret: data.totp.secret };
+  };
+
+  const mfaEnrollConfirm = async (factorId: string, code: string): Promise<{ success: boolean; message: string }> => {
+    const client = getSupabase();
+    const { data: challengeData, error: challengeError } = await client.auth.mfa.challenge({ factorId });
+    if (challengeError || !challengeData) {
+      return { success: false, message: challengeError?.message || 'Failed to verify. Please try again.' };
+    }
+    const { error: verifyError } = await client.auth.mfa.verify({ factorId, challengeId: challengeData.id, code: code.trim() });
+    if (verifyError) {
+      return { success: false, message: 'Invalid code. Please check your authenticator app and try again.' };
+    }
+    await refreshMfaFactors();
+    return { success: true, message: 'Two-factor authentication is now enabled on your account.' };
+  };
+
+  const mfaUnenroll = async (factorId: string): Promise<{ success: boolean; message: string }> => {
+    const client = getSupabase();
+    const { error } = await client.auth.mfa.unenroll({ factorId });
+    if (error) return { success: false, message: error.message };
+    await refreshMfaFactors();
+    return { success: true, message: 'Two-factor authentication has been disabled.' };
   };
 
   const requestPasswordReset = async (email: string): Promise<{ success: boolean; message: string }> => {
@@ -2384,10 +2521,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isViewOnlyReviewer,
         isAdminSystemOnly,
         registerUser,
-        loginWithGoogle,
         requestPasswordReset,
         updatePassword,
         isPasswordRecovery,
+        mfaFactors,
+        mfaChallengePending: mfaChallenge !== null,
+        mfaEnrollStart,
+        mfaEnrollConfirm,
+        mfaUnenroll,
+        mfaVerifyLogin,
+        cancelMfaChallenge,
         courses,
         takenRoleSlots,
         promoteToOfficer,

@@ -11,7 +11,7 @@ import {
   ShieldCheck,
   Building2,
   Sparkles,
-  Chrome
+  ArrowLeft
 } from 'lucide-react';
 
 interface LoginPageProps {
@@ -19,7 +19,7 @@ interface LoginPageProps {
 }
 
 export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
-  const { loginUser, loginWithGoogle, requestPasswordReset } = useApp();
+  const { loginUser, requestPasswordReset, mfaChallengePending, mfaVerifyLogin, cancelMfaChallenge } = useApp();
 
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
@@ -30,6 +30,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
   const [resetEmail, setResetEmail] = useState('');
   const [resetMessage, setResetMessage] = useState('');
   const [resetSending, setResetSending] = useState(false);
+  const [mfaCode, setMfaCode] = useState('');
+  const [mfaError, setMfaError] = useState('');
+  const [mfaVerifying, setMfaVerifying] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,6 +52,19 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
     setIsLoading(false);
     if (!res.success) {
       setError(res.message);
+    }
+  };
+
+  const handleVerifyMfa = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!mfaCode.trim()) return;
+    setMfaVerifying(true);
+    setMfaError('');
+    const res = await mfaVerifyLogin(mfaCode.trim());
+    setMfaVerifying(false);
+    if (!res.success) {
+      setMfaError(res.message);
+      setMfaCode('');
     }
   };
 
@@ -108,7 +124,51 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
             </div>
           )}
 
-          {showForgotPassword ? (
+          {mfaChallengePending ? (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 text-slate-800">
+                <ShieldCheck className="w-5 h-5 text-[#00873E]" />
+                <p className="text-sm font-bold">Two-Factor Verification</p>
+              </div>
+              <p className="text-xs text-slate-500">
+                Enter the 6-digit code from your authenticator app to finish signing in.
+              </p>
+              {mfaError && (
+                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2.5">
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                  <span>{mfaError}</span>
+                </div>
+              )}
+              <form onSubmit={handleVerifyMfa} className="space-y-3">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={6}
+                  value={mfaCode}
+                  onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, ''))}
+                  placeholder="000000"
+                  className="w-full px-3.5 py-3 text-center text-2xl tracking-[0.5em] font-mono border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#00873E] focus:border-[#00873E]"
+                  autoFocus
+                  required
+                />
+                <button
+                  type="submit"
+                  disabled={mfaVerifying || mfaCode.length < 6}
+                  className="w-full py-2.5 px-4 bg-[#00873E] hover:bg-[#007033] text-white font-bold text-sm rounded-xl shadow-xs transition cursor-pointer disabled:opacity-50"
+                >
+                  {mfaVerifying ? 'Verifying...' : 'Verify & Continue'}
+                </button>
+              </form>
+              <button
+                type="button"
+                onClick={() => cancelMfaChallenge()}
+                className="w-full flex items-center justify-center gap-1.5 text-center text-xs font-bold text-slate-500 hover:text-slate-700 cursor-pointer"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" /> Back to login
+              </button>
+            </div>
+          ) : showForgotPassword ? (
             <div className="space-y-4">
               <p className="text-xs text-slate-500">Enter your account email and we'll send a password reset link.</p>
               {resetMessage && (
@@ -144,20 +204,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
             </div>
           ) : (
           <>
-          <button
-            type="button"
-            onClick={() => loginWithGoogle()}
-            className="w-full mb-4 py-2.5 px-4 border-2 border-slate-200 hover:border-slate-300 text-slate-700 font-bold text-sm rounded-xl transition flex items-center justify-center gap-2 cursor-pointer"
-            title="Requires Google Workspace SSO to be configured by the system admin"
-          >
-            <Chrome className="w-4 h-4" />
-            <span>Continue with NCF Google Account</span>
-          </button>
-          <div className="relative mb-4">
-            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-200" /></div>
-            <div className="relative flex justify-center text-[11px]"><span className="bg-white px-2 text-slate-400">or log in manually</span></div>
-          </div>
-
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">

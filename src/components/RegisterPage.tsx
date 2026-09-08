@@ -17,7 +17,6 @@ import {
   GraduationCap,
   Landmark,
   LogIn,
-  Chrome,
   Lock
 } from 'lucide-react';
 
@@ -80,7 +79,7 @@ const DEFAULT_COURSES: Record<DepartmentCode, string[]> = {
 };
 
 export const RegisterPage: React.FC<RegisterPageProps> = ({ onGoToLogin }) => {
-  const { registerUser, loginWithGoogle, courses, takenRoleSlots } = useApp();
+  const { registerUser, courses, takenRoleSlots } = useApp();
 
   const [accountType, setAccountType] = useState<AccountType>('student');
   const [firstName, setFirstName] = useState('');
@@ -234,22 +233,6 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onGoToLogin }) => {
               <span>{successMessage} Redirecting to login&hellip;</span>
             </div>
           )}
-
-          {/* Google Workspace SSO — wired but inert until a Google OAuth
-              Client ID/Secret is configured in the Supabase dashboard. */}
-          <button
-            type="button"
-            onClick={() => loginWithGoogle()}
-            className="w-full mb-4 py-2.5 px-4 border-2 border-slate-200 hover:border-slate-300 text-slate-700 font-bold text-sm rounded-xl transition flex items-center justify-center gap-2 cursor-pointer"
-            title="Requires Google Workspace SSO to be configured by the system admin"
-          >
-            <Chrome className="w-4 h-4" />
-            <span>Continue with NCF Google Account</span>
-          </button>
-          <div className="relative mb-4">
-            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-200" /></div>
-            <div className="relative flex justify-center text-[11px]"><span className="bg-white px-2 text-slate-400">or register manually</span></div>
-          </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Account Type Selector */}
