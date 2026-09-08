@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { DepartmentCode, SchoolEvent, EventAttendance } from '../types';
 import { DEPARTMENTS } from '../data/mockData';
+import { ReceiptUploadField } from './ReceiptUploadField';
 import {
   Calendar,
   Plus,
@@ -24,6 +25,53 @@ import {
 } from 'lucide-react';
 
 const OFFICER_ROLES = ['officer_treasurer', 'officer_governor', 'council_member'];
+
+// Opens a short-lived signed link to a stored check-in photo — the bucket
+// is private, so the raw path alone isn't viewable.
+const ViewPhotoLink: React.FC<{ path: string }> = ({ path }) => {
+  const { getSignedReceiptUrl } = useApp();
+  return (
+    <button
+      onClick={async () => {
+        const url = await getSignedReceiptUrl(path);
+        if (url) window.open(url, '_blank', 'noopener,noreferrer');
+      }}
+      className="px-2 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[10px] font-bold cursor-pointer"
+    >
+      View Photo
+    </button>
+  );
+};
+
+// Student self check-in (Section 10) — uploads a photo attached to their
+// own already-existing attendance row (the officer creates the row when
+// taking attendance; the guard trigger only lets the student touch
+// photo_url/notes on it, never status or penalty fields).
+const SelfCheckInPhotoCell: React.FC<{ attendance: EventAttendance }> = ({ attendance }) => {
+  const { updateAttendancePhoto, currentUser } = useApp();
+  const [value, setValue] = useState<{ name: string; type: string; url: string } | null>(
+    attendance.photo_url ? { name: 'Check-in photo', type: 'image/jpeg', url: attendance.photo_url } : null
+  );
+
+  if (value) {
+    return <ViewPhotoLink path={value.url} />;
+  }
+
+  return (
+    <div className="w-40 mx-auto">
+      <ReceiptUploadField
+        label=""
+        pathPrefix={`attendance-photos/${attendance.event_id}/${currentUser.id}`}
+        value={null}
+        onChange={async (receipt) => {
+          if (!receipt) return;
+          setValue(receipt);
+          await updateAttendancePhoto(attendance.id, receipt.url);
+        }}
+      />
+    </div>
+  );
+};
 
 export const EventsAndPenalties: React.FC = () => {
   const {
@@ -589,6 +637,7 @@ export const EventsAndPenalties: React.FC = () => {
                     <th className="py-3 px-4">Student</th>
                     <th className="py-3 px-4">Event Title</th>
                     <th className="py-3 px-4 text-center">Attendance</th>
+                    <th className="py-3 px-4 text-center">Check-in Photo</th>
                     <th className="py-3 px-4">Remarks / Absence Reason</th>
                     <th className="py-3 px-4 text-right">Penalty Fine (₱)</th>
                     <th className="py-3 px-4 text-center">Clearance Status</th>
@@ -598,7 +647,7 @@ export const EventsAndPenalties: React.FC = () => {
                 <tbody className="divide-y divide-slate-100">
                   {filteredAttendances.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="py-12 text-center text-slate-400 space-y-2">
+                      <td colSpan={8} className="py-12 text-center text-slate-400 space-y-2">
                         <AlertTriangle className="w-8 h-8 mx-auto text-slate-300" />
                         <p className="font-bold text-sm text-slate-700">No attendance or penalty records match your query.</p>
                         <p className="text-xs text-slate-400">All registered students currently have cleared status or no attendances logged yet.</p>
@@ -637,6 +686,15 @@ export const EventsAndPenalties: React.FC = () => {
                                 <UserX className="w-3 h-3" />
                                 Absent
                               </span>
+                            )}
+                          </td>
+                          <td className="py-3.5 px-4 text-center">
+                            {isReadOnlyStudent && att.student_number === currentUser.student_number ? (
+                              <SelfCheckInPhotoCell attendance={att} />
+                            ) : att.photo_url ? (
+                              <ViewPhotoLink path={att.photo_url} />
+                            ) : (
+                              <span className="text-[10px] text-slate-300">—</span>
                             )}
                           </td>
                           <td className="py-3.5 px-4 text-slate-600 max-w-xs truncate">
@@ -933,6 +991,7 @@ export const EventsAndPenalties: React.FC = () => {
                           <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">
                             {stud.student_number}
                           </span>
+                          {existingAtt?.photo_url && <ViewPhotoLink path={existingAtt.photo_url} />}
                         </div>
                         <p className="text-[11px] text-slate-500 font-medium">
                           {stud.course} • Section {stud.section}

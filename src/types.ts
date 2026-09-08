@@ -118,6 +118,7 @@ export interface ActiveSemester {
 
 export interface Student {
   id: string;
+  profile_id?: string;
   student_number: string;
   first_name: string;
   last_name: string;

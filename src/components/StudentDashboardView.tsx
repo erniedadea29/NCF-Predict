@@ -8,7 +8,8 @@ import {
   Clock,
   Printer,
   GraduationCap,
-  Eye
+  Eye,
+  FileDown
 } from 'lucide-react';
 
 export const StudentDashboardView: React.FC = () => {
@@ -18,7 +19,9 @@ export const StudentDashboardView: React.FC = () => {
     attendances,
     activeSemester,
     currentUser,
-    generateClearance
+    generateClearance,
+    myReceipts,
+    getSignedReceiptUrl
   } = useApp();
 
   const [clearanceError, setClearanceError] = React.useState('');
@@ -256,6 +259,32 @@ Verify this clearance code with the Treasury/Adviser office if needed.
             <p className="text-[11px] text-emerald-800/80">Please settle your SAF fee at the SSC Treasury Office to update this status.</p>
           )}
         </div>
+
+        {/* Section 1b: My Receipts (auto-generated PDF on each SAF Cash-In) */}
+        {myReceipts.length > 0 && (
+          <div className="p-5 bg-white rounded-2xl border border-slate-200 space-y-2.5">
+            <h4 className="font-extrabold text-sm text-slate-900 flex items-center gap-2">
+              <FileDown className="w-4 h-4 text-emerald-700" />
+              My Receipts ({myReceipts.length})
+            </h4>
+            <div className="space-y-1.5">
+              {myReceipts.map(r => (
+                <div key={r.path} className="flex items-center justify-between gap-2 p-2.5 bg-slate-50 rounded-xl border border-slate-100 text-xs">
+                  <span className="font-mono text-slate-700 truncate">{r.name}</span>
+                  <button
+                    onClick={async () => {
+                      const url = await getSignedReceiptUrl(r.path);
+                      if (url) window.open(url, '_blank', 'noopener,noreferrer');
+                    }}
+                    className="shrink-0 px-2.5 py-1 rounded-lg bg-[#00873E] hover:bg-[#007033] text-white font-bold cursor-pointer"
+                  >
+                    View / Download
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Section 2: Penalties & Event Fines (view-only) */}
         <div className="space-y-3">

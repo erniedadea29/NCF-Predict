@@ -38,6 +38,7 @@ import {
   MOCK_FORECAST
 } from '../data/mockData';
 import { isSupabaseLiveConfigured, getSupabase, getIsolatedSupabase } from '../lib/supabaseClient';
+import { jsPDF } from 'jspdf';
 
 // Shown before a real Supabase session is restored / while logged out.
 // currentUser stays non-null everywhere else in this file; AuthGate (App.tsx)
@@ -152,6 +153,7 @@ interface AppContextType {
 
   // Receipt/DCR storage
   getSignedReceiptUrl: (path: string) => Promise<string | null>;
+  myReceipts: { name: string; path: string; created_at?: string }[];
 
   isAuthModalOpen: boolean;
   setIsAuthModalOpen: (open: boolean) => void;
@@ -200,6 +202,7 @@ interface AppContextType {
   attendances: EventAttendance[];
   penalties: EventAttendance[];
   recordAttendance: (eventId: string, studentId: string, status: 'Present' | 'Absent' | 'Excused', remarks?: string) => void;
+  updateAttendancePhoto: (attendanceId: string, photoPath: string) => Promise<void>;
   payPenalty: (attendanceId: string, receiptNo?: string) => void;
 
   // Budget Proposals & 5-Stage Approval Workflow
@@ -405,6 +408,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const mapStudentRow = (row: any): Student => ({
     id: row.id,
+    profile_id: row.profile_id || undefined,
     student_number: row.student_number,
     first_name: row.first_name,
     last_name: row.last_name,
@@ -653,6 +657,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (error || !data) { console.error('Failed to sign receipt URL', error); return null; }
     return data.signedUrl;
   };
+
+  // "My Receipts" — every SAF PDF receipt generated for the current student,
+  // listed from their own folder in the receipts bucket (RLS-scoped by the
+  // Storage policy on that path already in place from Phase 0).
+  const [myReceipts, setMyReceipts] = useState<{ name: string; path: string; created_at?: string }[]>([]);
+
+  useEffect(() => {
+    if (!isAuthenticated || currentUser.role !== 'student') { setMyReceipts([]); return; }
+    let cancelled = false;
+    (async () => {
+      const client = getSupabase();
+      const { data, error } = await client.storage.from('receipts').list(`saf-receipts/${currentUser.id}`, {
+        sortBy: { column: 'created_at', order: 'desc' }
+      });
+      if (cancelled) return;
+      if (error) { console.error('Failed to list SAF receipts', error); return; }
+      setMyReceipts((data || []).map(f => ({
+        name: f.name, path: `saf-receipts/${currentUser.id}/${f.name}`, created_at: f.created_at
+      })));
+    })();
+    return () => { cancelled = true; };
+  }, [isAuthenticated, currentUser.id, currentUser.role]);
 
   const generateClearance = async (studentId: string): Promise<ClearanceRecord | null> => {
     const client = getSupabase();
@@ -1421,6 +1447,75 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setStudents(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s));
   };
 
+  // Builds a one-page official SAF receipt as a PDF Blob — used by
+  // recordSafPayment to generate a real downloadable receipt (Section 9)
+  // rather than the old plain-text .txt slip.
+  const buildSafReceiptPdf = (rec: SAFRecord): Blob => {
+    const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const centerX = pageWidth / 2;
+    let y = 60;
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.text('NAGA COLLEGE FOUNDATION (NCF)', centerX, y, { align: 'center' });
+    y += 18;
+    doc.setFontSize(11);
+    doc.text('Supreme Student Council — Student Activity Fund (SAF)', centerX, y, { align: 'center' });
+    y += 12;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.text('Official Cash Receipt', centerX, y, { align: 'center' });
+    y += 20;
+    doc.setDrawColor(0, 135, 62);
+    doc.setLineWidth(1.5);
+    doc.line(60, y, pageWidth - 60, y);
+    y += 30;
+
+    const row = (label: string, value: string) => {
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.text(label, 70, y);
+      doc.setFont('helvetica', 'normal');
+      doc.text(value, 260, y);
+      y += 22;
+    };
+
+    row('Receipt No.:', rec.receipt_no || 'N/A');
+    row('Date Issued:', rec.payment_date || new Date().toLocaleString());
+    row('School Year:', `${rec.school_year} • ${rec.department}`);
+    row('Student Name:', rec.student_name);
+    row('Student Number:', rec.student_number);
+    row('Course / Section:', `${rec.course} - ${rec.section} (${rec.year_level})`);
+    row('Payment Method:', rec.payment_method || 'Cash');
+    row('Reference No.:', rec.double_entry.reference_no);
+
+    y += 10;
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.5);
+    doc.line(60, y, pageWidth - 60, y);
+    y += 30;
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.text('CREDIT: Cash on Hand', 70, y);
+    doc.setFontSize(16);
+    doc.text(`Amount Paid: PHP ${rec.amount.toFixed(2)}`, 70, y + 24);
+    y += 60;
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.text('This receipt certifies that the above Student Activity Fund (SAF) payment has been', 70, y);
+    y += 14;
+    doc.text('received and recorded in the NCF Predict treasury ledger.', 70, y);
+    y += 30;
+    doc.text(`Collected by: ${rec.collected_by}`, 70, y);
+    y += 14;
+    doc.text('Thank you for supporting student council activities & projects.', 70, y);
+
+    return doc.output('blob');
+  };
+
   const recordSafPayment = async (safId: string, paymentMethod: 'Cash' | 'Online / Bank' | 'G-Cash', notes?: string) => {
     const client = getSupabase();
     const timestamp = new Date();
@@ -1475,6 +1570,42 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       status: 'Completed',
       description: `SAF Double-entry cash-in (Receipt #${receiptNo})`
     });
+
+    // Auto-generate a real PDF receipt, store it, and notify the student
+    // (Section 9) — best-effort: a failure here never undoes the payment
+    // that was already recorded above.
+    try {
+      const finalRec: SAFRecord = {
+        ...targetRec,
+        paid: true,
+        payment_date: formattedDate,
+        receipt_no: receiptNo,
+        payment_method: paymentMethod,
+        collected_by: `${currentUser.name} (${currentUser.officer_position || 'Treasury Officer'})`,
+        double_entry: {
+          debit_account: debitAccount, credit_account: creditAccount, amount: targetRec.amount,
+          reference_no: receiptNo, transaction_type: 'SAF_CASH_IN', created_at: timestamp.toISOString()
+        }
+      };
+      const pdfBlob = buildSafReceiptPdf(finalRec);
+      const studentProfileId = students.find(s => s.id === targetRec.student_id)?.profile_id;
+      const storagePath = `saf-receipts/${studentProfileId || targetRec.student_id}/${receiptNo}.pdf`;
+      const { error: uploadErr } = await client.storage.from('receipts').upload(storagePath, pdfBlob, {
+        contentType: 'application/pdf', upsert: true
+      });
+      if (uploadErr) {
+        console.error('Failed to upload SAF receipt PDF', uploadErr);
+      } else if (studentProfileId) {
+        await client.rpc('notify_recipient', {
+          p_recipient_id: studentProfileId,
+          p_title: 'SAF Payment Received',
+          p_body: `Your ₱${targetRec.amount.toFixed(2)} SAF payment was recorded. Receipt #${receiptNo} is ready in My Receipts.`,
+          p_link_tab: 'student_portal'
+        });
+      }
+    } catch (pdfErr) {
+      console.error('Failed to generate/upload SAF receipt PDF', pdfErr);
+    }
   };
 
   const addSafRecord = async (record: Omit<SAFRecord, 'id' | 'double_entry' | 'receipt_no'>) => {
@@ -1731,6 +1862,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       return [updated, ...prev];
     });
+  };
+
+  // Student self-check-in photo (Section 10) — the row must already exist
+  // (created when the officer takes attendance); RLS/the Phase 0 guard
+  // trigger restrict a student's own update to photo_url/notes only, never
+  // status or penalty fields.
+  const updateAttendancePhoto = async (attendanceId: string, photoPath: string) => {
+    const client = getSupabase();
+    const { error } = await client.from('event_attendance').update({ photo_url: photoPath }).eq('id', attendanceId);
+    if (error) { console.error('Failed to save check-in photo', error); return; }
+    setAttendances(prev => prev.map(att => att.id === attendanceId ? { ...att, photo_url: photoPath } : att));
   };
 
   const payPenalty = async (attendanceId: string, receiptNo?: string) => {
@@ -2264,6 +2406,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         clearances,
         generateClearance,
         getSignedReceiptUrl,
+        myReceipts,
         userDepartment,
         isDepartmentRestricted,
         scopedDepartmentInfo,
@@ -2314,6 +2457,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         attendances,
         penalties: attendances,
         recordAttendance,
+        updateAttendancePhoto,
         payPenalty,
         proposals,
         createProposal,

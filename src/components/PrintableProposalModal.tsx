@@ -7,14 +7,29 @@ interface PrintableProposalModalProps {
   proposal: BudgetProposal | null;
   isOpen: boolean;
   onClose: () => void;
+  // Students only ever see the fully-approved PDF with approver names
+  // blacked out (Section 3) — everyone else sees real signatory names.
+  redactSignatures?: boolean;
 }
 
-export const PrintableProposalModal: React.FC<PrintableProposalModalProps> = ({ proposal, isOpen, onClose }) => {
+export const PrintableProposalModal: React.FC<PrintableProposalModalProps> = ({ proposal, isOpen, onClose, redactSignatures }) => {
   if (!isOpen || !proposal) return null;
 
   const handlePrint = () => {
     window.print();
   };
+
+  // Renders a signatory's name either as normal text, or as a solid black
+  // redaction box of roughly the same width (no e-signature/image system
+  // exists to redact a real signature image, so this produces the same
+  // visual effect from text data).
+  const Signatory: React.FC<{ name: string }> = ({ name }) => (
+    redactSignatures ? (
+      <div className="bg-black h-4 mx-2 rounded-sm" aria-label="Redacted" />
+    ) : (
+      <p className="font-bold text-slate-900 border-b border-slate-400 pb-1 mx-2">{name}</p>
+    )
+  );
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
@@ -185,13 +200,11 @@ export const PrintableProposalModal: React.FC<PrintableProposalModalProps> = ({ 
                 </div>
               </div>
 
-              {/* 2. Endorsed by Governor */}
+              {/* 2. Endorsed by Governor — approver signatures redacted for students */}
               <div className="border border-slate-200 p-3 rounded-lg flex flex-col justify-between h-28">
                 <p className="text-[10px] text-slate-400 uppercase font-bold">2. Executive Review:</p>
                 <div>
-                  <p className="font-bold text-slate-900 border-b border-slate-400 pb-1 mx-2">
-                    {proposal.executive_review?.reviewed_by || 'Gov. Clarisse Mendoza'}
-                  </p>
+                  <Signatory name={proposal.executive_review?.reviewed_by || 'Gov. Clarisse Mendoza'} />
                   <p className="text-[10px] text-slate-500 mt-0.5">
                     {proposal.executive_review ? `Endorsed (${proposal.executive_review.date})` : 'Pending Review'}
                   </p>
@@ -202,9 +215,7 @@ export const PrintableProposalModal: React.FC<PrintableProposalModalProps> = ({ 
               <div className="border border-slate-200 p-3 rounded-lg flex flex-col justify-between h-28">
                 <p className="text-[10px] text-slate-400 uppercase font-bold">3. Council Resolution:</p>
                 <div>
-                  <p className="font-bold text-slate-900 border-b border-slate-400 pb-1 mx-2">
-                    {proposal.council_resolution?.resolution_number || 'CSC-RES-2024-VOTING'}
-                  </p>
+                  <Signatory name={proposal.council_resolution?.resolution_number || 'CSC-RES-2024-VOTING'} />
                   <p className="text-[10px] text-slate-500 mt-0.5">
                     {proposal.votes.filter(v => v.vote === 'IN_FAVOR').length} Votes in Favor
                   </p>
@@ -215,9 +226,7 @@ export const PrintableProposalModal: React.FC<PrintableProposalModalProps> = ({ 
               <div className="border border-slate-200 p-3 rounded-lg flex flex-col justify-between h-28">
                 <p className="text-[10px] text-slate-400 uppercase font-bold">4. Recommended Approval:</p>
                 <div>
-                  <p className="font-bold text-slate-900 border-b border-slate-400 pb-1 mx-2">
-                    {proposal.adviser_approval?.adviser_name || 'Prof. Ramon Villanueva, MBA'}
-                  </p>
+                  <Signatory name={proposal.adviser_approval?.adviser_name || 'Prof. Ramon Villanueva, MBA'} />
                   <p className="text-[10px] text-slate-500 mt-0.5">
                     {proposal.adviser_approval ? `Approved (${proposal.adviser_approval.date})` : 'CSC Adviser Approval'}
                   </p>
@@ -228,12 +237,10 @@ export const PrintableProposalModal: React.FC<PrintableProposalModalProps> = ({ 
               <div className="border border-slate-200 p-3 rounded-lg flex flex-col justify-between h-28 sm:col-span-2">
                 <p className="text-[10px] text-slate-400 uppercase font-bold">5. Final Approval & Fund Release Authorization:</p>
                 <div>
-                  <p className="font-bold text-slate-900 border-b border-slate-400 pb-1 mx-6">
-                    {proposal.dean_approval?.dean_name || 'Dr. Evelyn Santos, DIT'}
-                  </p>
+                  <Signatory name={proposal.dean_approval?.dean_name || 'Dr. Evelyn Santos, DIT'} />
                   <p className="text-[10px] text-slate-500 mt-0.5">
-                    {proposal.dean_approval?.release_authorized 
-                      ? `Fund Release Approved & Released (${proposal.dean_approval.date})` 
+                    {proposal.dean_approval?.release_authorized
+                      ? `Fund Release Approved & Released (${proposal.dean_approval.date})`
                       : 'College Dean / Executive Director'}
                   </p>
                 </div>

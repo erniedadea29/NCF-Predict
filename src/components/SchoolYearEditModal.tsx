@@ -1,43 +1,59 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
-import { X, Calendar, CheckCircle2 } from 'lucide-react';
+import { X, Calendar, CheckCircle2, Loader2 } from 'lucide-react';
 
 interface SchoolYearEditModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
+type SaveState = 'idle' | 'saving' | 'saved' | 'error';
+
 export const SchoolYearEditModal: React.FC<SchoolYearEditModalProps> = ({ isOpen, onClose }) => {
   const { activeSemester, updateActiveSemester } = useApp();
 
   const [syLabel, setSyLabel] = useState(activeSemester.school_year_label);
   const [semName, setSemName] = useState(activeSemester.semester_name);
-  const [saved, setSaved] = useState(false);
+  const [saveState, setSaveState] = useState<SaveState>('idle');
+  const [error, setError] = useState('');
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isFirstRender = useRef(true);
 
   useEffect(() => {
     if (isOpen) {
       setSyLabel(activeSemester.school_year_label);
       setSemName(activeSemester.semester_name);
-      setSaved(false);
+      setSaveState('idle');
+      setError('');
+      isFirstRender.current = true;
     }
   }, [isOpen, activeSemester]);
 
-  if (!isOpen) return null;
-
-  const [error, setError] = useState('');
-
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Auto-save (Section 11) — debounced, no manual Save button. Every field
+  // change quietly persists a moment after the user stops typing/selecting.
+  useEffect(() => {
+    if (!isOpen) return;
+    if (isFirstRender.current) { isFirstRender.current = false; return; }
     if (!syLabel.trim() || !semName.trim()) return;
-    setError('');
-    try {
-      await updateActiveSemester(syLabel.trim(), semName.trim());
-      setSaved(true);
-      setTimeout(() => onClose(), 600);
-    } catch (err: any) {
-      setError(err?.message || 'Failed to save. You may not have permission to change the school year.');
-    }
-  };
+
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    setSaveState('saving');
+    debounceRef.current = setTimeout(async () => {
+      try {
+        await updateActiveSemester(syLabel.trim(), semName.trim());
+        setSaveState('saved');
+        setError('');
+      } catch (err: any) {
+        setSaveState('error');
+        setError(err?.message || 'Failed to save. You may not have permission to change the school year.');
+      }
+    }, 700);
+
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [syLabel, semName, isOpen]);
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
@@ -52,17 +68,22 @@ export const SchoolYearEditModal: React.FC<SchoolYearEditModalProps> = ({ isOpen
           </button>
         </div>
 
-        <form onSubmit={handleSave} className="p-5 space-y-4">
-          {saved && (
-            <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4" /> Updated!
-            </div>
-          )}
-          {error && (
-            <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs">
-              {error}
-            </div>
-          )}
+        <div className="p-5 space-y-4">
+          <div className="flex items-center gap-2 text-xs font-semibold h-5">
+            {saveState === 'saving' && (
+              <span className="flex items-center gap-1.5 text-slate-500">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" /> Saving...
+              </span>
+            )}
+            {saveState === 'saved' && (
+              <span className="flex items-center gap-1.5 text-emerald-700">
+                <CheckCircle2 className="w-3.5 h-3.5" /> All changes saved
+              </span>
+            )}
+            {saveState === 'error' && (
+              <span className="text-rose-600">{error}</span>
+            )}
+          </div>
 
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1 uppercase tracking-wider">
@@ -89,17 +110,11 @@ export const SchoolYearEditModal: React.FC<SchoolYearEditModalProps> = ({ isOpen
             >
               <option value="1st Semester">1st Semester</option>
               <option value="2nd Semester">2nd Semester</option>
-              <option value="Summer">Summer</option>
             </select>
           </div>
 
-          <button
-            type="submit"
-            className="w-full py-2.5 px-4 bg-[#00873E] hover:bg-[#007033] text-white font-bold text-sm rounded-xl shadow-xs transition cursor-pointer"
-          >
-            Save Changes
-          </button>
-        </form>
+          <p className="text-[11px] text-slate-400">Changes save automatically — just close this dialog when you're done.</p>
+        </div>
       </div>
     </div>
   );

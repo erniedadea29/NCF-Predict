@@ -57,7 +57,10 @@ export const BudgetProposalWorkflow: React.FC<BudgetProposalWorkflowProps> = ({
     isReadOnlyStudent
   } = useApp();
 
-  const displayProposals = isDepartmentRestricted ? scopedProposals : proposals;
+  // Students only ever see fully-approved-and-released budgets (Section 3)
+  // — never drafts or ones still mid-review.
+  const displayProposals = (isDepartmentRestricted ? scopedProposals : proposals)
+    .filter(p => !isReadOnlyStudent || p.budget_status === 'APPROVED_RELEASED');
 
   const [selectedProposalId, setSelectedProposalId] = useState<string>(() => displayProposals[0]?.id || '');
   const [printableProposal, setPrintableProposal] = useState<BudgetProposal | null>(null);
@@ -231,7 +234,7 @@ export const BudgetProposalWorkflow: React.FC<BudgetProposalWorkflowProps> = ({
                   className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl border border-slate-200 transition cursor-pointer self-start"
                 >
                   <Printer className="w-4 h-4 text-slate-600" />
-                  <span>Print Official Proposal</span>
+                  <span>{isReadOnlyStudent ? 'View / Download PDF' : 'Print Official Proposal'}</span>
                 </button>
               </div>
 
@@ -578,6 +581,7 @@ export const BudgetProposalWorkflow: React.FC<BudgetProposalWorkflowProps> = ({
         proposal={printableProposal}
         isOpen={Boolean(printableProposal)}
         onClose={() => setPrintableProposal(null)}
+        redactSignatures={isReadOnlyStudent}
       />
     </div>
   );
