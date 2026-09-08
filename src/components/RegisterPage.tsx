@@ -231,7 +231,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onGoToLogin }) => {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4" autoComplete="off">
             {/* Account Type Selector */}
             <div>
               <label className="block text-xs font-extrabold text-slate-900 uppercase tracking-wider mb-2 flex items-center gap-1.5">
@@ -334,6 +334,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onGoToLogin }) => {
                 </label>
                 <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
                   placeholder={accountType === 'student' ? 'e.g. jdelacruz@gbox.ncf.edu.ph' : 'e.g. jdelacruz@ncf.edu.ph'}
+                  autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false}
                   className="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#00873E]" required />
               </div>
               {accountType === 'student' && (
@@ -393,6 +394,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onGoToLogin }) => {
                 <div className="relative">
                   <input type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)}
                     placeholder="Set a password"
+                    autoComplete="new-password"
                     className="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#00873E]" />
                   <button type="button" onClick={() => setShowPassword(!showPassword)}
                     className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600" tabIndex={-1}>
@@ -407,6 +409,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onGoToLogin }) => {
                 <label className="block text-xs font-bold text-slate-700 mb-1">Confirm Password</label>
                 <input type={showPassword ? 'text' : 'password'} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="Repeat password"
+                  autoComplete="new-password"
                   className="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#00873E]" />
               </div>
             </div>
