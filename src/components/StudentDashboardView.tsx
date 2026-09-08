@@ -70,9 +70,9 @@ Course & Yr  : ${activeStudent?.course} (${activeStudent?.year_level})
 Section      : ${activeStudent?.section}
 ------------------------------------------------------------
 CLEARANCE STATUS BREAKDOWN:
-1. Student Activity Fund (SAF): ${record.saf_paid ? 'CLEARED / PAID (₱250.00)' : 'UNPAID (₱250.00)'}
+1. Student Activity Fund (SAF): ${record.saf_paid ? `CLEARED / PAID (₱${(studentSaf?.amount ?? 500).toFixed(2)})` : `UNPAID (₱${(studentSaf?.amount ?? 500).toFixed(2)})`}
    Receipt Code: ${studentSaf?.receipt_no || 'N/A'}
-   Double-Entry: ${studentSaf?.double_entry.reference_no || 'N/A'}
+   Reference: ${studentSaf?.double_entry.reference_no || 'N/A'}
 
 2. Event Attendance & Fines  : ${record.unpaid_penalties_count === 0 ? 'CLEARED (₱0.00 Outstanding)' : `UNPAID FINES (₱${record.unpaid_penalties_amount.toFixed(2)}, ${record.unpaid_penalties_count} record(s))`}
 
@@ -216,7 +216,7 @@ Verify this clearance code with the Treasury/Adviser office if needed.
               </h4>
             </div>
             <span className="font-mono text-xs font-bold text-emerald-800">
-              Fee: ₱{studentSaf?.amount.toFixed(2) || '250.00'}
+              Fee: ₱{studentSaf?.amount.toFixed(2) || '500.00'}
             </span>
           </div>
 

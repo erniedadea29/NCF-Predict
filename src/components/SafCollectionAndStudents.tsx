@@ -44,7 +44,8 @@ export const SafCollectionAndStudents: React.FC<SafCollectionAndStudentsProps> =
     activeSemester,
     currentUser,
     clearances,
-    generateClearance
+    generateClearance,
+    isViewOnlyReviewer
   } = useApp();
 
   const [activeSubTab, setActiveSubTab] = useState<'saf_ledger' | 'students_dir' | 'new_student' | 'clearances'>('saf_ledger');
@@ -149,8 +150,6 @@ Course & Year  : ${rec.course} - ${rec.year_level}
 Section        : ${rec.section}
 Department     : ${rec.department} (${DEPARTMENTS[rec.department]?.name})
 ------------------------------------------------------------
-DOUBLE-ENTRY RECORD:
-Debit  : ${rec.double_entry.debit_account} - ₱${rec.amount.toFixed(2)}
 Credit : ${rec.double_entry.credit_account} - ₱${rec.amount.toFixed(2)}
 ------------------------------------------------------------
 Payment Method : ${rec.payment_method || 'Cash'}
@@ -183,19 +182,21 @@ Thank you for supporting student council activities & projects.
             Record of Collection of Student Activity Fund (SAF)
           </h2>
           <p className="text-xs text-slate-500">
-            Double-Entry Accounting: <span className="font-bold text-slate-800">DEBIT: SAF | CREDIT: Cash</span> ({activeSemester.school_year_label})
+            <span className="font-bold text-slate-800">CREDIT: Cash on Hand</span> ({activeSemester.school_year_label})
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setActiveSubTab('new_student')}
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-[#00873E] hover:bg-[#007033] text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer"
-          >
-            <UserPlus className="w-4 h-4" />
-            <span>+ Enroll Student</span>
-          </button>
-        </div>
+        {!isViewOnlyReviewer && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setActiveSubTab('new_student')}
+              className="flex items-center gap-1.5 px-3.5 py-2 bg-[#00873E] hover:bg-[#007033] text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer"
+            >
+              <UserPlus className="w-4 h-4" />
+              <span>+ Enroll Student</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* SAF Double Entry Metric Cards */}
@@ -255,14 +256,16 @@ Thank you for supporting student council activities & projects.
           {isDepartmentRestricted ? `${userDepartment} Students Directory (${displayStudents.length})` : `Student Master Directory (${students.length})`}
         </button>
 
-        <button
-          onClick={() => setActiveSubTab('new_student')}
-          className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer ${
-            activeSubTab === 'new_student' ? 'bg-[#00873E] text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
-          }`}
-        >
-          + Enroll {isDepartmentRestricted ? userDepartment : 'New'} Student
-        </button>
+        {!isViewOnlyReviewer && (
+          <button
+            onClick={() => setActiveSubTab('new_student')}
+            className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+              activeSubTab === 'new_student' ? 'bg-[#00873E] text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            + Enroll {isDepartmentRestricted ? userDepartment : 'New'} Student
+          </button>
+        )}
 
         <button
           onClick={() => setActiveSubTab('clearances')}
@@ -393,6 +396,8 @@ Thank you for supporting student council activities & projects.
                               <Printer className="w-3.5 h-3.5 inline mr-1" />
                               Receipt
                             </button>
+                          ) : isViewOnlyReviewer ? (
+                            <span className="px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 text-[11px] font-bold">Unpaid</span>
                           ) : (
                             <button
                               onClick={() => setPayingSafRecord(rec)}
@@ -473,7 +478,7 @@ Thank you for supporting student council activities & projects.
       )}
 
       {/* TAB 3: ENROLL NEW STUDENT */}
-      {activeSubTab === 'new_student' && (
+      {activeSubTab === 'new_student' && !isViewOnlyReviewer && (
         <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-xs max-w-2xl mx-auto space-y-5">
           <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
             <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
@@ -581,7 +586,7 @@ Thank you for supporting student council activities & projects.
               type="submit"
               className="w-full py-3 bg-[#00873E] hover:bg-[#007033] text-white text-xs font-bold rounded-2xl shadow-md transition cursor-pointer"
             >
-              Enroll Student & Initialize SAF Record (₱250.00)
+              Enroll Student & Initialize SAF Record (₱500.00)
             </button>
           </form>
         </div>
@@ -639,14 +644,18 @@ Thank you for supporting student council activities & projects.
                           )}
                         </td>
                         <td className="py-2.5 px-3 text-right">
-                          <button
-                            onClick={() => handleGenerateClearance(stud.id)}
-                            disabled={generatingFor === stud.id}
-                            className="flex items-center gap-1 ml-auto px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-bold transition cursor-pointer disabled:opacity-50"
-                          >
-                            <RefreshCw className={`w-3.5 h-3.5 ${generatingFor === stud.id ? 'animate-spin' : ''}`} />
-                            {record ? 'Refresh' : 'Generate'}
-                          </button>
+                          {isViewOnlyReviewer ? (
+                            <span className="text-[10px] text-slate-400">View-only</span>
+                          ) : (
+                            <button
+                              onClick={() => handleGenerateClearance(stud.id)}
+                              disabled={generatingFor === stud.id}
+                              className="flex items-center gap-1 ml-auto px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-bold transition cursor-pointer disabled:opacity-50"
+                            >
+                              <RefreshCw className={`w-3.5 h-3.5 ${generatingFor === stud.id ? 'animate-spin' : ''}`} />
+                              {record ? 'Refresh' : 'Generate'}
+                            </button>
+                          )}
                         </td>
                       </tr>
                     );
@@ -709,7 +718,6 @@ Thank you for supporting student council activities & projects.
               </div>
 
               <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-[11px] font-mono text-emerald-900 space-y-0.5">
-                <p><strong>DEBIT:</strong> Student Activity Fund (SAF)</p>
                 <p><strong>CREDIT:</strong> {paymentMethod === 'Cash' ? 'Cash on Hand (Treasury)' : 'Cash in Bank'}</p>
               </div>
 

@@ -7,9 +7,11 @@ import {
   Eye,
   EyeOff,
   AlertCircle,
+  CheckCircle2,
   ShieldCheck,
   Building2,
-  Sparkles
+  Sparkles,
+  Chrome
 } from 'lucide-react';
 
 interface LoginPageProps {
@@ -17,13 +19,17 @@ interface LoginPageProps {
 }
 
 export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
-  const { loginUser } = useApp();
+  const { loginUser, loginWithGoogle, requestPasswordReset } = useApp();
 
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetMessage, setResetMessage] = useState('');
+  const [resetSending, setResetSending] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,6 +50,15 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
     if (!res.success) {
       setError(res.message);
     }
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetEmail.trim()) return;
+    setResetSending(true);
+    const res = await requestPasswordReset(resetEmail.trim());
+    setResetSending(false);
+    setResetMessage(res.message);
   };
 
   return (
@@ -93,6 +108,56 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
             </div>
           )}
 
+          {showForgotPassword ? (
+            <div className="space-y-4">
+              <p className="text-xs text-slate-500">Enter your account email and we'll send a password reset link.</p>
+              {resetMessage && (
+                <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-start gap-2.5">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                  <span>{resetMessage}</span>
+                </div>
+              )}
+              <form onSubmit={handleForgotPassword} className="space-y-3">
+                <div className="relative">
+                  <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="email" value={resetEmail} onChange={(e) => setResetEmail(e.target.value)}
+                    placeholder="your.email@ncf.edu.ph"
+                    className="w-full pl-9 pr-3 py-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#00873E]"
+                    required
+                  />
+                </div>
+                <button
+                  type="submit" disabled={resetSending}
+                  className="w-full py-2.5 px-4 bg-[#00873E] hover:bg-[#007033] text-white font-bold text-sm rounded-xl shadow-xs transition cursor-pointer disabled:opacity-50"
+                >
+                  {resetSending ? 'Sending...' : 'Send Reset Link'}
+                </button>
+              </form>
+              <button
+                type="button"
+                onClick={() => { setShowForgotPassword(false); setResetMessage(''); }}
+                className="w-full text-center text-xs font-bold text-slate-500 hover:text-slate-700 cursor-pointer"
+              >
+                &larr; Back to login
+              </button>
+            </div>
+          ) : (
+          <>
+          <button
+            type="button"
+            onClick={() => loginWithGoogle()}
+            className="w-full mb-4 py-2.5 px-4 border-2 border-slate-200 hover:border-slate-300 text-slate-700 font-bold text-sm rounded-xl transition flex items-center justify-center gap-2 cursor-pointer"
+            title="Requires Google Workspace SSO to be configured by the system admin"
+          >
+            <Chrome className="w-4 h-4" />
+            <span>Continue with NCF Google Account</span>
+          </button>
+          <div className="relative mb-4">
+            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-200" /></div>
+            <div className="relative flex justify-center text-[11px]"><span className="bg-white px-2 text-slate-400">or log in manually</span></div>
+          </div>
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
@@ -113,9 +178,18 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                Password
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  Password
+                </label>
+                <button
+                  type="button"
+                  onClick={() => { setShowForgotPassword(true); setResetEmail(identifier.includes('@') ? identifier : ''); }}
+                  className="text-[11px] font-bold text-[#00873E] hover:text-[#007033] cursor-pointer"
+                >
+                  Forgot password?
+                </button>
+              </div>
               <div className="relative">
                 <KeyRound className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
@@ -155,6 +229,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
               Register here
             </button>
           </div>
+          </>
+          )}
 
         </div>
       </div>

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { LoginPage } from './components/LoginPage';
 import { RegisterPage } from './components/RegisterPage';
+import { ResetPasswordPage } from './components/ResetPasswordPage';
 import { Header } from './components/Header';
 import { HomeDashboard } from './components/HomeDashboard';
 import { TransactionsView } from './components/TransactionsView';
@@ -16,11 +17,12 @@ import { BudgetRequestExpensesModal } from './components/BudgetRequestExpensesMo
 import { LiquidationReturnModal } from './components/LiquidationReturnModal';
 import { LiquidationReportDashboard } from './components/LiquidationReportDashboard';
 import { ManageUsersView } from './components/ManageUsersView';
+import { ReimbursementReviewPanel } from './components/ReimbursementReviewPanel';
 
 const STAFF_ROLES = ['csc_adviser', 'dean', 'admin'];
 
 function MainAppContent() {
-  const { currentTab, setCurrentTab, isReadOnlyStudent, currentUser } = useApp();
+  const { currentTab, setCurrentTab, isReadOnlyStudent, isAdminSystemOnly, isViewOnlyReviewer, currentUser } = useApp();
 
   // Modals state
   const [isAddTxOpen, setIsAddTxOpen] = useState(false);
@@ -37,6 +39,14 @@ function MainAppContent() {
       setCurrentTab('student_portal');
     }
   }, [isReadOnlyStudent, currentTab, setCurrentTab]);
+
+  // Admin is system-management only — force them onto Manage Users since
+  // Home/Budget/Transactions/etc. are never in their nav.
+  useEffect(() => {
+    if (isAdminSystemOnly && currentTab.toLowerCase() !== 'manage_users') {
+      setCurrentTab('manage_users');
+    }
+  }, [isAdminSystemOnly, currentTab, setCurrentTab]);
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-slate-800 flex flex-col font-sans selection:bg-[#00873E] selection:text-white">
@@ -64,11 +74,15 @@ function MainAppContent() {
         {(currentTab.toUpperCase() === 'BUDGET_PROPOSALS' ||
           currentTab.toUpperCase() === 'BUDGET' ||
           currentTab.toUpperCase() === 'REIMBURSE') && (
-          <BudgetProposalWorkflow
-            onOpenCreateProposal={() => setIsCreateProposalOpen(true)}
-            onOpenBudgetRequestModal={(id) => setActiveProposalIdForFinance(id)}
-            onOpenLiquidationModal={(id) => setActiveProposalIdForLiquidation(id)}
-          />
+          isViewOnlyReviewer ? (
+            <ReimbursementReviewPanel />
+          ) : (
+            <BudgetProposalWorkflow
+              onOpenCreateProposal={() => setIsCreateProposalOpen(true)}
+              onOpenBudgetRequestModal={(id) => setActiveProposalIdForFinance(id)}
+              onOpenLiquidationModal={(id) => setActiveProposalIdForLiquidation(id)}
+            />
+          )
         )}
 
         {!isReadOnlyStudent && (currentTab.toUpperCase() === 'LIQUIDATION_REPORTS' ||
@@ -140,7 +154,7 @@ function MainAppContent() {
 }
 
 function AuthGate() {
-  const { isAuthenticated, isAuthLoading } = useApp();
+  const { isAuthenticated, isAuthLoading, isPasswordRecovery } = useApp();
   const [authView, setAuthView] = useState<'login' | 'register'>('login');
 
   // Always land back on the Login page (not wherever they last were) after logging out.
@@ -157,6 +171,12 @@ function AuthGate() {
         <div className="w-10 h-10 border-4 border-white/30 border-t-white rounded-full animate-spin" />
       </div>
     );
+  }
+
+  // A password-reset email link takes priority over everything else, even
+  // an existing session.
+  if (isPasswordRecovery) {
+    return <ResetPasswordPage />;
   }
 
   // Not logged in -> the person is redirected straight to the Login page

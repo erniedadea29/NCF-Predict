@@ -2,15 +2,15 @@ import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { DepartmentCode, SchoolEvent, EventAttendance } from '../types';
 import { DEPARTMENTS } from '../data/mockData';
-import { 
-  Calendar, 
-  Plus, 
-  AlertTriangle, 
-  CheckCircle2, 
-  UserCheck, 
-  UserX, 
-  MapPin, 
-  Clock, 
+import {
+  Calendar,
+  Plus,
+  AlertTriangle,
+  CheckCircle2,
+  UserCheck,
+  UserX,
+  MapPin,
+  Clock,
   Search,
   Filter,
   Receipt,
@@ -18,30 +18,55 @@ import {
   ShieldCheck,
   Award,
   Sparkles,
-  TrendingUp
+  TrendingUp,
+  XCircle,
+  Hourglass
 } from 'lucide-react';
 
+const OFFICER_ROLES = ['officer_treasurer', 'officer_governor', 'council_member'];
+
 export const EventsAndPenalties: React.FC = () => {
-  const { 
-    events, 
+  const {
+    events,
     attendances,
     scopedEvents,
     scopedAttendances,
-    students, 
+    students,
     scopedStudents,
     userDepartment,
     isDepartmentRestricted,
     scopedDepartmentInfo,
-    activeSemester, 
-    addEvent, 
-    recordAttendance, 
+    activeSemester,
+    proposeEvent,
+    reviewEvent,
+    recordAttendance,
     payPenalty,
     isReadOnlyStudent,
+    isViewOnlyReviewer,
     currentUser
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<'events' | 'penalties' | 'create_event'>('events');
   const [selectedEventForAttendance, setSelectedEventForAttendance] = useState<SchoolEvent | null>(null);
+  const [reviewingEventId, setReviewingEventId] = useState<string | null>(null);
+  const [eventReviewRemarks, setEventReviewRemarks] = useState('');
+
+  // Events now go through an Officer-proposes -> Dean/Adviser-approves ->
+  // publish workflow (Section 7). Only officers propose; Dean/Adviser only
+  // approve/reject; everyone else (including students) is fully view-only
+  // here and never sees pending/draft/rejected events, only published ones.
+  const canProposeEvent = OFFICER_ROLES.includes(currentUser.role);
+  const canReviewEvents = isViewOnlyReviewer;
+  // Students, and anyone who isn't a proposer/reviewer, only ever see
+  // published events (or legacy rows with no status field at all).
+  const isEventVisible = (ev: SchoolEvent) => {
+    if (canProposeEvent || canReviewEvents) return true;
+    return !ev.status || ev.status === 'PUBLISHED';
+  };
+
+  // Dean/Adviser get view-only Penalties/Attendance (Section 5) — they can
+  // still approve/reject events above, just not run attendance/collect fines.
+  const canManageAttendance = !isReadOnlyStudent && !isViewOnlyReviewer;
 
   // New Event Form State
   const [eventTitle, setEventTitle] = useState('');
@@ -66,7 +91,8 @@ export const EventsAndPenalties: React.FC = () => {
   const [settledReceipt, setSettledReceipt] = useState<{ studentName: string; receiptNo: string; amount: number } | null>(null);
   const [attendanceSearch, setAttendanceSearch] = useState('');
 
-  const displayEvents = isDepartmentRestricted ? scopedEvents : events;
+  const displayEvents = (isDepartmentRestricted ? scopedEvents : events).filter(isEventVisible);
+  const pendingReviewEvents = canReviewEvents ? displayEvents.filter(ev => ev.status === 'PENDING_APPROVAL') : [];
   const displayAttendances = isReadOnlyStudent
     ? attendances.filter(a => a.student_number === currentUser.student_number)
     : (isDepartmentRestricted ? scopedAttendances : attendances);
@@ -83,7 +109,9 @@ export const EventsAndPenalties: React.FC = () => {
     ? Math.round((presentRecords.length / displayAttendances.length) * 100) 
     : 100;
 
-  const handleCreateEventSubmit = (e: React.FormEvent) => {
+  const [proposeMessage, setProposeMessage] = useState('');
+
+  const handleCreateEventSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!eventTitle.trim()) {
       alert('Please enter an event title.');
@@ -93,7 +121,7 @@ export const EventsAndPenalties: React.FC = () => {
     const penaltyVal = parseFloat(penaltyAmount) || 50.0;
     const targetDept = isDepartmentRestricted ? userDepartment : eventDept;
 
-    addEvent({
+    const res = await proposeEvent({
       event_title: eventTitle.trim(),
       event_description: eventDesc.trim() || 'Mandatory departmental academic assembly.',
       description: eventDesc.trim() || 'Mandatory departmental academic assembly.',
@@ -109,9 +137,18 @@ export const EventsAndPenalties: React.FC = () => {
       school_year: activeSemester.school_year_label
     });
 
-    setEventTitle('');
-    setEventDesc('');
-    setActiveTab('events');
+    setProposeMessage(res.message);
+    if (res.success) {
+      setEventTitle('');
+      setEventDesc('');
+      setActiveTab('events');
+    }
+  };
+
+  const handleReviewEvent = async (eventId: string, decision: 'APPROVED' | 'REJECTED') => {
+    await reviewEvent(eventId, decision, eventReviewRemarks || undefined);
+    setReviewingEventId(null);
+    setEventReviewRemarks('');
   };
 
   const handleSettlePenalty = (attendanceId: string, studentName: string, amount: number) => {
@@ -183,17 +220,80 @@ export const EventsAndPenalties: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
-          {!isReadOnlyStudent && (
+          {canProposeEvent && (
             <button
               onClick={() => setActiveTab('create_event')}
               className="flex items-center gap-1.5 px-4 py-2.5 bg-[#00873E] hover:bg-[#007033] text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer"
             >
               <Plus className="w-4 h-4" />
-              <span>+ Create {isDepartmentRestricted ? userDepartment : 'Semester'} Event</span>
+              <span>+ Propose {isDepartmentRestricted ? userDepartment : 'Semester'} Event</span>
             </button>
           )}
         </div>
       </div>
+
+      {/* Dean/Adviser approval queue for officer-proposed events */}
+      {canReviewEvents && pendingReviewEvents.length > 0 && (
+        <div className="bg-white rounded-2xl border border-amber-300 shadow-xs p-4 sm:p-5 space-y-3">
+          <div className="flex items-center gap-2">
+            <Hourglass className="w-4.5 h-4.5 text-amber-600" />
+            <h3 className="font-extrabold text-slate-900 text-sm sm:text-base">Pending Event Approvals ({pendingReviewEvents.length})</h3>
+          </div>
+          <div className="space-y-2">
+            {pendingReviewEvents.map(ev => (
+              <div key={ev.id} className="p-3.5 bg-amber-50/60 rounded-xl border border-amber-200 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="font-bold text-sm text-slate-900 truncate">{ev.event_title}</p>
+                    <p className="text-[11px] text-slate-500 truncate">{ev.venue} • {ev.event_date} {ev.start_time ? `• ${ev.start_time}-${ev.end_time || ''}` : ''}</p>
+                  </div>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-black bg-amber-100 text-amber-800 border border-amber-300 shrink-0">
+                    Pending
+                  </span>
+                </div>
+                {reviewingEventId === ev.id ? (
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      placeholder="Remarks (optional)..."
+                      value={eventReviewRemarks}
+                      onChange={(e) => setEventReviewRemarks(e.target.value)}
+                      className="w-full px-3 py-2 text-xs bg-white rounded-xl border border-amber-200"
+                    />
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleReviewEvent(ev.id, 'APPROVED')}
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#00873E] hover:bg-[#007033] text-white text-[11px] font-bold transition cursor-pointer"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Approve & Publish
+                      </button>
+                      <button
+                        onClick={() => handleReviewEvent(ev.id, 'REJECTED')}
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-800 text-[11px] font-bold transition cursor-pointer"
+                      >
+                        <XCircle className="w-3.5 h-3.5" /> Reject
+                      </button>
+                      <button
+                        onClick={() => { setReviewingEventId(null); setEventReviewRemarks(''); }}
+                        className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 text-[11px] font-bold transition cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setReviewingEventId(ev.id)}
+                    className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-bold transition cursor-pointer"
+                  >
+                    Review
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Settlement Success Notification */}
       {settledReceipt && (
@@ -286,7 +386,7 @@ export const EventsAndPenalties: React.FC = () => {
             </span>
           )}
         </button>
-        {!isReadOnlyStudent && (
+        {canProposeEvent && (
           <button
             onClick={() => setActiveTab('create_event')}
             className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center justify-center gap-2 ${
@@ -345,12 +445,14 @@ export const EventsAndPenalties: React.FC = () => {
                     : `No events currently scheduled for ${isDepartmentRestricted ? scopedDepartmentInfo.name : 'the semester'}.`}
                 </p>
               </div>
-              <button
-                onClick={() => setActiveTab('create_event')}
-                className="px-4 py-2 bg-[#00873E] hover:bg-[#007033] text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer"
-              >
-                + Create {isDepartmentRestricted ? userDepartment : 'New'} Event
-              </button>
+              {canProposeEvent && (
+                <button
+                  onClick={() => setActiveTab('create_event')}
+                  className="px-4 py-2 bg-[#00873E] hover:bg-[#007033] text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer"
+                >
+                  + Propose {isDepartmentRestricted ? userDepartment : 'New'} Event
+                </button>
+              )}
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -381,6 +483,16 @@ export const EventsAndPenalties: React.FC = () => {
                           {ev.event_date}
                         </span>
                       </div>
+
+                      {(canProposeEvent || canReviewEvents) && ev.status && ev.status !== 'PUBLISHED' && (
+                        <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-black border ${
+                          ev.status === 'PENDING_APPROVAL' ? 'bg-amber-100 text-amber-800 border-amber-300' :
+                          ev.status === 'REJECTED' ? 'bg-rose-100 text-rose-800 border-rose-300' :
+                          'bg-slate-100 text-slate-700 border-slate-300'
+                        }`}>
+                          {ev.status === 'PENDING_APPROVAL' ? 'Awaiting Approval' : ev.status}
+                        </span>
+                      )}
 
                       <div>
                         <h3 className="font-extrabold text-base text-slate-900 leading-snug line-clamp-2">
@@ -424,7 +536,7 @@ export const EventsAndPenalties: React.FC = () => {
                       <span className="text-[11px] text-slate-400 font-medium">
                         {ev.school_year || activeSemester.school_year_label}
                       </span>
-                      {!isReadOnlyStudent && (
+                      {canManageAttendance && (
                         <button
                           onClick={() => setSelectedEventForAttendance(ev)}
                           className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 shadow-xs"
@@ -554,9 +666,11 @@ export const EventsAndPenalties: React.FC = () => {
                             )}
                           </td>
                           <td className="py-3.5 px-4 text-right">
-                            {isReadOnlyStudent ? (
+                            {!canManageAttendance ? (
                               hasPenalty && !isPaid ? (
-                                <span className="text-rose-600 text-xs font-bold">Settle at SSC Treasury</span>
+                                <span className="text-rose-600 text-xs font-bold">
+                                  {isReadOnlyStudent ? 'Settle at SSC Treasury' : 'Unpaid — view-only'}
+                                </span>
                               ) : hasPenalty && isPaid ? (
                                 <span className="text-emerald-700 text-xs font-bold flex items-center justify-end gap-1">
                                   <CheckCircle2 className="w-3.5 h-3.5" />
@@ -593,16 +707,19 @@ export const EventsAndPenalties: React.FC = () => {
         </div>
       )}
 
-      {/* TAB 3: CREATE SEMESTER EVENT (never available to read-only students) */}
-      {!isReadOnlyStudent && activeTab === 'create_event' && (
+      {/* TAB 3: PROPOSE SEMESTER EVENT (officers only — Dean/Adviser approve, never propose) */}
+      {canProposeEvent && activeTab === 'create_event' && (
         <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-xs max-w-2xl mx-auto space-y-6">
+          {proposeMessage && (
+            <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs">{proposeMessage}</div>
+          )}
           <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
             <div className="w-10 h-10 rounded-2xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold">
               <Calendar className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-black text-slate-900 text-lg">Create Semester Activity / Event</h3>
-              <p className="text-xs text-slate-500">Configure event details and absence penalty fine policy for {activeSemester.school_year_label}</p>
+              <h3 className="font-black text-slate-900 text-lg">Propose Semester Activity / Event</h3>
+              <p className="text-xs text-slate-500">Submitted for Dean/Adviser approval before it's published — for {activeSemester.school_year_label}</p>
             </div>
           </div>
 
@@ -732,7 +849,7 @@ export const EventsAndPenalties: React.FC = () => {
               type="submit"
               className="w-full py-3.5 bg-[#00873E] hover:bg-[#007033] text-white font-bold rounded-2xl shadow-md transition cursor-pointer text-sm"
             >
-              Publish Event & Initialize Student Attendance Roster
+              Submit for Dean/Adviser Approval
             </button>
           </form>
         </div>

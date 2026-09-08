@@ -25,7 +25,10 @@ interface TransactionsViewProps {
   onOpenAddModal: () => void;
 }
 
-const REVIEWER_ROLES = ['admin', 'csc_adviser', 'dean'];
+// Dean/Adviser's Transactions screen ("CCS Transactions") is view-only per
+// spec Section 5 — no approve/reject there. Admin no longer has a
+// Transactions tab in its nav at all, but is left here for completeness.
+const REVIEWER_ROLES = ['admin'];
 
 export const TransactionsView: React.FC<TransactionsViewProps> = ({ onOpenAddModal }) => {
   const {
@@ -39,10 +42,14 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ onOpenAddMod
     isDepartmentRestricted,
     scopedDepartmentInfo,
     currentUser,
-    isReadOnlyStudent
+    isReadOnlyStudent,
+    isViewOnlyReviewer
   } = useApp();
 
   const canReview = REVIEWER_ROLES.includes(currentUser.role);
+  // Dean/Adviser see this screen as "CCS Transactions" — view-only, no
+  // add/archive/delete (Section 5).
+  const hideWriteActions = isReadOnlyStudent || isViewOnlyReviewer;
 
   const [selectedCategory, setSelectedCategory] = useState<TransactionCategory>('All');
   const [showArchived, setShowArchived] = useState<boolean>(false);
@@ -51,7 +58,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ onOpenAddMod
     return isDepartmentRestricted ? userDepartment : 'ALL';
   });
 
-  const categories: TransactionCategory[] = ['All', 'Revenue', 'Event', 'Capital', 'Operations', 'Academic'];
+  const categories: TransactionCategory[] = ['All', 'Revenue', 'Event', 'Capital'];
 
   // Base list respects department isolation
   const baseTransactions = isDepartmentRestricted ? scopedTransactions : transactions;
@@ -220,10 +227,10 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ onOpenAddMod
           <div>
             <h3 className="font-bold text-slate-800 text-base">No transaction</h3>
             <p className="text-xs text-slate-500 mt-1">
-              {isReadOnlyStudent ? 'Nothing recorded yet for your department.' : 'Tap + to create a budget entry or transaction'}
+              {hideWriteActions ? 'Nothing recorded yet for your department.' : 'Tap + to create a budget entry or transaction'}
             </p>
           </div>
-          {!isReadOnlyStudent && (
+          {!hideWriteActions && (
             <button
               onClick={onOpenAddModal}
               className="px-4 py-2 bg-[#00873E] hover:bg-[#007033] text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer"
@@ -319,7 +326,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ onOpenAddMod
                       <Download className="w-4 h-4" />
                     </button>
 
-                    {!isReadOnlyStudent && (
+                    {!hideWriteActions && (
                       <>
                         {/* Archive / Restore Button */}
                         <button
@@ -349,7 +356,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ onOpenAddMod
       )}
 
       {/* Floating / Bottom Sticky Action Button matching PDF screenshots */}
-      {!isReadOnlyStudent && (
+      {!hideWriteActions && (
         <div className="fixed bottom-6 right-6 z-30">
           <button
             onClick={onOpenAddModal}

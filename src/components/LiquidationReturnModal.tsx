@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
-import { X, Check, DollarSign, FileCheck, ArrowDownLeft, ShieldCheck, Plus, Trash2 } from 'lucide-react';
+import { X, Check, DollarSign, FileCheck, ArrowDownLeft, ShieldCheck, Plus, Trash2, ThumbsUp, ThumbsDown, RotateCcw } from 'lucide-react';
 
 interface LiquidationReturnModalProps {
   proposalId: string | null;
@@ -14,20 +14,38 @@ interface SummaryLine {
   line_item_count: number;
 }
 
-const CATEGORY_OPTIONS = ['Revenue', 'Event', 'Capital', 'Operations', 'Academic'];
+const CATEGORY_OPTIONS = ['Revenue', 'Event', 'Capital'];
 
 export const LiquidationReturnModal: React.FC<LiquidationReturnModalProps> = ({
   proposalId,
   isOpen,
   onClose
 }) => {
-  const { proposals, submitLiquidation, recordBudgetReturn } = useApp();
+  const { proposals, submitLiquidation, recordBudgetReturn, currentUser, adviserReviewLiquidation, deanReviewLiquidation } = useApp();
   const [activeTab, setActiveTab] = useState<'liquidation' | 'return'>('liquidation');
   const [liquidationNotes, setLiquidationNotes] = useState('All supplier invoices, physical cash vouchers, and attendance sheets verified for audit compliance.');
   const [returnRemarks, setReturnRemarks] = useState('Return of unused SAF event budget back to supreme treasury vault.');
   const [summaryLines, setSummaryLines] = useState<SummaryLine[]>([]);
+  const [reviewRemarks, setReviewRemarks] = useState('');
 
   const targetProposal = proposals.find(p => p.id === proposalId);
+  const liq = targetProposal?.liquidation;
+
+  // Adviser -> Dean sequential review, mirroring the budget proposal
+  // workflow. The Officer's submit form is only shown for a first
+  // submission or when the report was sent back FOR_REVISION (submitting
+  // again there updates the same row rather than creating a duplicate).
+  const isAdviserPending = liq?.status === 'PENDING_ADVISER' && currentUser.role === 'csc_adviser';
+  const isDeanPending = liq?.status === 'PENDING_DEAN' && currentUser.role === 'dean';
+  const isAwaitingOtherReviewer = liq && (liq.status === 'PENDING_ADVISER' || liq.status === 'PENDING_DEAN') && !isAdviserPending && !isDeanPending;
+  // Only Officers submit/edit liquidation reports — Dean/Adviser only ever
+  // see the review panel or a waiting/closed status message above.
+  const isOfficerRole = ['officer_treasurer', 'officer_governor', 'council_member'].includes(currentUser.role);
+  const canEditLiquidation = isOfficerRole && (!liq || liq.status === 'FOR_REVISION');
+  // Audited/Rejected/Closed (and legacy Draft/Submitted rows) are terminal
+  // or otherwise not directly editable/reviewable here.
+  const isClosedOrTerminal = Boolean(liq) && !canEditLiquidation && !isAdviserPending && !isDeanPending && !isAwaitingOtherReviewer;
+  const canProcessReturn = liq?.status === 'Audited';
 
   // Seed the editable accounting summary from actual recorded expenses
   // whenever the modal opens for a proposal — the user can still adjust or
@@ -80,6 +98,20 @@ export const LiquidationReturnModal: React.FC<LiquidationReturnModalProps> = ({
     onClose();
   };
 
+  const handleAdviserDecision = async (decision: 'APPROVED' | 'REVISION' | 'REJECTED') => {
+    if (!liq) return;
+    await adviserReviewLiquidation(liq.id, decision, reviewRemarks || undefined);
+    setReviewRemarks('');
+    onClose();
+  };
+
+  const handleDeanDecision = async (decision: 'APPROVED' | 'REVISION' | 'REJECTED') => {
+    if (!liq) return;
+    await deanReviewLiquidation(liq.id, decision, reviewRemarks || undefined);
+    setReviewRemarks('');
+    onClose();
+  };
+
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
       <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl border border-slate-200 overflow-hidden my-4">
@@ -105,8 +137,10 @@ export const LiquidationReturnModal: React.FC<LiquidationReturnModalProps> = ({
             1. Liquidation Accounting Audit
           </button>
           <button
-            onClick={() => setActiveTab('return')}
-            className={`flex-1 py-3 text-center border-b-2 transition cursor-pointer ${
+            onClick={() => canProcessReturn && setActiveTab('return')}
+            disabled={!canProcessReturn}
+            title={canProcessReturn ? undefined : 'Available once the liquidation report is fully Audited (Adviser + Dean approved)'}
+            className={`flex-1 py-3 text-center border-b-2 transition cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 ${
               activeTab === 'return' ? 'border-[#00873E] text-[#00873E] bg-white' : 'border-transparent text-slate-600 hover:text-slate-900'
             }`}
           >
@@ -139,8 +173,77 @@ export const LiquidationReturnModal: React.FC<LiquidationReturnModalProps> = ({
             </div>
           </div>
 
-          {activeTab === 'liquidation' ? (
+          {activeTab === 'liquidation' && liq && (isAdviserPending || isDeanPending) ? (
+            <div className="space-y-4">
+              <div className={`p-4 rounded-2xl border space-y-2 ${isAdviserPending ? 'bg-emerald-50 border-emerald-200' : 'bg-rose-50 border-rose-200'}`}>
+                <span className={`font-bold text-xs block ${isAdviserPending ? 'text-emerald-900' : 'text-rose-900'}`}>
+                  {isAdviserPending ? 'Adviser Review' : 'Dean Final Review'}
+                </span>
+                <p className={`text-xs ${isAdviserPending ? 'text-emerald-800' : 'text-rose-800'}`}>
+                  {isAdviserPending
+                    ? 'Review the accounting summary above and either forward this liquidation report to the Dean, send it back for revision, or reject it.'
+                    : 'This liquidation report was endorsed by the Adviser. Approve to certify it as Audited, send it back for revision, or reject it.'}
+                </p>
+                <textarea
+                  rows={2}
+                  placeholder="Remarks (optional)..."
+                  value={reviewRemarks}
+                  onChange={(e) => setReviewRemarks(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-white rounded-xl border border-slate-200"
+                />
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={() => (isAdviserPending ? handleAdviserDecision('APPROVED') : handleDeanDecision('APPROVED'))}
+                    className="flex items-center gap-1.5 px-4 py-2 bg-[#00873E] hover:bg-[#007033] text-white text-xs font-bold rounded-xl shadow-xs cursor-pointer"
+                  >
+                    <ThumbsUp className="w-3.5 h-3.5" /> {isAdviserPending ? 'Approve & Forward to Dean' : 'Approve & Certify Audited'}
+                  </button>
+                  <button
+                    onClick={() => (isAdviserPending ? handleAdviserDecision('REVISION') : handleDeanDecision('REVISION'))}
+                    className="flex items-center gap-1.5 px-3 py-2 bg-orange-100 hover:bg-orange-200 text-orange-800 text-xs font-bold rounded-xl cursor-pointer"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" /> Request Revision
+                  </button>
+                  <button
+                    onClick={() => (isAdviserPending ? handleAdviserDecision('REJECTED') : handleDeanDecision('REJECTED'))}
+                    className="flex items-center gap-1.5 px-3 py-2 bg-rose-100 hover:bg-rose-200 text-rose-800 text-xs font-bold rounded-xl cursor-pointer"
+                  >
+                    <ThumbsDown className="w-3.5 h-3.5" /> Reject
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : activeTab === 'liquidation' && isAwaitingOtherReviewer ? (
+            <div className="p-6 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 space-y-1.5">
+              <ShieldCheck className="w-6 h-6 text-slate-300 mx-auto" />
+              <p className="text-xs font-bold text-slate-600">
+                Awaiting {liq?.status === 'PENDING_ADVISER' ? 'Adviser' : 'Dean'} review.
+              </p>
+              <p className="text-[11px] text-slate-400">You'll be able to edit and resubmit if it's returned for revision.</p>
+            </div>
+          ) : activeTab === 'liquidation' && isClosedOrTerminal ? (
+            <div className={`p-4 rounded-2xl border space-y-1.5 text-xs ${
+              liq?.status === 'Audited' ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-rose-50 border-rose-200 text-rose-900'
+            }`}>
+              <p className="font-bold">Liquidation status: {liq?.status}</p>
+              {liq?.dean_remarks && <p>Dean remarks: {liq.dean_remarks}</p>}
+              {liq?.adviser_remarks && <p>Adviser remarks: {liq.adviser_remarks}</p>}
+            </div>
+          ) : activeTab === 'liquidation' && !canEditLiquidation ? (
+            <div className="p-6 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 space-y-1.5">
+              <FileCheck className="w-6 h-6 text-slate-300 mx-auto" />
+              <p className="text-xs font-bold text-slate-600">No liquidation report submitted yet.</p>
+              <p className="text-[11px] text-slate-400">Only the Officer who owns this proposal can submit one.</p>
+            </div>
+          ) : activeTab === 'liquidation' ? (
             <form onSubmit={handleLiquidationSubmit} className="space-y-4">
+              {liq?.status === 'FOR_REVISION' && (liq.adviser_remarks || liq.dean_remarks) && (
+                <div className="p-3 rounded-xl bg-orange-50 border border-orange-200 text-orange-900 text-xs space-y-1">
+                  <p className="font-bold">Sent back for revision:</p>
+                  {liq.adviser_remarks && <p>Adviser: {liq.adviser_remarks}</p>}
+                  {liq.dean_remarks && <p>Dean: {liq.dean_remarks}</p>}
+                </div>
+              )}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <h4 className="text-xs font-bold uppercase text-slate-700">Accounting Summary (editable)</h4>
@@ -226,9 +329,15 @@ export const LiquidationReturnModal: React.FC<LiquidationReturnModalProps> = ({
                 className="w-full py-3 bg-[#00873E] hover:bg-[#007033] text-white text-xs font-bold rounded-2xl shadow-md transition cursor-pointer flex items-center justify-center gap-2"
               >
                 <FileCheck className="w-4 h-4" />
-                <span>Submit & Certify Official Liquidation</span>
+                <span>{liq?.status === 'FOR_REVISION' ? 'Resubmit for Adviser Review' : 'Submit for Adviser Review'}</span>
               </button>
             </form>
+          ) : !canProcessReturn ? (
+            <div className="p-6 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 space-y-1.5">
+              <ArrowDownLeft className="w-6 h-6 text-slate-300 mx-auto" />
+              <p className="text-xs font-bold text-slate-600">Budget return isn't available yet.</p>
+              <p className="text-[11px] text-slate-400">The liquidation report must be fully Audited (Adviser + Dean approved) first.</p>
+            </div>
           ) : (
             <form onSubmit={handleBudgetReturnSubmit} className="space-y-4">
               <div className="p-4 bg-amber-50 rounded-2xl border border-amber-200 text-xs space-y-2 text-amber-900">

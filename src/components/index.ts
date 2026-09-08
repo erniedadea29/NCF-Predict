@@ -18,3 +18,5 @@ export * from './SchoolYearEditModal';
 export * from './EditProfileModal';
 export * from './ManageUsersView';
 export * from './ReceiptUploadField';
+export * from './ResetPasswordPage';
+export * from './ReimbursementReviewPanel';

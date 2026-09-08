@@ -103,10 +103,10 @@ export const BudgetProposalWorkflow: React.FC<BudgetProposalWorkflowProps> = ({
         <div>
           <h2 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">
             <FileText className="w-5 h-5 text-emerald-600" />
-            Budget Proposal & 5-Stage Approval System
+            Budget Proposal & Reimbursement
           </h2>
           <p className="text-xs text-slate-500">
-            Define requirements, evaluate pricing, resolution voting, and fund release tracking ({activeSemester.school_year_label})
+            Draft a request, submit it for Adviser review, and track it through to Dean fund release ({activeSemester.school_year_label})
           </p>
         </div>
 
@@ -241,77 +241,70 @@ export const BudgetProposalWorkflow: React.FC<BudgetProposalWorkflowProps> = ({
                 <p>{activeProposal.budget_description}</p>
                 {activeProposal.event_title && (
                   <p className="text-[11px] text-emerald-800 font-medium pt-1">
-                    🎯 Linked Event: <span className="font-bold">{activeProposal.event_title}</span>
+                    📅 Linked Semester: <span className="font-bold">{activeProposal.event_title}</span>
                   </p>
                 )}
               </div>
 
-              {/* 5-Stage Approval Progress Tracker */}
+              {/* Approval Progress Tracker — Officer creates, Adviser reviews,
+                  auto-forwards to Dean for final release. (Old Governor
+                  Review / Council Voting stages are skipped for new
+                  proposals but stay recognized here in case any legacy
+                  proposal is still mid-flow in one of them.) */}
               <div className="space-y-2">
                 <h4 className="text-xs font-black uppercase text-slate-400 tracking-wider">
-                  5-Stage Approval Workflow Progress
+                  Approval Workflow Progress
                 </h4>
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs">
-                  {/* Stage 1: Treasurer */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                  {/* Stage 1: Officer Draft */}
                   <div className={`p-2.5 rounded-xl border ${
-                    activeProposal.budget_status !== 'DRAFT' 
-                      ? 'bg-emerald-50 border-emerald-300 text-emerald-900' 
+                    activeProposal.budget_status !== 'DRAFT'
+                      ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
                       : 'bg-amber-50 border-amber-300 text-amber-900'
                   }`}>
                     <p className="text-[10px] font-bold uppercase opacity-75">Stage 1</p>
-                    <p className="font-bold text-xs mt-0.5">Treasurer Draft</p>
+                    <p className="font-bold text-xs mt-0.5">Officer Draft</p>
                     <span className="text-[10px] block mt-1">✓ Line Items Set</span>
                   </div>
 
-                  {/* Stage 2: Governor */}
-                  <div className={`p-2.5 rounded-xl border ${
-                    activeProposal.executive_review?.decision === 'APPROVED_TO_COUNCIL'
-                      ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
-                      : (activeProposal.budget_status === 'EXECUTIVE_REVIEW' ? 'bg-purple-50 border-purple-300 text-purple-900' : 'bg-slate-50 border-slate-200 text-slate-400')
-                  }`}>
-                    <p className="text-[10px] font-bold uppercase opacity-75">Stage 2</p>
-                    <p className="font-bold text-xs mt-0.5">Governor Review</p>
-                    <span className="text-[10px] block mt-1">
-                      {activeProposal.executive_review?.decision === 'APPROVED_TO_COUNCIL' ? '✓ Endorsed' : 'Pending'}
-                    </span>
-                  </div>
-
-                  {/* Stage 3: Council Voting */}
-                  <div className={`p-2.5 rounded-xl border ${
-                    activeProposal.council_resolution?.status === 'PASSED'
-                      ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
-                      : (activeProposal.budget_status === 'COUNCIL_VOTING' ? 'bg-blue-50 border-blue-300 text-blue-900' : 'bg-slate-50 border-slate-200 text-slate-400')
-                  }`}>
-                    <p className="text-[10px] font-bold uppercase opacity-75">Stage 3</p>
-                    <p className="font-bold text-xs mt-0.5">Council Voting</p>
-                    <span className="text-[10px] block mt-1">
-                      {activeProposal.votes?.length || 0} Votes Recorded
-                    </span>
-                  </div>
-
-                  {/* Stage 4: CSC Adviser */}
+                  {/* Stage 2: CSC Adviser */}
                   <div className={`p-2.5 rounded-xl border ${
                     activeProposal.adviser_approval?.decision === 'APPROVED'
                       ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
-                      : (activeProposal.budget_status === 'CSC_ADVISER_APPROVAL' ? 'bg-indigo-50 border-indigo-300 text-indigo-900' : 'bg-slate-50 border-slate-200 text-slate-400')
+                      : (['EXECUTIVE_REVIEW', 'COUNCIL_VOTING', 'CSC_ADVISER_APPROVAL'].includes(activeProposal.budget_status)
+                          ? 'bg-indigo-50 border-indigo-300 text-indigo-900'
+                          : 'bg-slate-50 border-slate-200 text-slate-400')
                   }`}>
-                    <p className="text-[10px] font-bold uppercase opacity-75">Stage 4</p>
-                    <p className="font-bold text-xs mt-0.5">CSC Adviser</p>
+                    <p className="text-[10px] font-bold uppercase opacity-75">Stage 2</p>
+                    <p className="font-bold text-xs mt-0.5">Adviser Review</p>
                     <span className="text-[10px] block mt-1">
                       {activeProposal.adviser_approval?.decision === 'APPROVED' ? '✓ Approved' : 'Pending'}
                     </span>
                   </div>
 
-                  {/* Stage 5: Dean */}
-                  <div className={`p-2.5 rounded-xl border sm:col-span-1 col-span-2 ${
+                  {/* Stage 3: Dean */}
+                  <div className={`p-2.5 rounded-xl border ${
                     activeProposal.dean_approval?.release_authorized
                       ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
                       : (activeProposal.budget_status === 'DEAN_APPROVAL' ? 'bg-rose-50 border-rose-300 text-rose-900' : 'bg-slate-50 border-slate-200 text-slate-400')
                   }`}>
-                    <p className="text-[10px] font-bold uppercase opacity-75">Stage 5</p>
-                    <p className="font-bold text-xs mt-0.5">Dean Release</p>
+                    <p className="text-[10px] font-bold uppercase opacity-75">Stage 3</p>
+                    <p className="font-bold text-xs mt-0.5">Dean Approval</p>
                     <span className="text-[10px] block mt-1">
-                      {activeProposal.dean_approval?.release_authorized ? '✓ Fund Released' : 'Pending'}
+                      {activeProposal.dean_approval?.release_authorized ? '✓ Approved' : 'Pending'}
+                    </span>
+                  </div>
+
+                  {/* Stage 4: Released */}
+                  <div className={`p-2.5 rounded-xl border ${
+                    activeProposal.budget_status === 'APPROVED_RELEASED'
+                      ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
+                      : 'bg-slate-50 border-slate-200 text-slate-400'
+                  }`}>
+                    <p className="text-[10px] font-bold uppercase opacity-75">Stage 4</p>
+                    <p className="font-bold text-xs mt-0.5">Funds Released</p>
+                    <span className="text-[10px] block mt-1">
+                      {activeProposal.budget_status === 'APPROVED_RELEASED' ? '✓ Fund Released' : 'Pending'}
                     </span>
                   </div>
                 </div>
@@ -359,21 +352,21 @@ export const BudgetProposalWorkflow: React.FC<BudgetProposalWorkflowProps> = ({
 
               {/* ACTION PANELS BASED ON CURRENT USER ROLE & PROPOSAL STATUS */}
               <div className="pt-2 border-t border-slate-100 space-y-4">
-                {/* 1. Treasurer Actions (Submit Draft) */}
+                {/* 1. Officer Actions (Submit Draft) */}
                 {currentUser.role === 'officer_treasurer' && activeProposal.budget_status === 'DRAFT' && (
                   <div className="p-4 bg-amber-50 rounded-2xl border border-amber-200 space-y-3">
                     <div className="flex items-center gap-2 text-amber-900 font-bold text-xs">
                       <AlertCircle className="w-4 h-4 text-amber-600" />
-                      <span>Treasurer Action: Ready for Submission?</span>
+                      <span>Draft ready — submit for Adviser review?</span>
                     </div>
                     <p className="text-xs text-amber-800">
-                      Submit this draft proposal to College Governor and Executive Committee for formal stage review.
+                      This sends the request straight to your CSC Adviser, who forwards it to the Dean for final approval.
                     </p>
                     <button
                       onClick={() => submitProposalForReview(activeProposal.id)}
                       className="px-4 py-2 bg-[#00873E] hover:bg-[#007033] text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer"
                     >
-                      Submit for Executive Review →
+                      Submit Request →
                     </button>
                   </div>
                 )}

@@ -20,7 +20,11 @@ import {
   BudgetReturnRecord,
   ProposalNote,
   UserAccountSummary,
-  ClearanceRecord
+  ClearanceRecord,
+  Course,
+  NotificationItem,
+  OfficerSlotKey,
+  OFFICER_POSITION_LABELS
 } from '../types';
 import {
   DEPARTMENTS,
@@ -82,11 +86,14 @@ interface AppContextType {
   isAuthenticated: boolean;
   isAuthLoading: boolean;
   isReadOnlyStudent: boolean;
+  isViewOnlyReviewer: boolean;
+  isAdminSystemOnly: boolean;
   registerUser: (userData: {
     name: string;
     email: string;
     role: UserRole;
     department: DepartmentCode;
+    course_id?: number;
     student_number?: string;
     officer_position?: string;
     course?: string;
@@ -95,6 +102,30 @@ interface AppContextType {
     password: string;
     contact_number?: string;
   }) => Promise<{ success: boolean; message: string; user?: User }>;
+  loginWithGoogle: () => Promise<void>;
+  requestPasswordReset: (email: string) => Promise<{ success: boolean; message: string }>;
+  updatePassword: (newPassword: string) => Promise<{ success: boolean; message: string }>;
+  isPasswordRecovery: boolean;
+
+  // Courses & role-slot availability (needed pre-auth for registration)
+  courses: Course[];
+  takenRoleSlots: { course_id: number; slot_key: string }[];
+
+  // Officer promotion (Adviser-only)
+  promoteToOfficer: (studentProfileId: string, slotKey: OfficerSlotKey) => Promise<{ success: boolean; message: string }>;
+  vacateOfficerPosition: (profileId: string) => Promise<{ success: boolean; message: string }>;
+
+  // Notifications
+  notifications: NotificationItem[];
+  markNotificationRead: (id: string) => Promise<void>;
+
+  // Events approval workflow
+  proposeEvent: (event: Omit<SchoolEvent, 'id' | 'created_at' | 'status'>) => Promise<{ success: boolean; message: string }>;
+  reviewEvent: (eventId: string, decision: 'APPROVED' | 'REJECTED', remarks?: string) => Promise<void>;
+
+  // Liquidation review (Adviser -> Dean)
+  adviserReviewLiquidation: (liquidationId: string, decision: 'APPROVED' | 'REVISION' | 'REJECTED', remarks?: string) => Promise<void>;
+  deanReviewLiquidation: (liquidationId: string, decision: 'APPROVED' | 'REVISION' | 'REJECTED', remarks?: string) => Promise<void>;
   updateOwnProfile: (updates: {
     name?: string;
     contact_number?: string;
@@ -231,6 +262,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // True until the initial supabase.auth.getSession() resolves, so the UI
   // doesn't flash the login page before a real session is restored.
   const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
+  // True while the user arrived via a password-reset email link — AuthGate
+  // shows ResetPasswordPage instead of the normal login/dashboard split.
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState<boolean>(false);
   // Suppresses the global onAuthStateChange listener while registerUser's
   // transient post-signUp session is being cleaned up, so a new account
   // never causes a brief flash into the dashboard before landing on login.
@@ -240,6 +274,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [authModalMode, setAuthModalMode] = useState<'login' | 'register'>('login');
   const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(false);
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState<boolean>(false);
+
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [takenRoleSlots, setTakenRoleSlots] = useState<{ course_id: number; slot_key: string }[]>([]);
+
+  // Fetched unconditionally (not gated on isAuthenticated) — the registration
+  // form needs both of these before anyone is logged in. Both are backed by
+  // public-readable/anon-callable DB objects for exactly this reason.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const client = getSupabase();
+      const [{ data: courseRows }, { data: slotRows }] = await Promise.all([
+        client.from('courses').select('id, department_code, name, code, is_active').eq('is_active', true).order('name'),
+        client.rpc('get_taken_role_slots')
+      ]);
+      if (cancelled) return;
+      if (courseRows) setCourses(courseRows as Course[]);
+      if (slotRows) setTakenRoleSlots(slotRows);
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const openAuthModal = (mode: 'login' | 'register' = 'login') => {
     setAuthModalMode(mode);
@@ -500,14 +555,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     (async () => {
       const client = getSupabase();
       const [{ data: profileRows }, { data: clearanceRows }] = await Promise.all([
-        client.from('profiles').select('id, full_name, email, role, department, is_active'),
+        client.from('profiles').select('id, full_name, email, role, department, is_active, course_id, officer_position'),
         client.from('clearances').select('*')
       ]);
       if (cancelled) return;
       if (profileRows) {
         setUserAccounts(profileRows.map((r: any): UserAccountSummary => ({
           id: r.id, full_name: r.full_name, email: r.email, role: r.role,
-          department: r.department || undefined, is_active: r.is_active
+          department: r.department || undefined, is_active: r.is_active,
+          course_id: r.course_id ?? undefined, officer_position: r.officer_position || undefined
         })));
       }
       if (clearanceRows) setClearances(clearanceRows.map(mapClearanceRow));
@@ -605,6 +661,117 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const record = mapClearanceRow(data);
     setClearances(prev => [record, ...prev.filter(c => c.student_id !== studentId)]);
     return record;
+  };
+
+  // ============================================================
+  // Officer promotion (Adviser-only)
+  // ============================================================
+  const promoteToOfficer = async (studentProfileId: string, slotKey: OfficerSlotKey): Promise<{ success: boolean; message: string }> => {
+    const client = getSupabase();
+    const label = OFFICER_POSITION_LABELS[slotKey];
+    const { error } = await client.rpc('promote_to_officer', {
+      p_student_profile_id: studentProfileId, p_slot_key: slotKey, p_position_label: label
+    });
+    if (error) return { success: false, message: error.message };
+    setUserAccounts(prev => prev.map(u => u.id === studentProfileId
+      ? { ...u, role: slotKey === 'auditor' ? 'council_member' : slotKey.includes('governor') ? 'officer_governor' : 'officer_treasurer' }
+      : u));
+    return { success: true, message: `Promoted to ${label}.` };
+  };
+
+  const vacateOfficerPosition = async (profileId: string): Promise<{ success: boolean; message: string }> => {
+    const client = getSupabase();
+    const { error } = await client.rpc('vacate_officer_position', { p_profile_id: profileId });
+    if (error) return { success: false, message: error.message };
+    setUserAccounts(prev => prev.map(u => u.id === profileId ? { ...u, role: 'student' } : u));
+    return { success: true, message: 'Position vacated — reverted to student.' };
+  };
+
+  // ============================================================
+  // Notifications
+  // ============================================================
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    let cancelled = false;
+    (async () => {
+      const client = getSupabase();
+      const { data } = await client.from('notifications').select('*').order('created_at', { ascending: false }).limit(50);
+      if (!cancelled && data) {
+        setNotifications(data.map((n: any): NotificationItem => ({
+          id: n.id, title: n.title, body: n.body || undefined, link_tab: n.link_tab || undefined,
+          created_at: n.created_at, read_at: n.read_at || undefined
+        })));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isAuthenticated]);
+
+  const markNotificationRead = async (id: string) => {
+    const client = getSupabase();
+    const { error } = await client.from('notifications').update({ read_at: new Date().toISOString() }).eq('id', id);
+    if (error) { console.error('Failed to mark notification read', error); return; }
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read_at: new Date().toISOString() } : n));
+  };
+
+  // ============================================================
+  // Events: propose (officer) -> review (adviser/dean) -> publish
+  // ============================================================
+  const proposeEvent = async (event: Omit<SchoolEvent, 'id' | 'created_at' | 'status'>): Promise<{ success: boolean; message: string }> => {
+    const client = getSupabase();
+    const { error } = await client.rpc('propose_event', {
+      p_event_title: event.event_title,
+      p_event_description: event.event_description || event.description || null,
+      p_venue: event.venue,
+      p_event_type: event.event_type,
+      p_event_date: event.event_date,
+      p_start_time: event.start_time || null,
+      p_end_time: event.end_time || null,
+      p_penalty_fee_amount: event.penalty ?? event.penalty_fee_amount ?? 50,
+      p_semester_id: event.activesem_id ? Number(event.activesem_id) : null,
+      p_department_code: event.department === 'ALL' ? null : event.department
+    });
+    if (error) return { success: false, message: error.message };
+    return { success: true, message: 'Event proposed — awaiting Adviser/Dean approval.' };
+  };
+
+  const reviewEvent = async (eventId: string, decision: 'APPROVED' | 'REJECTED', remarks?: string) => {
+    const client = getSupabase();
+    const { error } = await client.rpc('review_event', { p_event_id: eventId, p_decision: decision, p_remarks: remarks });
+    if (error) { console.error('Failed to review event', error); return; }
+    setEvents(prev => prev.map(e => e.id === eventId ? { ...e, status: decision === 'APPROVED' ? 'PUBLISHED' : 'REJECTED' } : e));
+  };
+
+  // ============================================================
+  // Liquidation review: Adviser -> Dean
+  // ============================================================
+  const adviserReviewLiquidation = async (liquidationId: string, decision: 'APPROVED' | 'REVISION' | 'REJECTED', remarks?: string) => {
+    const client = getSupabase();
+    const { error } = await client.rpc('adviser_review_liquidation', { p_liquidation_id: liquidationId, p_decision: decision, p_remarks: remarks });
+    if (error) { console.error('Failed to submit adviser liquidation review', error); return; }
+    setProposals(prev => prev.map(p => p.liquidation?.id === liquidationId ? {
+      ...p,
+      liquidation: {
+        ...p.liquidation!,
+        status: decision === 'APPROVED' ? 'PENDING_DEAN' : decision === 'REVISION' ? 'FOR_REVISION' : 'Rejected',
+        adviser_decision: decision, adviser_remarks: remarks
+      }
+    } : p));
+  };
+
+  const deanReviewLiquidation = async (liquidationId: string, decision: 'APPROVED' | 'REVISION' | 'REJECTED', remarks?: string) => {
+    const client = getSupabase();
+    const { error } = await client.rpc('dean_review_liquidation', { p_liquidation_id: liquidationId, p_decision: decision, p_remarks: remarks });
+    if (error) { console.error('Failed to submit dean liquidation review', error); return; }
+    setProposals(prev => prev.map(p => p.liquidation?.id === liquidationId ? {
+      ...p,
+      liquidation: {
+        ...p.liquidation!,
+        status: decision === 'APPROVED' ? 'Audited' : decision === 'REVISION' ? 'FOR_REVISION' : 'Rejected',
+        dean_decision: decision, dean_remarks: remarks
+      }
+    } : p));
   };
 
   const [proposals, setProposals] = useState<BudgetProposal[]>(MOCK_PROPOSALS);
@@ -798,11 +965,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // signup). officer_position/course are derived client-side since they
   // aren't stored on profiles; course/year_level/section for students come
   // from their students row (profiles doesn't carry academic info either).
+  // Roles that started as a self-registered/enrolled student and still have
+  // a linked `students` roster row (officers are promoted students, not a
+  // separate account type) — course/year/section come from that row.
+  const STUDENT_LINKED_ROLES: UserRole[] = ['student', 'officer_treasurer', 'officer_governor', 'council_member'];
+
   const buildUserFromSession = async (authUser: { id: string; email?: string | null }): Promise<User> => {
     const client = getSupabase();
     const { data: profile } = await client
       .from('profiles')
-      .select('full_name, email, role, department, contact_number, is_active')
+      .select('full_name, email, role, department, contact_number, is_active, course_id, officer_position')
       .eq('id', authUser.id)
       .maybeSingle();
 
@@ -814,7 +986,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     let year_level: string | undefined;
     let section: string | undefined;
 
-    if (role === 'student') {
+    if (STUDENT_LINKED_ROLES.includes(role)) {
       const { data: studentRow } = await client
         .from('students')
         .select('student_number, course, year_level, section')
@@ -832,7 +1004,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       email: profile?.email || authUser.email || '',
       role,
       department,
-      officer_position: deriveOfficerPosition(role, department),
+      course_id: profile?.course_id ?? undefined,
+      officer_position: profile?.officer_position || deriveOfficerPosition(role, department),
       student_number,
       course: course || (role === 'student' ? deriveCourse(department) : undefined),
       year_level,
@@ -865,6 +1038,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const { data: sub } = client.auth.onAuthStateChange(async (_event, session) => {
       if (suppressAuthEventsRef.current) return;
+      if (_event === 'PASSWORD_RECOVERY') {
+        // A recovery-link click gives a real (temporary) session, but we
+        // don't want the app to treat this as a normal login — show the
+        // reset-password form instead until a new password is set.
+        setIsPasswordRecovery(true);
+        setIsAuthLoading(false);
+        return;
+      }
       if (session?.user) {
         const user = await buildUserFromSession(session.user);
         if (user.is_active === false) {
@@ -933,11 +1114,43 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setAuthModalMode('login');
   };
 
+  // Non-functional until a Google OAuth Client ID/Secret is configured in
+  // the Supabase dashboard (Authentication -> Providers -> Google) — the
+  // button that calls this should say so until then.
+  const loginWithGoogle = async () => {
+    await getSupabase().auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: window.location.origin }
+    });
+  };
+
+  const requestPasswordReset = async (email: string): Promise<{ success: boolean; message: string }> => {
+    const { error } = await getSupabase().auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: `${window.location.origin}${window.location.pathname}#reset-password`
+    });
+    if (error) return { success: false, message: error.message };
+    return { success: true, message: 'If an account exists for that email, a reset link has been sent.' };
+  };
+
+  const updatePassword = async (newPassword: string): Promise<{ success: boolean; message: string }> => {
+    if (!/[a-zA-Z]/.test(newPassword) || !/[0-9]/.test(newPassword) || newPassword.length < 6) {
+      return { success: false, message: 'Password must be at least 6 characters and contain both letters and numbers.' };
+    }
+    const { error } = await getSupabase().auth.updateUser({ password: newPassword });
+    if (error) return { success: false, message: error.message };
+    // The recovery session is done its job — sign out so they log in fresh
+    // with the new password rather than silently landing in the dashboard.
+    setIsPasswordRecovery(false);
+    await getSupabase().auth.signOut();
+    return { success: true, message: 'Password updated. You can now log in with your new password.' };
+  };
+
   const registerUser = async (userData: {
     name: string;
     email: string;
     role: UserRole;
     department: DepartmentCode;
+    course_id?: number;
     student_number?: string;
     officer_position?: string;
     course?: string;
@@ -949,9 +1162,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!userData.password || userData.password.length < 6) {
       return { success: false, message: 'Password must be at least 6 characters.' };
     }
+    if (!/[a-zA-Z]/.test(userData.password) || !/[0-9]/.test(userData.password)) {
+      return { success: false, message: 'Password must contain both letters and numbers.' };
+    }
+
+    const cleanEmail = userData.email.trim().toLowerCase();
+    const isGbox = /@gbox\.ncf\.edu\.ph$/i.test(cleanEmail);
+    const isNcf = /@ncf\.edu\.ph$/i.test(cleanEmail);
+    if (userData.role === 'student' && !isGbox) {
+      return { success: false, message: 'Student accounts must use an @gbox.ncf.edu.ph email address.' };
+    }
+    if (['admin', 'dean', 'csc_adviser'].includes(userData.role)) {
+      if (isGbox) {
+        return { success: false, message: 'Admin, Dean, and Adviser accounts must use an @ncf.edu.ph email address, not @gbox.ncf.edu.ph.' };
+      }
+      if (!isNcf) {
+        return { success: false, message: 'Admin, Dean, and Adviser accounts must use an @ncf.edu.ph email address.' };
+      }
+    }
 
     const client = getSupabase();
-    const cleanEmail = userData.email.trim().toLowerCase();
     suppressAuthEventsRef.current = true;
     try {
       return await registerUserInner(client, cleanEmail, userData);
@@ -964,7 +1194,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     client: ReturnType<typeof getSupabase>,
     cleanEmail: string,
     userData: {
-      name: string; role: UserRole; department: DepartmentCode; student_number?: string;
+      name: string; role: UserRole; department: DepartmentCode; course_id?: number; student_number?: string;
       officer_position?: string; course?: string; year_level?: string; section?: string;
       password: string; contact_number?: string;
     }
@@ -977,15 +1207,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         data: {
           full_name: userData.name.trim(),
           role: userData.role,
-          department: userData.department
+          department: userData.department,
+          course_id: userData.course_id ?? null
         }
       }
     });
 
     if (error) {
-      const message = /already registered|already exists/i.test(error.message)
-        ? `Mayroon nang nakarehistrong account gamit ang email na "${cleanEmail}". Mangyaring mag-log in na lamang.`
-        : error.message;
+      let message = error.message;
+      if (/already registered|already exists/i.test(error.message)) {
+        message = `Mayroon nang nakarehistrong account gamit ang email na "${cleanEmail}". Mangyaring mag-log in na lamang.`;
+      } else if (/already taken for this course/i.test(error.message)) {
+        message = 'That role is already taken for this course this school year. Pick a different course or role.';
+      } else if (/must use an? @/i.test(error.message)) {
+        message = error.message; // our own trigger's message, already clear
+      }
       return { success: false, message };
     }
     if (!data.user) {
@@ -1022,7 +1258,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         p_email: cleanEmail,
         p_department_code: userData.department,
         p_semester_id: activeSemester.semester_id ? Number(activeSemester.semester_id) : null,
-        p_profile_id: data.user.id
+        p_profile_id: data.user.id,
+        p_course_id: userData.course_id ?? null
       });
       if (rpcError) {
         await client.auth.signOut();
@@ -1614,8 +1851,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setProposals(prev => prev.map(p => p.id === id ? { ...p, ...updates, updated_at: new Date().toISOString().slice(0, 10) } : p));
   };
 
+  // Skips the old Executive-Review/Council-Voting stages: Officer -> Adviser
+  // -> Dean is the whole review sequence now. Those stages/RPCs are left in
+  // the schema unused rather than removed, so no old data/enum breaks.
   const submitProposalForReview = async (id: string) => {
-    await updateProposalDraft(id, { budget_status: 'EXECUTIVE_REVIEW' });
+    await updateProposalDraft(id, { budget_status: 'CSC_ADVISER_APPROVAL' });
   };
 
   const executiveReviewProposal = async (id: string, decision: 'APPROVED_TO_COUNCIL' | 'NEEDS_REVISION' | 'REJECTED', remarks: string) => {
@@ -1983,6 +2223,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const isReadOnlyStudent = currentUser.role === 'student';
 
+  // Dean/Adviser get course-scoped, view-only access to Transactions, SAF
+  // Cash-In, Penalties/Attendance, and SAF Clearance (Section 5) — they
+  // still retain write access to Reimbursement/Liquidation decisions and
+  // Event approval, which are gated separately, so this is narrower than
+  // isReadOnlyStudent and applied only to those specific screens.
+  const isViewOnlyReviewer = currentUser.role === 'dean' || currentUser.role === 'csc_adviser';
+  const isAdminSystemOnly = currentUser.role === 'admin';
+
   return (
     <AppContext.Provider
       value={{
@@ -1991,7 +2239,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isAuthenticated,
         isAuthLoading,
         isReadOnlyStudent,
+        isViewOnlyReviewer,
+        isAdminSystemOnly,
         registerUser,
+        loginWithGoogle,
+        requestPasswordReset,
+        updatePassword,
+        isPasswordRecovery,
+        courses,
+        takenRoleSlots,
+        promoteToOfficer,
+        vacateOfficerPosition,
+        notifications,
+        markNotificationRead,
+        proposeEvent,
+        reviewEvent,
+        adviserReviewLiquidation,
+        deanReviewLiquidation,
         updateOwnProfile,
         userAccounts,
         addUserAccount,

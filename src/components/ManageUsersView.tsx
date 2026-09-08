@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { UserRole, DepartmentCode } from '../types';
+import { UserRole, DepartmentCode, OfficerSlotKey, OFFICER_POSITION_LABELS } from '../types';
 import { DEPARTMENTS } from '../data/mockData';
 import {
   UserPlus,
@@ -9,7 +9,9 @@ import {
   Copy,
   X,
   AlertCircle,
-  Search
+  Search,
+  Award,
+  UserMinus
 } from 'lucide-react';
 
 const ROLE_OPTIONS: { value: UserRole; label: string }[] = [
@@ -24,6 +26,127 @@ const ROLE_OPTIONS: { value: UserRole; label: string }[] = [
 ];
 
 const roleLabel = (role: UserRole) => ROLE_OPTIONS.find(r => r.value === role)?.label || role;
+
+const OFFICER_SLOTS: OfficerSlotKey[] = ['governor', 'vice_governor', 'treasurer', 'assistant_treasurer', 'auditor'];
+
+// Reverse-map an officer_position label ("Vice Governor") back to its slot
+// key ('vice_governor') so we can tell which slots are already occupied.
+const labelToSlotKey = (label?: string): OfficerSlotKey | null => {
+  if (!label) return null;
+  const entry = (Object.entries(OFFICER_POSITION_LABELS) as [OfficerSlotKey, string][]).find(([, l]) => l === label);
+  return entry ? entry[0] : null;
+};
+
+const OfficerPromotionPanel: React.FC = () => {
+  const { userAccounts, currentUser, promoteToOfficer, vacateOfficerPosition } = useApp();
+  const [studentId, setStudentId] = useState('');
+  const [slotKey, setSlotKey] = useState<OfficerSlotKey>('governor');
+  const [submitting, setSubmitting] = useState(false);
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Scope candidate students to the Adviser's own department (and course,
+  // when the Adviser account is bound to one specific course).
+  const eligibleStudents = userAccounts.filter(u =>
+    u.role === 'student' && u.is_active &&
+    u.department === currentUser.department &&
+    (currentUser.course_id ? u.course_id === currentUser.course_id : true)
+  );
+
+  const currentOfficers = userAccounts.filter(u =>
+    u.is_active &&
+    u.department === currentUser.department &&
+    (currentUser.course_id ? u.course_id === currentUser.course_id : true) &&
+    labelToSlotKey(u.officer_position) !== null
+  );
+
+  const takenSlotKeys = new Set(currentOfficers.map(u => labelToSlotKey(u.officer_position)));
+
+  const handlePromote = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!studentId) { setMessage({ type: 'error', text: 'Select a student first.' }); return; }
+    setSubmitting(true);
+    setMessage(null);
+    const res = await promoteToOfficer(studentId, slotKey);
+    setSubmitting(false);
+    setMessage({ type: res.success ? 'success' : 'error', text: res.message });
+    if (res.success) setStudentId('');
+  };
+
+  const handleVacate = async (profileId: string) => {
+    setSubmitting(true);
+    setMessage(null);
+    const res = await vacateOfficerPosition(profileId);
+    setSubmitting(false);
+    setMessage({ type: res.success ? 'success' : 'error', text: res.message });
+  };
+
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-4 sm:p-5 space-y-4">
+      <div className="flex items-center gap-2">
+        <Award className="w-4.5 h-4.5 text-[#00873E]" />
+        <h3 className="font-extrabold text-slate-900 text-sm sm:text-base">Officer Promotion</h3>
+      </div>
+      <p className="text-[11px] text-slate-500 -mt-2">
+        Promote a student in your department to an officer position. Each position can only be held by one active officer per school year.
+      </p>
+
+      {message && (
+        <div className={`p-2.5 rounded-xl text-xs border ${
+          message.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-rose-50 border-rose-200 text-rose-800'
+        }`}>
+          {message.text}
+        </div>
+      )}
+
+      <form onSubmit={handlePromote} className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-3">
+        <div>
+          <label className="block text-[11px] font-bold text-slate-700 mb-1 uppercase tracking-wider">Student</label>
+          <select value={studentId} onChange={(e) => setStudentId(e.target.value)}
+            className="w-full px-3 py-2.5 text-sm border border-slate-300 rounded-xl bg-white focus:ring-2 focus:ring-[#00873E]">
+            <option value="">Select a student...</option>
+            {eligibleStudents.map(s => <option key={s.id} value={s.id}>{s.full_name} ({s.email})</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="block text-[11px] font-bold text-slate-700 mb-1 uppercase tracking-wider">Position</label>
+          <select value={slotKey} onChange={(e) => setSlotKey(e.target.value as OfficerSlotKey)}
+            className="w-full px-3 py-2.5 text-sm border border-slate-300 rounded-xl bg-white focus:ring-2 focus:ring-[#00873E]">
+            {OFFICER_SLOTS.map(key => (
+              <option key={key} value={key} disabled={takenSlotKeys.has(key)}>
+                {OFFICER_POSITION_LABELS[key]}{takenSlotKeys.has(key) ? ' (Taken)' : ''}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="flex items-end">
+          <button type="submit" disabled={submitting || !studentId}
+            className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs font-bold bg-[#00873E] hover:bg-[#007033] text-white shadow-xs transition cursor-pointer disabled:opacity-50 whitespace-nowrap">
+            {submitting ? 'Promoting...' : 'Promote'}
+          </button>
+        </div>
+      </form>
+
+      {currentOfficers.length > 0 && (
+        <div className="border-t border-slate-100 pt-3 space-y-2">
+          <p className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">Current Officers</p>
+          {currentOfficers.map(o => (
+            <div key={o.id} className="flex items-center justify-between gap-2 bg-slate-50 rounded-xl px-3 py-2">
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-slate-900 truncate">{o.full_name}</p>
+                <p className="text-[10px] text-slate-500 truncate">{o.officer_position}</p>
+              </div>
+              <button onClick={() => handleVacate(o.id)} disabled={submitting}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-[11px] font-bold transition cursor-pointer disabled:opacity-50 shrink-0"
+                title="Vacate position — reverts to student">
+                <UserMinus className="w-3.5 h-3.5" /> Vacate
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 export const ManageUsersView: React.FC = () => {
   const { userAccounts, addUserAccount, deactivateUser, reactivateUser, currentUser } = useApp();
@@ -93,6 +216,8 @@ export const ManageUsersView: React.FC = () => {
           <span>Add User</span>
         </button>
       </div>
+
+      {currentUser.role === 'csc_adviser' && <OfficerPromotionPanel />}
 
       {tempPasswordInfo && (
         <div className="bg-amber-50 border border-amber-300 rounded-2xl p-4 flex items-start gap-3">

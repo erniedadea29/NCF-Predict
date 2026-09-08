@@ -32,12 +32,41 @@ export interface User {
   officer_position?: string;
   student_number?: string;
   course?: string;
+  course_id?: number;
   year_level?: string;
   section?: string;
   avatar?: string;
   contact_number?: string;
   registered_at?: string;
   is_active?: boolean;
+}
+
+export interface Course {
+  id: number;
+  department_code: DepartmentCode;
+  name: string;
+  code?: string;
+  is_active: boolean;
+}
+
+export type OfficerSlotKey = 'governor' | 'vice_governor' | 'treasurer' | 'assistant_treasurer' | 'auditor';
+export type StaffSlotKey = 'admin' | 'dean' | 'adviser';
+
+export const OFFICER_POSITION_LABELS: Record<OfficerSlotKey, string> = {
+  governor: 'Governor',
+  vice_governor: 'Vice Governor',
+  treasurer: 'Treasurer',
+  assistant_treasurer: 'Assistant Treasurer',
+  auditor: 'Auditor'
+};
+
+export interface NotificationItem {
+  id: string;
+  title: string;
+  body?: string;
+  link_tab?: string;
+  created_at: string;
+  read_at?: string;
 }
 
 export interface UserAccountSummary {
@@ -47,6 +76,8 @@ export interface UserAccountSummary {
   role: UserRole;
   department?: DepartmentCode;
   is_active: boolean;
+  course_id?: number;
+  officer_position?: string;
 }
 
 export interface ClearanceRecord {
@@ -91,6 +122,7 @@ export interface Student {
   first_name: string;
   last_name: string;
   course: string;
+  course_id?: number;
   year_level: string;
   section: string;
   email: string;
@@ -129,6 +161,9 @@ export interface SAFRecord {
   notes?: string;
 }
 
+// 'Operations'/'Academic' removed from selectable UI per the latest spec but
+// kept in the type (and DB CHECK constraint) since old rows may still use
+// them — dropping the value outright would make historical data un-typeable.
 export type TransactionCategory = 'Revenue' | 'Event' | 'Capital' | 'Operations' | 'Academic' | 'All';
 
 export interface DepartmentTransaction {
@@ -163,6 +198,11 @@ export interface SchoolEvent {
   department: DepartmentCode | 'ALL';
   school_year?: string;
   created_at: string;
+  status?: 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'PUBLISHED';
+  proposed_by?: string;
+  reviewed_by?: string;
+  review_remarks?: string;
+  published_at?: string;
 }
 
 export interface EventAttendance {
@@ -184,6 +224,7 @@ export interface EventAttendance {
   penalty_paid_date?: string;
   receipt_no?: string;
   notes?: string;
+  photo_url?: string;
 }
 
 export interface BudgetLineItem {
@@ -271,12 +312,16 @@ export interface LiquidationRecord {
   total_released: number;
   total_spent: number;
   balance: number; // unspent fund to be returned
-  status: 'Draft' | 'Submitted' | 'Audited' | 'Closed';
+  status: 'Draft' | 'Submitted' | 'PENDING_ADVISER' | 'PENDING_DEAN' | 'FOR_REVISION' | 'Audited' | 'Rejected' | 'Closed';
   accounting_summary: { category: string; spent: number; line_item_count: number }[];
   submitted_by: string;
   submitted_date: string;
   auditor_remarks?: string;
   notes?: string;
+  adviser_decision?: 'APPROVED' | 'REVISION' | 'REJECTED';
+  adviser_remarks?: string;
+  dean_decision?: 'APPROVED' | 'REVISION' | 'REJECTED';
+  dean_remarks?: string;
 }
 
 export type SemesterEvent = SchoolEvent;

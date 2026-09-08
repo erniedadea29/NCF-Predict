@@ -37,14 +37,10 @@ export const MLForecastView: React.FC = () => {
     departments
   } = useApp();
 
-  // Scenario Simulator Interactive State
-  const [enrollmentShift, setEnrollmentShift] = useState<number>(0); // percentage shift -20 to +30
-  const [collectionEfficiency, setCollectionEfficiency] = useState<number>(95); // 70 to 100%
-  const [inflationRate, setInflationRate] = useState<number>(4.5); // 0 to 12%
   const [selectedDeptFilter, setSelectedDeptFilter] = useState<string>(isDepartmentRestricted ? userDepartment : 'ALL');
 
   // Active Tab within Forecast View
-  const [activeSubTab, setActiveSubTab] = useState<'overview' | 'comparison' | 'simulator' | 'insights'>('overview');
+  const [activeSubTab, setActiveSubTab] = useState<'overview' | 'comparison' | 'insights'>('overview');
 
   // Month-by-month trajectory data for time-series visualization
   const monthlyTrajectory = [
@@ -73,26 +69,6 @@ export const MLForecastView: React.FC = () => {
     }
     return true;
   });
-
-  // Calculate dynamic simulator results based on slider inputs
-  const simulatedFactor = (1 + enrollmentShift / 100) * (collectionEfficiency / 95) * (1 + (inflationRate - 4.5) / 100);
-  const baseTotalForecast = isDepartmentRestricted 
-    ? (forecastMetric.departments.find(d => d.code === userDepartment)?.forecast || 79200)
-    : forecastMetric.departments.reduce((sum, d) => sum + d.forecast, 0);
-
-  const simulatedTotalForecast = Math.round(baseTotalForecast * simulatedFactor);
-  const baseAllocated = isDepartmentRestricted 
-    ? (scopedDepartmentInfo.allocated || 85000)
-    : forecastMetric.departments.reduce((sum, d) => sum + d.allocated, 0);
-
-  const simulatedDiff = baseAllocated - simulatedTotalForecast;
-  const isSurplus = simulatedDiff >= 0;
-
-  const handleResetSimulator = () => {
-    setEnrollmentShift(0);
-    setCollectionEfficiency(95);
-    setInflationRate(4.5);
-  };
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
@@ -183,15 +159,6 @@ export const MLForecastView: React.FC = () => {
         >
           <Building2 className="w-4 h-4" />
           <span>Department Variance Table</span>
-        </button>
-        <button
-          onClick={() => setActiveSubTab('simulator')}
-          className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center justify-center gap-2 ${
-            activeSubTab === 'simulator' ? 'bg-[#00873E] text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
-          }`}
-        >
-          <Sliders className="w-4 h-4" />
-          <span>What-If Scenario Simulator</span>
         </button>
         <button
           onClick={() => setActiveSubTab('insights')}
@@ -411,129 +378,6 @@ export const MLForecastView: React.FC = () => {
         </div>
       )}
 
-      {/* TAB 3: WHAT-IF SCENARIO SIMULATOR */}
-      {activeSubTab === 'simulator' && (
-        <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-xs space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
-            <div>
-              <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
-                <Sliders className="w-5 h-5 text-emerald-600" />
-                Interactive Predictive Budget Simulator
-              </h3>
-              <p className="text-xs text-slate-500">
-                Simulate macro-variables like student population shifts, collection velocity, and inflation index in real time
-              </p>
-            </div>
-            <button
-              onClick={handleResetSimulator}
-              className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl flex items-center gap-1.5 transition cursor-pointer self-start"
-            >
-              <RefreshCw className="w-3.5 h-3.5" />
-              Reset Defaults
-            </button>
-          </div>
-
-          {/* Sliders Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-5 bg-slate-50 rounded-2xl border border-slate-200/80">
-            {/* Slider 1: Student Population */}
-            <div className="space-y-2">
-              <div className="flex justify-between text-xs font-bold">
-                <span className="text-slate-700">Student Enrollment Shift</span>
-                <span className={`font-mono ${enrollmentShift >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
-                  {enrollmentShift > 0 ? `+${enrollmentShift}%` : `${enrollmentShift}%`}
-                </span>
-              </div>
-              <input
-                type="range"
-                min="-20"
-                max="30"
-                step="1"
-                value={enrollmentShift}
-                onChange={(e) => setEnrollmentShift(parseInt(e.target.value))}
-                className="w-full accent-[#00873E] cursor-pointer"
-              />
-              <div className="flex justify-between text-[10px] text-slate-400">
-                <span>-20% Drop</span>
-                <span>Baseline (0%)</span>
-                <span>+30% Growth</span>
-              </div>
-            </div>
-
-            {/* Slider 2: SAF Collection Rate */}
-            <div className="space-y-2">
-              <div className="flex justify-between text-xs font-bold">
-                <span className="text-slate-700">SAF Collection Efficiency</span>
-                <span className="text-blue-700 font-mono">{collectionEfficiency}%</span>
-              </div>
-              <input
-                type="range"
-                min="70"
-                max="100"
-                step="1"
-                value={collectionEfficiency}
-                onChange={(e) => setCollectionEfficiency(parseInt(e.target.value))}
-                className="w-full accent-blue-600 cursor-pointer"
-              />
-              <div className="flex justify-between text-[10px] text-slate-400">
-                <span>70% Low</span>
-                <span>95% Target</span>
-                <span>100% Perfect</span>
-              </div>
-            </div>
-
-            {/* Slider 3: Inflation & Event Costs */}
-            <div className="space-y-2">
-              <div className="flex justify-between text-xs font-bold">
-                <span className="text-slate-700">Projected Operational Inflation</span>
-                <span className="text-purple-700 font-mono">{inflationRate}%</span>
-              </div>
-              <input
-                type="range"
-                min="0"
-                max="12"
-                step="0.5"
-                value={inflationRate}
-                onChange={(e) => setInflationRate(parseFloat(e.target.value))}
-                className="w-full accent-purple-600 cursor-pointer"
-              />
-              <div className="flex justify-between text-[10px] text-slate-400">
-                <span>0% Fixed</span>
-                <span>4.5% Est.</span>
-                <span>12% High</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Simulation Output Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="p-5 bg-white rounded-2xl border border-slate-200 shadow-2xs space-y-1">
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Baseline Budget Pool</span>
-              <p className="text-2xl font-black text-slate-900">₱{baseAllocated.toLocaleString()}.00</p>
-              <p className="text-[11px] text-slate-500">{isDepartmentRestricted ? `${userDepartment} Initial Fund` : 'All Departments Combined'}</p>
-            </div>
-
-            <div className="p-5 bg-white rounded-2xl border border-slate-200 shadow-2xs space-y-1">
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Dynamic ML Projection</span>
-              <p className="text-2xl font-black text-purple-700">₱{simulatedTotalForecast.toLocaleString()}.00</p>
-              <p className="text-[11px] text-slate-500">Adjusted for {enrollmentShift}% shift & {inflationRate}% inflation</p>
-            </div>
-
-            <div className={`p-5 rounded-2xl border shadow-2xs space-y-1 ${
-              isSurplus ? 'bg-emerald-50 border-emerald-200' : 'bg-rose-50 border-rose-200'
-            }`}>
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                {isSurplus ? 'Estimated Net Reserve' : 'Estimated Deficit Risk'}
-              </span>
-              <p className={`text-2xl font-black ${isSurplus ? 'text-emerald-700' : 'text-rose-600'}`}>
-                {isSurplus ? `+₱${simulatedDiff.toLocaleString()}.00` : `-₱${Math.abs(simulatedDiff).toLocaleString()}.00`}
-              </p>
-              <p className="text-[11px] font-medium text-slate-600">
-                {isSurplus ? 'Safe fiscal boundary maintained' : 'Warning: Supplementary allocation required'}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* TAB 4: AI RISK & OPTIMIZATION ALERTS */}
       {activeSubTab === 'insights' && (

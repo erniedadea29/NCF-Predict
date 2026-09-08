@@ -11,9 +11,8 @@ interface CreateProposalModalProps {
 
 export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({ isOpen, onClose }) => {
   const { 
-    createProposal, 
-    activeSemester, 
-    events, 
+    createProposal,
+    activeSemester,
     currentUser,
     userDepartment,
     isDepartmentRestricted,
@@ -23,7 +22,7 @@ export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({ isOpen
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [department, setDepartment] = useState<DepartmentCode>(userDepartment);
-  const [selectedEventId, setSelectedEventId] = useState<string>('');
+  const [linkedSemester, setLinkedSemester] = useState<string>('');
   const [treasurerNotes, setTreasurerNotes] = useState('KUNG MAY NOTES KAMO IDAGDAG INI SA NOTES: Verified unit costs against campus supplier price quotations.');
 
   // Line items for requirements & price evaluation
@@ -110,14 +109,12 @@ export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({ isOpen
       return;
     }
 
-    const selectedEv = events.find(e => e.id === selectedEventId);
-
     await createProposal({
       budget_title: title.trim(),
       budget_description: description.trim() || 'No additional description provided.',
       department,
-      event_id: selectedEv?.id,
-      event_title: selectedEv?.event_title,
+      event_id: undefined,
+      event_title: linkedSemester || undefined,
       total_budget_amount: totalCalculatedBudget,
       budget_status: 'DRAFT',
       activesem_id: activeSemester.id,
@@ -196,19 +193,16 @@ export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({ isOpen
 
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                Linked Semester Event (Optional)
+                Link Semester (Optional)
               </label>
               <select
-                value={selectedEventId}
-                onChange={(e) => setSelectedEventId(e.target.value)}
+                value={linkedSemester}
+                onChange={(e) => setLinkedSemester(e.target.value)}
                 className="w-full px-3.5 py-2.5 bg-slate-50 focus:bg-white text-xs rounded-xl border border-slate-200 font-medium"
               >
-                <option value="">-- No specific event linked --</option>
-                {events.map(ev => (
-                  <option key={ev.id} value={ev.id}>
-                    {ev.event_title} ({ev.event_date})
-                  </option>
-                ))}
+                <option value="">-- Not linked to a specific semester --</option>
+                <option value="1st Semester">1st Semester</option>
+                <option value="2nd Semester">2nd Semester</option>
               </select>
             </div>
 

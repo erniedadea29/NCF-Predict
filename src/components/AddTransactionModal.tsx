@@ -27,7 +27,7 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ isOpen
   const [fiscalYear, setFiscalYear] = useState<string>(activeSemester.school_year_label);
 
   const deptCodes: DepartmentCode[] = ['CAF', 'CAS', 'CBM', 'CCJE', 'CCS', 'COE', 'CHS', 'CTED'];
-  const categories: TransactionCategory[] = ['Revenue', 'Event', 'Capital', 'Operations', 'Academic'];
+  const categories: TransactionCategory[] = ['Revenue', 'Event', 'Capital'];
 
   if (!isOpen) return null;
 

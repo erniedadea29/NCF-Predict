@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { getSupabase } from '../lib/supabaseClient';
 import { UserRole, DepartmentCode } from '../types';
@@ -13,11 +13,12 @@ import {
   Building2,
   IdCard,
   Award,
-  Briefcase,
   ShieldCheck,
   GraduationCap,
   Landmark,
-  LogIn
+  LogIn,
+  Chrome,
+  Lock
 } from 'lucide-react';
 
 interface RegisterPageProps {
@@ -25,78 +26,51 @@ interface RegisterPageProps {
 }
 
 // ---------------------------------------------------------------------------
-// Four broad account types the person registering can choose from.
-// Each maps to one (or a filtered set) of the system's internal roles so the
-// existing 5-stage approval workflow keeps working under the hood.
+// Only 4 self-registerable account types now. "Officer" is no longer one of
+// them — officers are promoted from an existing student account by their
+// Adviser (see the Manage Users / promotion flow), not self-selected here.
 // ---------------------------------------------------------------------------
-type AccountType = 'officer' | 'admin' | 'adviser' | 'student';
+type AccountType = 'student' | 'adviser' | 'dean' | 'admin';
 
-interface PositionOption {
-  id: string;
-  title: string;
-  role: UserRole;
-  description: string;
-}
-
-const ACCOUNT_TYPE_META: Record<AccountType, { label: string; description: string; icon: React.ReactNode; color: string; ring: string }> = {
-  officer: {
-    label: 'Officer',
-    description: 'Treasurer, Governor, or Council Member handling budgets & voting.',
-    icon: <Briefcase className="w-5 h-5" />,
-    color: 'bg-amber-100 text-amber-800 border-amber-300',
-    ring: 'ring-amber-400'
-  },
-  admin: {
-    label: 'Admin',
-    description: 'Dean / Executive with final approval & fund-release authority.',
-    icon: <ShieldCheck className="w-5 h-5" />,
-    color: 'bg-rose-100 text-rose-800 border-rose-300',
-    ring: 'ring-rose-400'
+const ACCOUNT_TYPE_META: Record<AccountType, { label: string; role: UserRole; description: string; icon: React.ReactNode; color: string; ring: string; emailHint: string }> = {
+  student: {
+    label: 'Student', role: 'student',
+    description: 'View SAF status, attendance, budgets, and clearance penalties.',
+    icon: <GraduationCap className="w-5 h-5" />,
+    color: 'bg-slate-100 text-slate-800 border-slate-300', ring: 'ring-slate-400',
+    emailHint: 'Must be an @gbox.ncf.edu.ph address.'
   },
   adviser: {
-    label: 'Adviser',
-    description: 'Student Council Adviser / OSA formal review & approval.',
+    label: 'Adviser', role: 'csc_adviser',
+    description: 'Student Council Adviser — reviews proposals/liquidation, approves events, promotes officers.',
     icon: <Landmark className="w-5 h-5" />,
-    color: 'bg-emerald-100 text-emerald-800 border-emerald-300',
-    ring: 'ring-emerald-400'
+    color: 'bg-emerald-100 text-emerald-800 border-emerald-300', ring: 'ring-emerald-400',
+    emailHint: 'Must be an @ncf.edu.ph address (not @gbox.ncf.edu.ph).'
   },
-  student: {
-    label: 'Student',
-    description: 'View-only access to SAF status, attendance, and penalties.',
-    icon: <GraduationCap className="w-5 h-5" />,
-    color: 'bg-slate-100 text-slate-800 border-slate-300',
-    ring: 'ring-slate-400'
+  dean: {
+    label: 'Dean', role: 'dean',
+    description: 'Final approval & fund-release authority for one course.',
+    icon: <Award className="w-5 h-5" />,
+    color: 'bg-rose-100 text-rose-800 border-rose-300', ring: 'ring-rose-400',
+    emailHint: 'Must be an @ncf.edu.ph address (not @gbox.ncf.edu.ph).'
+  },
+  admin: {
+    label: 'Admin', role: 'admin',
+    description: 'System management only — user accounts, courses, school year.',
+    icon: <ShieldCheck className="w-5 h-5" />,
+    color: 'bg-indigo-100 text-indigo-800 border-indigo-300', ring: 'ring-indigo-400',
+    emailHint: 'Must be an @ncf.edu.ph address (not @gbox.ncf.edu.ph).'
   }
 };
 
-const POSITIONS_BY_TYPE: Record<AccountType, PositionOption[]> = {
-  officer: [
-    { id: 'treasurer_dept', title: 'Department Treasurer', role: 'officer_treasurer', description: 'Manages SAF collection, budget drafts, and disbursement cashouts.' },
-    { id: 'treasurer_asst', title: 'Assistant Treasurer', role: 'officer_treasurer', description: 'Assists in auditing SAF collections, receipts, and line items.' },
-    { id: 'gov_college', title: 'College Governor', role: 'officer_governor', description: 'Executive review and endorsement of budget proposals.' },
-    { id: 'gov_vice', title: 'Vice Governor', role: 'officer_governor', description: 'Assists the Governor in leading department programs.' },
-    { id: 'council_pres', title: 'Student Council President', role: 'officer_governor', description: 'Overall council leadership and resolution sign-off.' },
-    { id: 'council_rep', title: 'Council Representative', role: 'council_member', description: 'Votes and comments on budget proposal resolutions.' },
-    { id: 'council_sec', title: 'Council Secretary', role: 'council_member', description: 'Documents meetings, resolutions, and event attendance.' },
-    { id: 'saf_cashier', title: 'SAF Cashier', role: 'cashier', description: 'Collects and verifies Student Activity Fee (SAF) payments.' }
-  ],
-  admin: [
-    { id: 'dean_college', title: 'College Dean', role: 'dean', description: 'Final approval and fund-release authorization.' },
-    { id: 'dean_assoc', title: 'Associate Dean / Program Chair', role: 'dean', description: 'Assists in departmental leadership and fund oversight.' }
-  ],
-  adviser: [
-    { id: 'adviser_csc', title: 'Student Council Adviser', role: 'csc_adviser', description: 'Formal review and approval before the Dean.' },
-    { id: 'adviser_osa', title: 'Office of Student Affairs Officer', role: 'csc_adviser', description: 'Oversees general regulation of student organizations.' }
-  ],
-  student: [
-    { id: 'student_reg', title: 'Student / Council Member', role: 'student', description: 'View SAF status, attendance, and clearance penalties.' },
-    { id: 'student_officer', title: 'Class Mayor / Representative', role: 'student', description: 'Class or block representative for department coordination.' }
-  ]
-};
+// One admin/dean/adviser per course per school year — this bucket only needs
+// the role, no sub-positions (officer positions are assigned later by the
+// Adviser via promotion, not chosen here).
+const STAFF_TYPES: AccountType[] = ['adviser', 'dean', 'admin'];
 
 const DEFAULT_COURSES: Record<DepartmentCode, string[]> = {
   CAF: ['BS Accountancy (BSA)', 'BS Management Accounting (BSMA)', 'BS Accounting Information System'],
-  CCS: ['BS Computer Science (BSCS)', 'BS Information Technology (BSIT)', 'Associate in Computer Technology'],
+  CCS: ['BS Computer Science (BSCS)', 'BS Information Technology (BSIT)', 'BS Information System (BSIS)', 'Associate in Computer Technology'],
   CBM: ['BS Business Administration (BSBA)', 'BS Hospitality Management (BSHM)', 'BS Tourism Management (BSTM)'],
   COE: ['BS Civil Engineering (BSCE)', 'BS Computer Engineering (BSCpE)', 'BS Electrical Engineering (BSEE)'],
   CAS: ['AB Communication', 'AB Political Science', 'BS Psychology'],
@@ -106,16 +80,16 @@ const DEFAULT_COURSES: Record<DepartmentCode, string[]> = {
 };
 
 export const RegisterPage: React.FC<RegisterPageProps> = ({ onGoToLogin }) => {
-  const { registerUser } = useApp();
+  const { registerUser, loginWithGoogle, courses, takenRoleSlots } = useApp();
 
   const [accountType, setAccountType] = useState<AccountType>('student');
-  const [selectedPositionId, setSelectedPositionId] = useState<string>(POSITIONS_BY_TYPE.student[0].id);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [studentNumber, setStudentNumber] = useState('');
   const [department, setDepartment] = useState<DepartmentCode>('CAF');
   const [course, setCourse] = useState<string>(DEFAULT_COURSES.CAF[0]);
+  const [courseId, setCourseId] = useState<number | undefined>(undefined);
   const [yearLevel, setYearLevel] = useState<string>('1st Year');
   const [section, setSection] = useState<string>('CAF-1A');
   const [password, setPassword] = useState('');
@@ -127,12 +101,27 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onGoToLogin }) => {
   const [studentIdAvailable, setStudentIdAvailable] = useState<boolean | null>(null);
   const [checkingStudentId, setCheckingStudentId] = useState(false);
 
+  const isStaffType = STAFF_TYPES.includes(accountType);
+  const meta = ACCOUNT_TYPE_META[accountType];
+
+  // Courses under the selected department, from the DB (falls back to the
+  // static list if the courses table hasn't loaded yet).
+  const coursesInDept = useMemo(() => {
+    const fromDb = courses.filter(c => c.department_code === department);
+    if (fromDb.length > 0) return fromDb.map(c => ({ id: c.id, name: c.name }));
+    return (DEFAULT_COURSES[department] || []).map((name, i) => ({ id: -1 - i, name }));
+  }, [courses, department]);
+
+  const takenSlotKeyForType: Record<string, string> = { adviser: 'adviser', dean: 'dean', admin: 'admin' };
+  const isCourseTakenForRole = (cId: number) => {
+    const slotKey = takenSlotKeyForType[accountType];
+    if (!slotKey) return false;
+    return takenRoleSlots.some(s => s.course_id === cId && s.slot_key === slotKey);
+  };
+
   const checkStudentIdAvailability = async (value: string) => {
     const trimmed = value.trim();
-    if (!trimmed) {
-      setStudentIdAvailable(null);
-      return;
-    }
+    if (!trimmed) { setStudentIdAvailable(null); return; }
     setCheckingStudentId(true);
     try {
       const { data, error: rpcError } = await getSupabase().rpc('check_student_number_available', { p_student_number: trimmed });
@@ -142,18 +131,17 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onGoToLogin }) => {
     }
   };
 
-  const currentPositions = POSITIONS_BY_TYPE[accountType];
-  const currentPosition = currentPositions.find(p => p.id === selectedPositionId) || currentPositions[0];
-
   const handleAccountTypeChange = (type: AccountType) => {
     setAccountType(type);
-    setSelectedPositionId(POSITIONS_BY_TYPE[type][0].id);
+    setCourseId(undefined);
+    setError('');
   };
 
   const handleDepartmentChange = (dept: DepartmentCode) => {
     setDepartment(dept);
-    const courses = DEFAULT_COURSES[dept];
-    if (courses?.length) setCourse(courses[0]);
+    setCourseId(undefined);
+    const defaults = DEFAULT_COURSES[dept];
+    if (defaults?.length) setCourse(defaults[0]);
     setSection(`${dept}-1A`);
   };
 
@@ -165,34 +153,52 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onGoToLogin }) => {
       setError('Please enter your First Name and Last Name.');
       return;
     }
-    if (!email.trim() || !email.includes('@')) {
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail.includes('@')) {
       setError('Please enter a valid email address.');
       return;
     }
+    const isGbox = /@gbox\.ncf\.edu\.ph$/i.test(cleanEmail);
+    const isNcf = /@ncf\.edu\.ph$/i.test(cleanEmail);
+    if (accountType === 'student' && !isGbox) {
+      setError('Student accounts must use an @gbox.ncf.edu.ph email address.');
+      return;
+    }
+    if (isStaffType) {
+      if (isGbox) { setError('Admin, Dean, and Adviser accounts must use an @ncf.edu.ph email address, not @gbox.ncf.edu.ph.'); return; }
+      if (!isNcf) { setError('Admin, Dean, and Adviser accounts must use an @ncf.edu.ph email address.'); return; }
+      if (!courseId) { setError('Please select which course you are registering for.'); return; }
+      if (isCourseTakenForRole(courseId)) { setError(`That course already has a registered ${meta.label} this school year.`); return; }
+    }
     if (!password || password.length < 6) {
       setError('Please enter a password of at least 6 characters.');
+      return;
+    }
+    if (!/[a-zA-Z]/.test(password) || !/[0-9]/.test(password)) {
+      setError('Password must contain both letters and numbers.');
       return;
     }
     if (password !== confirmPassword) {
       setError('Password and Confirm Password do not match.');
       return;
     }
-    if (studentIdAvailable === false) {
-      setError('That Student / Employee ID is already taken. Please use a different one.');
+    if (accountType === 'student' && studentIdAvailable === false) {
+      setError('That Student ID is already taken. Please use a different one.');
       return;
     }
 
     setIsSubmitting(true);
     const res = await registerUser({
       name: `${firstName.trim()} ${lastName.trim()}`,
-      email: email.trim(),
-      role: currentPosition.role,
+      email: cleanEmail,
+      role: meta.role,
       department,
-      student_number: studentNumber.trim() || undefined,
-      officer_position: currentPosition.title,
-      course,
-      year_level: yearLevel,
-      section,
+      course_id: courseId,
+      student_number: accountType === 'student' ? (studentNumber.trim() || undefined) : undefined,
+      officer_position: meta.label,
+      course: accountType === 'student' ? course : undefined,
+      year_level: accountType === 'student' ? yearLevel : undefined,
+      section: accountType === 'student' ? section : undefined,
       password
     });
     setIsSubmitting(false);
@@ -200,8 +206,6 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onGoToLogin }) => {
       setError(res.message);
       return;
     }
-    // Registration no longer auto-logs-in — show the success message, then
-    // send the user to the login page instead of straight into the dashboard.
     setSuccessMessage(res.message);
     setTimeout(() => onGoToLogin(), 1800);
   };
@@ -231,6 +235,22 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onGoToLogin }) => {
             </div>
           )}
 
+          {/* Google Workspace SSO — wired but inert until a Google OAuth
+              Client ID/Secret is configured in the Supabase dashboard. */}
+          <button
+            type="button"
+            onClick={() => loginWithGoogle()}
+            className="w-full mb-4 py-2.5 px-4 border-2 border-slate-200 hover:border-slate-300 text-slate-700 font-bold text-sm rounded-xl transition flex items-center justify-center gap-2 cursor-pointer"
+            title="Requires Google Workspace SSO to be configured by the system admin"
+          >
+            <Chrome className="w-4 h-4" />
+            <span>Continue with NCF Google Account</span>
+          </button>
+          <div className="relative mb-4">
+            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-200" /></div>
+            <div className="relative flex justify-center text-[11px]"><span className="bg-white px-2 text-slate-400">or register manually</span></div>
+          </div>
+
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Account Type Selector */}
             <div>
@@ -240,7 +260,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onGoToLogin }) => {
               </label>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {(Object.keys(ACCOUNT_TYPE_META) as AccountType[]).map((type) => {
-                  const meta = ACCOUNT_TYPE_META[type];
+                  const m = ACCOUNT_TYPE_META[type];
                   const isSelected = accountType === type;
                   return (
                     <button
@@ -248,34 +268,18 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onGoToLogin }) => {
                       type="button"
                       onClick={() => handleAccountTypeChange(type)}
                       className={`p-3 rounded-xl border text-left transition cursor-pointer flex flex-col gap-1.5 ${
-                        isSelected ? `${meta.color} ring-2 ${meta.ring} font-bold` : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
+                        isSelected ? `${m.color} ring-2 ${m.ring} font-bold` : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
                       }`}
                     >
-                      {meta.icon}
-                      <span className="text-xs font-extrabold">{meta.label}</span>
+                      {m.icon}
+                      <span className="text-xs font-extrabold">{m.label}</span>
                     </button>
                   );
                 })}
               </div>
-              <p className="text-[11px] text-slate-500 mt-2">{ACCOUNT_TYPE_META[accountType].description}</p>
+              <p className="text-[11px] text-slate-500 mt-2">{meta.description}</p>
+              <p className="text-[11px] text-slate-400 mt-0.5 italic">{meta.emailHint}</p>
             </div>
-
-            {/* Position within account type */}
-            {currentPositions.length > 1 && (
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Specific Position</label>
-                <select
-                  value={selectedPositionId}
-                  onChange={(e) => setSelectedPositionId(e.target.value)}
-                  className="w-full py-2.5 px-3 text-sm font-semibold border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#00873E] bg-white cursor-pointer"
-                >
-                  {currentPositions.map(pos => (
-                    <option key={pos.id} value={pos.id}>{pos.title}</option>
-                  ))}
-                </select>
-                <p className="text-[11px] text-slate-500 mt-1">{currentPosition.description}</p>
-              </div>
-            )}
 
             {/* Department */}
             <div>
@@ -302,6 +306,41 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onGoToLogin }) => {
               </div>
             </div>
 
+            {/* Course — for staff roles, this IS the scoping unit (one
+                Admin/Dean/Adviser slot per course per school year); taken
+                combinations are disabled. For students it's just their
+                program. */}
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Course / Program *</label>
+              <select
+                value={isStaffType ? (courseId ?? '') : course}
+                onChange={(e) => {
+                  if (isStaffType) {
+                    setCourseId(Number(e.target.value));
+                  } else {
+                    setCourse(e.target.value);
+                  }
+                }}
+                required={isStaffType}
+                className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#00873E] bg-white cursor-pointer"
+              >
+                {isStaffType && <option value="" disabled>Select a course&hellip;</option>}
+                {coursesInDept.map(c => {
+                  const taken = isStaffType && c.id > 0 && isCourseTakenForRole(c.id);
+                  return (
+                    <option key={c.id} value={isStaffType ? c.id : c.name} disabled={taken}>
+                      {c.name}{taken ? ` — ${meta.label} already registered` : ''}
+                    </option>
+                  );
+                })}
+              </select>
+              {isStaffType && (
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Only one {meta.label} may register per course each school year. Courses already filled are disabled above.
+                </p>
+              )}
+            </div>
+
             {/* Name & Email */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
@@ -318,68 +357,64 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onGoToLogin }) => {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className={`grid grid-cols-1 ${accountType === 'student' ? 'sm:grid-cols-2' : ''} gap-3`}>
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1">
                   <Mail className="w-3.5 h-3.5 text-slate-400" /> Email *
                 </label>
                 <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-                  placeholder="e.g. jdelacruz@gbox.ncf.edu.ph"
+                  placeholder={accountType === 'student' ? 'e.g. jdelacruz@gbox.ncf.edu.ph' : 'e.g. jdelacruz@ncf.edu.ph'}
                   className="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#00873E]" required />
               </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1">
-                  <IdCard className="w-3.5 h-3.5 text-slate-400" /> Student / Employee ID
-                </label>
-                <input type="text" value={studentNumber}
-                  onChange={(e) => { setStudentNumber(e.target.value); setStudentIdAvailable(null); }}
-                  onBlur={(e) => checkStudentIdAvailability(e.target.value)}
-                  placeholder={accountType === 'admin' || accountType === 'adviser' ? 'e.g. EMP-4029' : 'e.g. 2024-00142'}
-                  className={`w-full px-3 py-2 text-sm border rounded-xl focus:ring-2 focus:ring-[#00873E] ${
-                    studentIdAvailable === false ? 'border-rose-400' : 'border-slate-300'
-                  }`} />
-                {checkingStudentId && (
-                  <p className="text-[11px] text-slate-400 mt-1">Checking availability&hellip;</p>
-                )}
-                {studentIdAvailable === false && !checkingStudentId && (
-                  <p className="text-[11px] text-rose-600 font-semibold mt-1 flex items-center gap-1">
-                    <AlertCircle className="w-3 h-3" /> This ID is already taken. Please use a different one.
-                  </p>
-                )}
-                {studentIdAvailable === true && !checkingStudentId && (
-                  <p className="text-[11px] text-emerald-600 font-semibold mt-1">✓ Available</p>
-                )}
-              </div>
+              {accountType === 'student' && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1">
+                    <IdCard className="w-3.5 h-3.5 text-slate-400" /> Student ID
+                  </label>
+                  <input type="text" value={studentNumber}
+                    onChange={(e) => { setStudentNumber(e.target.value); setStudentIdAvailable(null); }}
+                    onBlur={(e) => checkStudentIdAvailability(e.target.value)}
+                    placeholder="e.g. 2024-00142"
+                    className={`w-full px-3 py-2 text-sm border rounded-xl focus:ring-2 focus:ring-[#00873E] ${
+                      studentIdAvailable === false ? 'border-rose-400' : 'border-slate-300'
+                    }`} />
+                  {checkingStudentId && (
+                    <p className="text-[11px] text-slate-400 mt-1">Checking availability&hellip;</p>
+                  )}
+                  {studentIdAvailable === false && !checkingStudentId && (
+                    <p className="text-[11px] text-rose-600 font-semibold mt-1 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3" /> This ID is already taken. Please use a different one.
+                    </p>
+                  )}
+                  {studentIdAvailable === true && !checkingStudentId && (
+                    <p className="text-[11px] text-emerald-600 font-semibold mt-1">✓ Available</p>
+                  )}
+                </div>
+              )}
             </div>
 
-            {/* Academic details */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Course / Program</label>
-                <select value={course} onChange={(e) => setCourse(e.target.value)}
-                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#00873E] bg-white cursor-pointer">
-                  {(DEFAULT_COURSES[department] || []).map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
+            {/* Academic details — students only; Adviser/Dean/Admin don't
+                have a year level or section. */}
+            {accountType === 'student' && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Year Level</label>
+                  <select value={yearLevel} onChange={(e) => setYearLevel(e.target.value)}
+                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#00873E] bg-white cursor-pointer">
+                    <option value="1st Year">1st Year</option>
+                    <option value="2nd Year">2nd Year</option>
+                    <option value="3rd Year">3rd Year</option>
+                    <option value="4th Year">4th Year</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Section</label>
+                  <input type="text" value={section} onChange={(e) => setSection(e.target.value)}
+                    placeholder="e.g. CAF-1A"
+                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#00873E]" />
+                </div>
               </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Year Level</label>
-                <select value={yearLevel} onChange={(e) => setYearLevel(e.target.value)}
-                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#00873E] bg-white cursor-pointer">
-                  <option value="1st Year">1st Year</option>
-                  <option value="2nd Year">2nd Year</option>
-                  <option value="3rd Year">3rd Year</option>
-                  <option value="4th Year">4th Year</option>
-                  <option value="Faculty/Staff">Faculty / Adviser</option>
-                  <option value="Administration">Administration</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Section</label>
-                <input type="text" value={section} onChange={(e) => setSection(e.target.value)}
-                  placeholder="e.g. CAF-1A"
-                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#00873E]" />
-              </div>
-            </div>
+            )}
 
             {/* Password */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-100">
@@ -394,6 +429,9 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onGoToLogin }) => {
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
+                <p className="text-[10px] text-slate-400 mt-1 flex items-center gap-1">
+                  <Lock className="w-2.5 h-2.5" /> At least 6 characters, with both letters and numbers.
+                </p>
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">Confirm Password</label>
