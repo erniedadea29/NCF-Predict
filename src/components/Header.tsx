@@ -91,10 +91,10 @@ export const Header: React.FC = () => {
   // renders Reimbursement-only content (gated inside BudgetProposalWorkflow).
   const reviewerNav = [
     { id: 'home', label: 'Home' },
-    { id: 'transactions', label: 'CCS Transactions' },
+    { id: 'transactions', label: 'Transactions' },
     { id: 'budget', label: 'Reimbursement' },
     { id: 'liquidation_reports', label: 'Liquidation Reports' },
-    { id: 'saf_students', label: 'CCS SAF Cash-In' },
+    { id: 'saf_students', label: 'SAF' },
     { id: 'events_attendance', label: 'Events & Penalties' },
     { id: 'manage_users', label: 'Manage Users' }
   ];
