@@ -7,7 +7,8 @@ import {
   ChevronDown,
   LogOut,
   Pencil,
-  UserCog
+  UserCog,
+  Bell
 } from 'lucide-react';
 import { UserRole } from '../types';
 import { SchoolYearEditModal } from './SchoolYearEditModal';
@@ -26,13 +27,17 @@ export const Header: React.FC = () => {
     logoutUser,
     isReadOnlyStudent,
     isViewOnlyReviewer,
-    isAdminSystemOnly
+    isAdminSystemOnly,
+    notifications,
+    markNotificationRead
   } = useApp();
 
   const [roleMenuOpen, setRoleMenuOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
   const [isSyModalOpen, setIsSyModalOpen] = useState(false);
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
   const [confirmingLogout, setConfirmingLogout] = useState(false);
+  const unreadCount = notifications.filter(n => !n.read_at).length;
 
   const getRoleBadge = (role: UserRole) => {
     switch (role) {
@@ -152,10 +157,54 @@ export const Header: React.FC = () => {
             <span>{mobileFrameMode ? 'Full View' : 'Mobile Frame'}</span>
           </button>
 
+          {/* Notification Bell — event publish/approval and SAF receipt alerts */}
+          <div className="relative">
+            <button
+              onClick={() => { setNotifOpen(!notifOpen); setRoleMenuOpen(false); }}
+              className="relative p-1.5 sm:p-2 rounded-full bg-slate-100 hover:bg-slate-200 border border-slate-200 transition cursor-pointer"
+              title="Notifications"
+            >
+              <Bell className="w-4 h-4 text-slate-600" />
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-rose-600 text-white text-[9px] font-black flex items-center justify-center">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
+            </button>
+
+            {notifOpen && (
+              <div className="absolute right-0 mt-2 w-72 bg-white rounded-xl shadow-xl border border-slate-200 py-2 z-50 animate-in fade-in zoom-in-95 max-h-96 overflow-y-auto">
+                <div className="px-3 py-1.5 border-b border-slate-100 flex items-center justify-between">
+                  <p className="text-xs font-bold text-slate-700">Notifications</p>
+                  {unreadCount > 0 && <span className="text-[10px] text-rose-600 font-bold">{unreadCount} unread</span>}
+                </div>
+                {notifications.length === 0 ? (
+                  <p className="px-3 py-6 text-center text-xs text-slate-400">No notifications yet.</p>
+                ) : (
+                  <div className="py-1">
+                    {notifications.map(n => (
+                      <button
+                        key={n.id}
+                        onClick={() => { if (!n.read_at) markNotificationRead(n.id); }}
+                        className={`w-full text-left px-3 py-2 text-xs transition cursor-pointer ${
+                          n.read_at ? 'hover:bg-slate-50' : 'bg-emerald-50/60 hover:bg-emerald-50'
+                        }`}
+                      >
+                        <p className={`font-bold ${n.read_at ? 'text-slate-700' : 'text-emerald-900'}`}>{n.title}</p>
+                        {n.body && <p className="text-slate-500 mt-0.5">{n.body}</p>}
+                        <p className="text-[10px] text-slate-400 mt-1">{new Date(n.created_at).toLocaleString()}</p>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
           {/* User Menu */}
           <div className="relative">
             <button
-              onClick={() => setRoleMenuOpen(!roleMenuOpen)}
+              onClick={() => { setRoleMenuOpen(!roleMenuOpen); setNotifOpen(false); }}
               className="flex items-center gap-1.5 p-1 sm:px-2.5 sm:py-1 rounded-full bg-slate-100 hover:bg-slate-200 border border-slate-200 transition cursor-pointer"
             >
               <div className="w-6 h-6 rounded-full bg-[#00873E] text-white font-bold flex items-center justify-center text-xs">
