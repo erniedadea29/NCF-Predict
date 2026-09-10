@@ -1,12 +1,17 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { UserRole, OfficerSlotKey, OFFICER_POSITION_LABELS } from '../types';
+import { UserRole, OfficerSlotKey, OFFICER_POSITION_LABELS, DepartmentCode } from '../types';
+import { DEPARTMENTS } from '../data/mockData';
+import { SearchableUserSelect } from './SearchableUserSelect';
 import {
   ShieldCheck,
   ShieldOff,
   Search,
   Award,
-  UserMinus
+  UserMinus,
+  Crown,
+  Landmark,
+  GraduationCap
 } from 'lucide-react';
 
 const ROLE_OPTIONS: { value: UserRole; label: string }[] = [
@@ -17,6 +22,8 @@ const ROLE_OPTIONS: { value: UserRole; label: string }[] = [
   { value: 'csc_adviser', label: 'Adviser' },
   { value: 'dean', label: 'Dean' },
   { value: 'admin', label: 'System Admin' },
+  { value: 'super_admin', label: 'Super Admin' },
+  { value: 'employee', label: 'Employee' },
   { value: 'student', label: 'Student' }
 ];
 
@@ -96,11 +103,12 @@ const OfficerPromotionPanel: React.FC = () => {
       <form onSubmit={handlePromote} className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-3">
         <div>
           <label className="block text-[11px] font-bold text-slate-700 mb-1 uppercase tracking-wider">Student</label>
-          <select value={studentId} onChange={(e) => setStudentId(e.target.value)}
-            className="w-full px-3 py-2.5 text-sm border border-slate-300 rounded-xl bg-white focus:ring-2 focus:ring-[#00873E]">
-            <option value="">Select a student...</option>
-            {eligibleStudents.map(s => <option key={s.id} value={s.id}>{s.full_name} ({s.email})</option>)}
-          </select>
+          <SearchableUserSelect
+            candidates={eligibleStudents}
+            value={studentId}
+            onChange={setStudentId}
+            placeholder="Search students..."
+          />
         </div>
         <div>
           <label className="block text-[11px] font-bold text-slate-700 mb-1 uppercase tracking-wider">Position</label>
@@ -143,11 +151,290 @@ const OfficerPromotionPanel: React.FC = () => {
   );
 };
 
+// Super Admin promotes one Admin per department (up to all 8).
+const AdminPromotionPanel: React.FC = () => {
+  const { userAccounts, promoteEmployeeToAdmin, deactivateUser } = useApp();
+  const [departmentCode, setDepartmentCode] = useState<DepartmentCode>('CAF');
+  const [employeeId, setEmployeeId] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Super Admin has no department of its own — candidates span every
+  // department; the department picker below decides which slot to claim.
+  const eligibleEmployees = userAccounts.filter(u => u.role === 'employee' && u.is_active);
+  const currentAdmins = userAccounts.filter(u => u.role === 'admin' && u.is_active);
+
+  const handlePromote = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!employeeId) { setMessage({ type: 'error', text: 'Select an employee first.' }); return; }
+    setSubmitting(true);
+    setMessage(null);
+    const res = await promoteEmployeeToAdmin(employeeId, departmentCode);
+    setSubmitting(false);
+    setMessage({ type: res.success ? 'success' : 'error', text: res.message });
+    if (res.success) setEmployeeId('');
+  };
+
+  const handleDeactivate = async (profileId: string) => {
+    setSubmitting(true);
+    setMessage(null);
+    await deactivateUser(profileId);
+    setSubmitting(false);
+    setMessage({ type: 'success', text: 'Deactivated — that department\'s Admin slot is now open for a new promotion.' });
+  };
+
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-4 sm:p-5 space-y-4">
+      <div className="flex items-center gap-2">
+        <Crown className="w-4.5 h-4.5 text-[#00873E]" />
+        <h3 className="font-extrabold text-slate-900 text-sm sm:text-base">Promote Employee to Admin</h3>
+      </div>
+      <p className="text-[11px] text-slate-500 -mt-2">
+        One Admin per department per school year, across all 8 departments. Deactivating an Admin frees their department's slot immediately.
+      </p>
+
+      {message && (
+        <div className={`p-2.5 rounded-xl text-xs border ${
+          message.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-rose-50 border-rose-200 text-rose-800'
+        }`}>
+          {message.text}
+        </div>
+      )}
+
+      <form onSubmit={handlePromote} className="space-y-3">
+        <div>
+          <label className="block text-[11px] font-bold text-slate-700 mb-1 uppercase tracking-wider">Department</label>
+          <div className="grid grid-cols-4 gap-1.5">
+            {(Object.keys(DEPARTMENTS) as DepartmentCode[]).map(dept => {
+              const taken = currentAdmins.some(a => a.department === dept);
+              return (
+                <button
+                  key={dept}
+                  type="button"
+                  disabled={taken}
+                  onClick={() => setDepartmentCode(dept)}
+                  className={`p-2 rounded-lg border text-xs font-extrabold transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
+                    departmentCode === dept ? 'border-[#00873E] bg-emerald-50 text-emerald-950 ring-1 ring-[#00873E]' : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
+                  }`}
+                  title={taken ? `${dept} already has an Admin` : dept}
+                >
+                  {dept}{taken ? ' •' : ''}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3">
+          <div>
+            <label className="block text-[11px] font-bold text-slate-700 mb-1 uppercase tracking-wider">Employee</label>
+            <SearchableUserSelect
+              candidates={eligibleEmployees}
+              value={employeeId}
+              onChange={setEmployeeId}
+              placeholder="Search employees..."
+            />
+          </div>
+          <div className="flex items-end">
+            <button type="submit" disabled={submitting || !employeeId}
+              className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs font-bold bg-[#00873E] hover:bg-[#007033] text-white shadow-xs transition cursor-pointer disabled:opacity-50 whitespace-nowrap">
+              {submitting ? 'Promoting...' : 'Promote'}
+            </button>
+          </div>
+        </div>
+      </form>
+
+      {currentAdmins.length > 0 && (
+        <div className="border-t border-slate-100 pt-3 space-y-2">
+          <p className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">Current Admins ({currentAdmins.length}/8)</p>
+          {currentAdmins.map(a => (
+            <div key={a.id} className="flex items-center justify-between gap-2 bg-slate-50 rounded-xl px-3 py-2">
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-slate-900 truncate">{a.full_name}</p>
+                <p className="text-[10px] text-slate-500 truncate">{a.department} • {a.email}</p>
+              </div>
+              <button onClick={() => handleDeactivate(a.id)} disabled={submitting}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-[11px] font-bold transition cursor-pointer disabled:opacity-50 shrink-0"
+                title="Deactivate — frees this department's Admin slot">
+                <ShieldOff className="w-3.5 h-3.5" /> Deactivate
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Admin promotes exactly one Dean, in the Admin's own department.
+const DeanPromotionPanel: React.FC = () => {
+  const { userAccounts, currentUser, promoteEmployeeToDean, deactivateUser } = useApp();
+  const [employeeId, setEmployeeId] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const eligibleEmployees = userAccounts.filter(u => u.role === 'employee' && u.is_active && u.department === currentUser.department);
+  const currentDean = userAccounts.find(u => u.role === 'dean' && u.is_active && u.department === currentUser.department);
+
+  const handlePromote = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!employeeId) { setMessage({ type: 'error', text: 'Select an employee first.' }); return; }
+    setSubmitting(true);
+    setMessage(null);
+    const res = await promoteEmployeeToDean(employeeId);
+    setSubmitting(false);
+    setMessage({ type: res.success ? 'success' : 'error', text: res.message });
+    if (res.success) setEmployeeId('');
+  };
+
+  const handleDeactivate = async (profileId: string) => {
+    setSubmitting(true);
+    setMessage(null);
+    await deactivateUser(profileId);
+    setSubmitting(false);
+    setMessage({ type: 'success', text: 'Deactivated — the Dean slot for your department is now open for a new promotion.' });
+  };
+
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-4 sm:p-5 space-y-4">
+      <div className="flex items-center gap-2">
+        <Landmark className="w-4.5 h-4.5 text-[#00873E]" />
+        <h3 className="font-extrabold text-slate-900 text-sm sm:text-base">Promote Employee to Dean</h3>
+      </div>
+      <p className="text-[11px] text-slate-500 -mt-2">
+        Exactly one Dean for {currentUser.department} this school year. Deactivating your Dean frees the slot immediately.
+      </p>
+
+      {message && (
+        <div className={`p-2.5 rounded-xl text-xs border ${
+          message.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-rose-50 border-rose-200 text-rose-800'
+        }`}>
+          {message.text}
+        </div>
+      )}
+
+      {currentDean ? (
+        <div className="flex items-center justify-between gap-2 bg-slate-50 rounded-xl px-3 py-2.5">
+          <div className="min-w-0">
+            <p className="text-xs font-bold text-slate-900 truncate">{currentDean.full_name}</p>
+            <p className="text-[10px] text-slate-500 truncate">{currentDean.email}</p>
+          </div>
+          <button onClick={() => handleDeactivate(currentDean.id)} disabled={submitting}
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-[11px] font-bold transition cursor-pointer disabled:opacity-50 shrink-0"
+            title="Deactivate — frees the Dean slot">
+            <ShieldOff className="w-3.5 h-3.5" /> Deactivate
+          </button>
+        </div>
+      ) : (
+        <form onSubmit={handlePromote} className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3">
+          <div>
+            <label className="block text-[11px] font-bold text-slate-700 mb-1 uppercase tracking-wider">Employee</label>
+            <SearchableUserSelect
+              candidates={eligibleEmployees}
+              value={employeeId}
+              onChange={setEmployeeId}
+              placeholder="Search employees in your department..."
+            />
+          </div>
+          <div className="flex items-end">
+            <button type="submit" disabled={submitting || !employeeId}
+              className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs font-bold bg-[#00873E] hover:bg-[#007033] text-white shadow-xs transition cursor-pointer disabled:opacity-50 whitespace-nowrap">
+              {submitting ? 'Promoting...' : 'Promote'}
+            </button>
+          </div>
+        </form>
+      )}
+    </div>
+  );
+};
+
+// Dean promotes exactly one Adviser, in the Dean's own department.
+const AdviserPromotionPanel: React.FC = () => {
+  const { userAccounts, currentUser, promoteEmployeeToAdviser, deactivateUser } = useApp();
+  const [employeeId, setEmployeeId] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const eligibleEmployees = userAccounts.filter(u => u.role === 'employee' && u.is_active && u.department === currentUser.department);
+  const currentAdviser = userAccounts.find(u => u.role === 'csc_adviser' && u.is_active && u.department === currentUser.department);
+
+  const handlePromote = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!employeeId) { setMessage({ type: 'error', text: 'Select an employee first.' }); return; }
+    setSubmitting(true);
+    setMessage(null);
+    const res = await promoteEmployeeToAdviser(employeeId);
+    setSubmitting(false);
+    setMessage({ type: res.success ? 'success' : 'error', text: res.message });
+    if (res.success) setEmployeeId('');
+  };
+
+  const handleDeactivate = async (profileId: string) => {
+    setSubmitting(true);
+    setMessage(null);
+    await deactivateUser(profileId);
+    setSubmitting(false);
+    setMessage({ type: 'success', text: 'Deactivated — the Adviser slot for your department is now open for a new promotion.' });
+  };
+
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-4 sm:p-5 space-y-4">
+      <div className="flex items-center gap-2">
+        <GraduationCap className="w-4.5 h-4.5 text-[#00873E]" />
+        <h3 className="font-extrabold text-slate-900 text-sm sm:text-base">Promote Employee to Adviser</h3>
+      </div>
+      <p className="text-[11px] text-slate-500 -mt-2">
+        Exactly one Adviser for {currentUser.department} this school year. Deactivating your Adviser frees the slot immediately.
+      </p>
+
+      {message && (
+        <div className={`p-2.5 rounded-xl text-xs border ${
+          message.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-rose-50 border-rose-200 text-rose-800'
+        }`}>
+          {message.text}
+        </div>
+      )}
+
+      {currentAdviser ? (
+        <div className="flex items-center justify-between gap-2 bg-slate-50 rounded-xl px-3 py-2.5">
+          <div className="min-w-0">
+            <p className="text-xs font-bold text-slate-900 truncate">{currentAdviser.full_name}</p>
+            <p className="text-[10px] text-slate-500 truncate">{currentAdviser.email}</p>
+          </div>
+          <button onClick={() => handleDeactivate(currentAdviser.id)} disabled={submitting}
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-[11px] font-bold transition cursor-pointer disabled:opacity-50 shrink-0"
+            title="Deactivate — frees the Adviser slot">
+            <ShieldOff className="w-3.5 h-3.5" /> Deactivate
+          </button>
+        </div>
+      ) : (
+        <form onSubmit={handlePromote} className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3">
+          <div>
+            <label className="block text-[11px] font-bold text-slate-700 mb-1 uppercase tracking-wider">Employee</label>
+            <SearchableUserSelect
+              candidates={eligibleEmployees}
+              value={employeeId}
+              onChange={setEmployeeId}
+              placeholder="Search employees in your department..."
+            />
+          </div>
+          <div className="flex items-end">
+            <button type="submit" disabled={submitting || !employeeId}
+              className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs font-bold bg-[#00873E] hover:bg-[#007033] text-white shadow-xs transition cursor-pointer disabled:opacity-50 whitespace-nowrap">
+              {submitting ? 'Promoting...' : 'Promote'}
+            </button>
+          </div>
+        </form>
+      )}
+    </div>
+  );
+};
+
 export const ManageUsersView: React.FC = () => {
   const { userAccounts, deactivateUser, reactivateUser, currentUser, isDepartmentRestricted, userDepartment } = useApp();
 
   // Dean/Adviser only manage accounts within their own registered
-  // department — Admin (unrestricted) still sees everyone system-wide.
+  // department — Admin/Super Admin (unrestricted) still see everyone
+  // system-wide.
   const scopedUserAccounts = isDepartmentRestricted
     ? userAccounts.filter(u => u.department === userDepartment)
     : userAccounts;
@@ -171,6 +458,9 @@ export const ManageUsersView: React.FC = () => {
         </div>
       </div>
 
+      {currentUser.role === 'super_admin' && <AdminPromotionPanel />}
+      {currentUser.role === 'admin' && <DeanPromotionPanel />}
+      {currentUser.role === 'dean' && <AdviserPromotionPanel />}
       {currentUser.role === 'csc_adviser' && <OfficerPromotionPanel />}
 
       <div className="relative">

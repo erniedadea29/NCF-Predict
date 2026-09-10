@@ -15,9 +15,11 @@ import {
   Award,
   ShieldCheck,
   GraduationCap,
-  Landmark,
+  Briefcase,
   LogIn,
-  Lock
+  Lock,
+  ArrowLeft,
+  MailCheck
 } from 'lucide-react';
 
 interface RegisterPageProps {
@@ -25,11 +27,13 @@ interface RegisterPageProps {
 }
 
 // ---------------------------------------------------------------------------
-// Only 4 self-registerable account types now. "Officer" is no longer one of
-// them — officers are promoted from an existing student account by their
-// Adviser (see the Manage Users / promotion flow), not self-selected here.
+// Admin/Dean/Adviser/Officer are promotion-only now — assigned by the level
+// above them (Super Admin -> Admin -> Dean -> Adviser -> Officer), never
+// self-selected here. Self-registration is just Student and Employee (a
+// generic pre-promotion staff account), plus Super Admin — but only until
+// one exists; after that it's permanently hidden from this dropdown.
 // ---------------------------------------------------------------------------
-type AccountType = 'student' | 'adviser' | 'dean' | 'admin';
+type AccountType = 'student' | 'employee' | 'super_admin';
 
 const ACCOUNT_TYPE_META: Record<AccountType, { label: string; role: UserRole; description: string; icon: React.ReactNode; color: string; ring: string; emailHint: string }> = {
   student: {
@@ -39,33 +43,21 @@ const ACCOUNT_TYPE_META: Record<AccountType, { label: string; role: UserRole; de
     color: 'bg-slate-100 text-slate-800 border-slate-300', ring: 'ring-slate-400',
     emailHint: 'Must be an @gbox.ncf.edu.ph address.'
   },
-  adviser: {
-    label: 'Adviser', role: 'csc_adviser',
-    description: 'Student Council Adviser — reviews proposals/liquidation, approves events, promotes officers.',
-    icon: <Landmark className="w-5 h-5" />,
+  employee: {
+    label: 'Employee', role: 'employee',
+    description: 'General staff account. No special access until promoted to Admin, Dean, or Adviser by the role above.',
+    icon: <Briefcase className="w-5 h-5" />,
     color: 'bg-emerald-100 text-emerald-800 border-emerald-300', ring: 'ring-emerald-400',
     emailHint: 'Must be an @ncf.edu.ph address (not @gbox.ncf.edu.ph).'
   },
-  dean: {
-    label: 'Dean', role: 'dean',
-    description: 'Final approval & fund-release authority for one course.',
-    icon: <Award className="w-5 h-5" />,
-    color: 'bg-rose-100 text-rose-800 border-rose-300', ring: 'ring-rose-400',
-    emailHint: 'Must be an @ncf.edu.ph address (not @gbox.ncf.edu.ph).'
-  },
-  admin: {
-    label: 'Admin', role: 'admin',
-    description: 'System management only — user accounts, courses, school year.',
+  super_admin: {
+    label: 'Super Admin', role: 'super_admin',
+    description: 'System-wide governance — promotes one Admin per department. Only ever registered once.',
     icon: <ShieldCheck className="w-5 h-5" />,
     color: 'bg-indigo-100 text-indigo-800 border-indigo-300', ring: 'ring-indigo-400',
     emailHint: 'Must be an @ncf.edu.ph address (not @gbox.ncf.edu.ph).'
   }
 };
-
-// One admin/dean/adviser per course per school year — this bucket only needs
-// the role, no sub-positions (officer positions are assigned later by the
-// Adviser via promotion, not chosen here).
-const STAFF_TYPES: AccountType[] = ['adviser', 'dean', 'admin'];
 
 const DEFAULT_COURSES: Record<DepartmentCode, string[]> = {
   CAF: ['BS Accountancy (BSA)', 'BS Management Accounting (BSMA)', 'BS Accounting Information System'],
@@ -79,7 +71,7 @@ const DEFAULT_COURSES: Record<DepartmentCode, string[]> = {
 };
 
 export const RegisterPage: React.FC<RegisterPageProps> = ({ onGoToLogin }) => {
-  const { registerUser, courses, takenRoleSlots } = useApp();
+  const { registerUser, verifyRegistrationOtp, courses, superAdminExists } = useApp();
 
   const [accountType, setAccountType] = useState<AccountType>('student');
   const [firstName, setFirstName] = useState('');
@@ -99,25 +91,26 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onGoToLogin }) => {
   const [studentIdAvailable, setStudentIdAvailable] = useState<boolean | null>(null);
   const [checkingStudentId, setCheckingStudentId] = useState(false);
 
-  const isStaffType = STAFF_TYPES.includes(accountType);
+  // Step 2: 6-digit email verification (Section 5) — shown after a
+  // successful signUp() that requires confirmation, instead of redirecting
+  // straight to login.
+  const [otpStep, setOtpStep] = useState(false);
+  const [otpEmail, setOtpEmail] = useState('');
+  const [otpCode, setOtpCode] = useState('');
+  const [otpError, setOtpError] = useState('');
+  const [otpVerifying, setOtpVerifying] = useState(false);
+  const [otpVerified, setOtpVerified] = useState(false);
+
+  const isStaffType = accountType === 'employee';
   const meta = ACCOUNT_TYPE_META[accountType];
 
   // Courses under the selected department, from the DB (falls back to the
-  // static list if the courses table hasn't loaded yet).
+  // static list if the courses table hasn't loaded yet). Students only.
   const coursesInDept = useMemo(() => {
     const fromDb = courses.filter(c => c.department_code === department);
     if (fromDb.length > 0) return fromDb.map(c => ({ id: c.id, name: c.name }));
     return (DEFAULT_COURSES[department] || []).map((name, i) => ({ id: -1 - i, name }));
   }, [courses, department]);
-
-  const takenSlotKeyForType: Record<string, string> = { adviser: 'adviser', dean: 'dean', admin: 'admin' };
-  // Staff (Admin/Dean/Adviser) no longer pick a course — they're scoped to
-  // their whole Department instead, so uniqueness is checked at that level.
-  const isDeptTakenForRole = () => {
-    const slotKey = takenSlotKeyForType[accountType];
-    if (!slotKey) return false;
-    return takenRoleSlots.some(s => s.department_code === department && s.slot_key === slotKey);
-  };
 
   const checkStudentIdAvailability = async (value: string) => {
     const trimmed = value.trim();
@@ -162,10 +155,9 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onGoToLogin }) => {
       setError('Student accounts must use an @gbox.ncf.edu.ph email address.');
       return;
     }
-    if (isStaffType) {
-      if (isGbox) { setError('Admin, Dean, and Adviser accounts must use an @ncf.edu.ph email address, not @gbox.ncf.edu.ph.'); return; }
-      if (!isNcf) { setError('Admin, Dean, and Adviser accounts must use an @ncf.edu.ph email address.'); return; }
-      if (isDeptTakenForRole()) { setError(`That department already has a registered ${meta.label} this school year.`); return; }
+    if (accountType === 'employee' || accountType === 'super_admin') {
+      if (isGbox) { setError('Employee and Super Admin accounts must use an @ncf.edu.ph email address, not @gbox.ncf.edu.ph.'); return; }
+      if (!isNcf) { setError('Employee and Super Admin accounts must use an @ncf.edu.ph email address.'); return; }
     }
     if (!password || password.length < 6) {
       setError('Please enter a password of at least 6 characters.');
@@ -202,9 +194,100 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onGoToLogin }) => {
       setError(res.message);
       return;
     }
+
+    if (res.requiresOtp) {
+      setOtpEmail(cleanEmail);
+      setOtpStep(true);
+      setSuccessMessage(res.message);
+      return;
+    }
+
+    // Confirmation was off project-side — account is already fully created.
     setSuccessMessage(res.message);
     setTimeout(() => onGoToLogin(), 1800);
   };
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!otpCode.trim()) return;
+    setOtpVerifying(true);
+    setOtpError('');
+    const res = await verifyRegistrationOtp(otpEmail, otpCode.trim());
+    setOtpVerifying(false);
+    if (!res.success) {
+      setOtpError(res.message);
+      setOtpCode('');
+      return;
+    }
+    setOtpVerified(true);
+    setSuccessMessage(res.message);
+    setTimeout(() => onGoToLogin(), 1800);
+  };
+
+  if (otpStep) {
+    return (
+      <div className="min-h-screen w-full bg-gradient-to-br from-[#00873E] via-[#03693a] to-slate-900 flex items-center justify-center p-3 sm:p-6">
+        <div className="w-full max-w-sm bg-white rounded-3xl shadow-2xl overflow-hidden">
+          <div className="p-6 sm:p-8">
+            <div className="w-11 h-11 rounded-2xl bg-[#00873E]/10 flex items-center justify-center mb-4">
+              <MailCheck className="w-5 h-5 text-[#00873E]" />
+            </div>
+            <h2 className="text-xl font-black text-slate-900">Verify your email</h2>
+            <p className="text-xs text-slate-500 mt-1">
+              Enter the 6-digit code we sent to <span className="font-bold text-slate-700">{otpEmail}</span> to finish creating your account.
+            </p>
+
+            {otpError && (
+              <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2.5 mt-4">
+                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                <span>{otpError}</span>
+              </div>
+            )}
+            {otpVerified && successMessage && (
+              <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-start gap-2.5 mt-4">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                <span>{successMessage} Redirecting to login&hellip;</span>
+              </div>
+            )}
+
+            {!otpVerified && (
+              <form onSubmit={handleVerifyOtp} className="space-y-3 mt-5">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={6}
+                  value={otpCode}
+                  onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
+                  placeholder="000000"
+                  className="w-full px-3.5 py-3 text-center text-2xl tracking-[0.5em] font-mono border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#00873E] focus:border-[#00873E]"
+                  autoFocus
+                  required
+                />
+                <button
+                  type="submit"
+                  disabled={otpVerifying || otpCode.length < 6}
+                  className="w-full py-2.5 px-4 bg-[#00873E] hover:bg-[#007033] text-white font-bold text-sm rounded-xl shadow-xs transition cursor-pointer disabled:opacity-50"
+                >
+                  {otpVerifying ? 'Verifying...' : 'Verify & Create Account'}
+                </button>
+              </form>
+            )}
+
+            {!otpVerified && (
+              <button
+                type="button"
+                onClick={() => { setOtpStep(false); setOtpCode(''); setOtpError(''); setSuccessMessage(''); }}
+                className="w-full flex items-center justify-center gap-1.5 text-center text-xs font-bold text-slate-500 hover:text-slate-700 cursor-pointer mt-4"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" /> Back to registration form
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-[#00873E] via-[#03693a] to-slate-900 flex items-center justify-center p-3 sm:p-6 py-8">
@@ -224,12 +307,6 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onGoToLogin }) => {
               <span>{error}</span>
             </div>
           )}
-          {successMessage && (
-            <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-start gap-2.5 mb-4">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-              <span>{successMessage} Redirecting to login&hellip;</span>
-            </div>
-          )}
 
           <form onSubmit={handleSubmit} className="space-y-4" autoComplete="off">
             {/* Account Type Selector */}
@@ -238,65 +315,63 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onGoToLogin }) => {
                 <Award className="w-4 h-4 text-[#00873E]" />
                 I am registering as *
               </label>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {(Object.keys(ACCOUNT_TYPE_META) as AccountType[]).map((type) => {
-                  const m = ACCOUNT_TYPE_META[type];
-                  const isSelected = accountType === type;
-                  return (
-                    <button
-                      key={type}
-                      type="button"
-                      onClick={() => handleAccountTypeChange(type)}
-                      className={`p-3 rounded-xl border text-left transition cursor-pointer flex flex-col gap-1.5 ${
-                        isSelected ? `${m.color} ring-2 ${m.ring} font-bold` : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
-                      }`}
-                    >
-                      {m.icon}
-                      <span className="text-xs font-extrabold">{m.label}</span>
-                    </button>
-                  );
-                })}
+              <div className={`grid grid-cols-2 ${superAdminExists ? '' : 'sm:grid-cols-3'} gap-2`}>
+                {(Object.keys(ACCOUNT_TYPE_META) as AccountType[])
+                  .filter(type => type !== 'super_admin' || !superAdminExists)
+                  .map((type) => {
+                    const m = ACCOUNT_TYPE_META[type];
+                    const isSelected = accountType === type;
+                    return (
+                      <button
+                        key={type}
+                        type="button"
+                        onClick={() => handleAccountTypeChange(type)}
+                        className={`p-3 rounded-xl border text-left transition cursor-pointer flex flex-col gap-1.5 ${
+                          isSelected ? `${m.color} ring-2 ${m.ring} font-bold` : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
+                        }`}
+                      >
+                        {m.icon}
+                        <span className="text-xs font-extrabold">{m.label}</span>
+                      </button>
+                    );
+                  })}
               </div>
               <p className="text-[11px] text-slate-500 mt-2">{meta.description}</p>
               <p className="text-[11px] text-slate-400 mt-0.5 italic">{meta.emailHint}</p>
             </div>
 
-            {/* Department */}
-            <div>
-              <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5 mb-2">
-                <Building2 className="w-4 h-4 text-[#00873E]" />
-                Department / College *
-              </label>
-              <div className="grid grid-cols-4 gap-2">
-                {(Object.keys(DEPARTMENTS) as DepartmentCode[]).map((dept) => {
-                  const isSelected = department === dept;
-                  return (
-                    <button
-                      key={dept}
-                      type="button"
-                      onClick={() => handleDepartmentChange(dept)}
-                      className={`p-2 rounded-xl border text-left transition cursor-pointer ${
-                        isSelected ? 'border-[#00873E] bg-emerald-50 text-emerald-950 font-bold ring-1 ring-[#00873E]' : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
-                      }`}
-                    >
-                      <div className="text-xs font-extrabold">{dept}</div>
-                    </button>
-                  );
-                })}
+            {/* Department — Student and Employee only; Super Admin is
+                department-less by design (it promotes across all 8). */}
+            {accountType !== 'super_admin' && (
+              <div>
+                <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5 mb-2">
+                  <Building2 className="w-4 h-4 text-[#00873E]" />
+                  Department / College *
+                </label>
+                <div className="grid grid-cols-4 gap-2">
+                  {(Object.keys(DEPARTMENTS) as DepartmentCode[]).map((dept) => {
+                    const isSelected = department === dept;
+                    return (
+                      <button
+                        key={dept}
+                        type="button"
+                        onClick={() => handleDepartmentChange(dept)}
+                        className={`p-2 rounded-xl border text-left transition cursor-pointer ${
+                          isSelected ? 'border-[#00873E] bg-emerald-50 text-emerald-950 font-bold ring-1 ring-[#00873E]' : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
+                        }`}
+                      >
+                        <div className="text-xs font-extrabold">{dept}</div>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
+            )}
 
-            {/* Course — students only. Admin/Dean/Adviser are scoped to their
-                whole Department instead (one per department per school
-                year, checked above via isDeptTakenForRole), so they never
-                see a course picker at all. */}
-            {isStaffType ? (
-              isDeptTakenForRole() && (
-                <p className="text-[11px] text-rose-600 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2">
-                  {department} already has a registered {meta.label} this school year — choose a different department, or contact that department's {meta.label} if this is a mistake.
-                </p>
-              )
-            ) : (
+            {/* Course — students only. Employee/Super Admin never pick a
+                course; Employee just picks a department above, and only
+                becomes Admin/Dean/Adviser once promoted. */}
+            {!isStaffType && accountType === 'student' && (
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">Course / Program *</label>
                 <select
@@ -364,8 +439,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onGoToLogin }) => {
               )}
             </div>
 
-            {/* Academic details — students only; Adviser/Dean/Admin don't
-                have a year level or section. */}
+            {/* Academic details — students only. */}
             {accountType === 'student' && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
@@ -416,7 +490,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onGoToLogin }) => {
 
             <button
               type="submit"
-              disabled={isSubmitting || Boolean(successMessage)}
+              disabled={isSubmitting}
               className="w-full py-3 px-4 bg-[#00873E] hover:bg-[#007033] text-white font-bold text-sm rounded-xl shadow-xs transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
             >
               <CheckCircle2 className="w-4 h-4" />

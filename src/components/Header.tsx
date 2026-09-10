@@ -28,6 +28,7 @@ export const Header: React.FC = () => {
     isReadOnlyStudent,
     isViewOnlyReviewer,
     isAdminSystemOnly,
+    isEmployeeAwaitingAssignment,
     notifications,
     markNotificationRead
   } = useApp();
@@ -57,6 +58,10 @@ export const Header: React.FC = () => {
         return { label: 'Cashier', color: 'bg-teal-100 text-teal-800 border-teal-300' };
       case 'student':
         return { label: 'Student', color: 'bg-slate-100 text-slate-800 border-slate-300' };
+      case 'super_admin':
+        return { label: 'Super Admin', color: 'bg-indigo-100 text-indigo-800 border-indigo-300' };
+      case 'employee':
+        return { label: 'Employee', color: 'bg-amber-100 text-amber-800 border-amber-300' };
     }
   };
 
@@ -89,6 +94,8 @@ export const Header: React.FC = () => {
   // Dean/Adviser: course-scoped, mostly view-only. No general "Budget and
   // Proposals" or "Draft CCS Proposal" sections — the Budget tab here
   // renders Reimbursement-only content (gated inside BudgetProposalWorkflow).
+  // The archive tab differs by level: Dean sees "Past Adviser", Adviser
+  // sees "Past Officer" (Section 4).
   const reviewerNav = [
     { id: 'home', label: 'Home' },
     { id: 'transactions', label: 'Transactions' },
@@ -96,21 +103,30 @@ export const Header: React.FC = () => {
     { id: 'liquidation_reports', label: 'Liquidation Reports' },
     { id: 'saf_students', label: 'SAF' },
     { id: 'events_attendance', label: 'Events & Penalties' },
+    currentUser.role === 'dean'
+      ? { id: 'past_adviser', label: 'Past Adviser' }
+      : { id: 'past_officer', label: 'Past Officer' },
     { id: 'manage_users', label: 'Manage Users' }
   ];
 
-  // Admin: system-management only — no council workflow, no finance tabs.
+  // Admin/Super Admin: system-management only — no council workflow, no finance tabs.
   const adminNav = [
     { id: 'manage_users', label: 'Manage Users' }
   ];
 
+  // Employee: no tabs at all — App.tsx renders an "Awaiting Assignment"
+  // placeholder regardless of currentTab until they're promoted.
+  const employeeNav: { id: string; label: string }[] = [];
+
   const navList = isReadOnlyStudent
     ? studentNav
-    : isAdminSystemOnly
-      ? adminNav
-      : isViewOnlyReviewer
-        ? reviewerNav
-        : fullNav;
+    : isEmployeeAwaitingAssignment
+      ? employeeNav
+      : isAdminSystemOnly
+        ? adminNav
+        : isViewOnlyReviewer
+          ? reviewerNav
+          : fullNav;
 
   return (
     <header className="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-xs no-print">

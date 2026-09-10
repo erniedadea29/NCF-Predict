@@ -19,7 +19,7 @@ interface LoginPageProps {
 }
 
 export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
-  const { loginUser, requestPasswordReset, mfaChallengePending, mfaVerifyLogin, cancelMfaChallenge } = useApp();
+  const { loginUser, requestPasswordReset, verifyPasswordResetOtp, mfaChallengePending, mfaVerifyLogin, cancelMfaChallenge } = useApp();
 
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
@@ -30,6 +30,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
   const [resetEmail, setResetEmail] = useState('');
   const [resetMessage, setResetMessage] = useState('');
   const [resetSending, setResetSending] = useState(false);
+  // Step 2 of forgot-password: 6-digit code (Section 5) — shown after
+  // requestPasswordReset sends it, instead of relying on a clicked link.
+  const [resetOtpStep, setResetOtpStep] = useState(false);
+  const [resetOtpCode, setResetOtpCode] = useState('');
+  const [resetOtpError, setResetOtpError] = useState('');
+  const [resetOtpVerifying, setResetOtpVerifying] = useState(false);
   const [mfaCode, setMfaCode] = useState('');
   const [mfaError, setMfaError] = useState('');
   const [mfaVerifying, setMfaVerifying] = useState(false);
@@ -75,6 +81,23 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
     const res = await requestPasswordReset(resetEmail.trim());
     setResetSending(false);
     setResetMessage(res.message);
+    if (res.success) setResetOtpStep(true);
+  };
+
+  const handleVerifyResetOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetOtpCode.trim()) return;
+    setResetOtpVerifying(true);
+    setResetOtpError('');
+    const res = await verifyPasswordResetOtp(resetEmail.trim(), resetOtpCode.trim());
+    setResetOtpVerifying(false);
+    if (!res.success) {
+      setResetOtpError(res.message);
+      setResetOtpCode('');
+      return;
+    }
+    // isPasswordRecovery flips true in context on success — AuthGate swaps
+    // straight to ResetPasswordPage on the next render, no navigation needed here.
   };
 
   return (
@@ -170,37 +193,80 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
             </div>
           ) : showForgotPassword ? (
             <div className="space-y-4">
-              <p className="text-xs text-slate-500">Enter your account email and we'll send a password reset link.</p>
-              {resetMessage && (
-                <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-start gap-2.5">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                  <span>{resetMessage}</span>
-                </div>
+              {resetOtpStep ? (
+                <>
+                  <p className="text-xs text-slate-500">
+                    Enter the 6-digit code we sent to <span className="font-bold text-slate-700">{resetEmail}</span> to reset your password.
+                  </p>
+                  {resetOtpError && (
+                    <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2.5">
+                      <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                      <span>{resetOtpError}</span>
+                    </div>
+                  )}
+                  <form onSubmit={handleVerifyResetOtp} className="space-y-3">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      maxLength={6}
+                      value={resetOtpCode}
+                      onChange={(e) => setResetOtpCode(e.target.value.replace(/\D/g, ''))}
+                      placeholder="000000"
+                      className="w-full px-3.5 py-3 text-center text-2xl tracking-[0.5em] font-mono border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#00873E] focus:border-[#00873E]"
+                      autoFocus
+                      required
+                    />
+                    <button
+                      type="submit" disabled={resetOtpVerifying || resetOtpCode.length < 6}
+                      className="w-full py-2.5 px-4 bg-[#00873E] hover:bg-[#007033] text-white font-bold text-sm rounded-xl shadow-xs transition cursor-pointer disabled:opacity-50"
+                    >
+                      {resetOtpVerifying ? 'Verifying...' : 'Verify Code'}
+                    </button>
+                  </form>
+                  <button
+                    type="button"
+                    onClick={() => { setResetOtpStep(false); setResetOtpCode(''); setResetOtpError(''); setResetMessage(''); }}
+                    className="w-full flex items-center justify-center gap-1.5 text-center text-xs font-bold text-slate-500 hover:text-slate-700 cursor-pointer"
+                  >
+                    <ArrowLeft className="w-3.5 h-3.5" /> Use a different email
+                  </button>
+                </>
+              ) : (
+                <>
+                  <p className="text-xs text-slate-500">Enter your account email and we'll send a 6-digit code to reset your password.</p>
+                  {resetMessage && (
+                    <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-start gap-2.5">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                      <span>{resetMessage}</span>
+                    </div>
+                  )}
+                  <form onSubmit={handleForgotPassword} className="space-y-3">
+                    <div className="relative">
+                      <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="email" value={resetEmail} onChange={(e) => setResetEmail(e.target.value)}
+                        placeholder="your.email@ncf.edu.ph"
+                        className="w-full pl-9 pr-3 py-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#00873E]"
+                        required
+                      />
+                    </div>
+                    <button
+                      type="submit" disabled={resetSending}
+                      className="w-full py-2.5 px-4 bg-[#00873E] hover:bg-[#007033] text-white font-bold text-sm rounded-xl shadow-xs transition cursor-pointer disabled:opacity-50"
+                    >
+                      {resetSending ? 'Sending...' : 'Send Code'}
+                    </button>
+                  </form>
+                  <button
+                    type="button"
+                    onClick={() => { setShowForgotPassword(false); setResetMessage(''); }}
+                    className="w-full text-center text-xs font-bold text-slate-500 hover:text-slate-700 cursor-pointer"
+                  >
+                    &larr; Back to login
+                  </button>
+                </>
               )}
-              <form onSubmit={handleForgotPassword} className="space-y-3">
-                <div className="relative">
-                  <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="email" value={resetEmail} onChange={(e) => setResetEmail(e.target.value)}
-                    placeholder="your.email@ncf.edu.ph"
-                    className="w-full pl-9 pr-3 py-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#00873E]"
-                    required
-                  />
-                </div>
-                <button
-                  type="submit" disabled={resetSending}
-                  className="w-full py-2.5 px-4 bg-[#00873E] hover:bg-[#007033] text-white font-bold text-sm rounded-xl shadow-xs transition cursor-pointer disabled:opacity-50"
-                >
-                  {resetSending ? 'Sending...' : 'Send Reset Link'}
-                </button>
-              </form>
-              <button
-                type="button"
-                onClick={() => { setShowForgotPassword(false); setResetMessage(''); }}
-                className="w-full text-center text-xs font-bold text-slate-500 hover:text-slate-700 cursor-pointer"
-              >
-                &larr; Back to login
-              </button>
             </div>
           ) : (
           <>

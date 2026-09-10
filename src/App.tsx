@@ -18,11 +18,13 @@ import { LiquidationReturnModal } from './components/LiquidationReturnModal';
 import { LiquidationReportDashboard } from './components/LiquidationReportDashboard';
 import { ManageUsersView } from './components/ManageUsersView';
 import { ReimbursementReviewPanel } from './components/ReimbursementReviewPanel';
+import { PastRecordsView } from './components/PastRecordsView';
+import { Clock } from 'lucide-react';
 
-const STAFF_ROLES = ['csc_adviser', 'dean', 'admin'];
+const STAFF_ROLES = ['csc_adviser', 'dean', 'admin', 'super_admin'];
 
 function MainAppContent() {
-  const { currentTab, setCurrentTab, isReadOnlyStudent, isAdminSystemOnly, isViewOnlyReviewer, currentUser } = useApp();
+  const { currentTab, setCurrentTab, isReadOnlyStudent, isAdminSystemOnly, isViewOnlyReviewer, isEmployeeAwaitingAssignment, currentUser } = useApp();
 
   // Modals state
   const [isAddTxOpen, setIsAddTxOpen] = useState(false);
@@ -55,6 +57,20 @@ function MainAppContent() {
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+        {isEmployeeAwaitingAssignment ? (
+          <div className="max-w-lg mx-auto text-center py-16 space-y-3">
+            <div className="w-14 h-14 mx-auto rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center">
+              <Clock className="w-7 h-7" />
+            </div>
+            <h2 className="text-xl font-black text-slate-900">Awaiting Assignment</h2>
+            <p className="text-sm text-slate-500">
+              Your Employee account is active, but you haven't been assigned a role yet. Once an Admin, Dean, or
+              your department's leadership promotes you, your dashboard will appear here automatically — just log
+              back in after you've been notified.
+            </p>
+          </div>
+        ) : (
+        <>
         {!isReadOnlyStudent && (currentTab.toUpperCase() === 'HOME' || currentTab.toUpperCase() === 'OVERVIEW') && (
           <HomeDashboard
             onOpenAddTransaction={() => setIsAddTxOpen(true)}
@@ -100,6 +116,14 @@ function MainAppContent() {
           <ManageUsersView />
         )}
 
+        {currentUser.role === 'dean' && currentTab.toUpperCase() === 'PAST_ADVISER' && (
+          <PastRecordsView />
+        )}
+
+        {currentUser.role === 'csc_adviser' && currentTab.toUpperCase() === 'PAST_OFFICER' && (
+          <PastRecordsView />
+        )}
+
         {(currentTab.toUpperCase() === 'STUDENT_PORTAL' ||
           currentTab.toUpperCase() === 'PROFILE' ||
           currentTab.toUpperCase() === 'STUDENT') && (
@@ -110,6 +134,8 @@ function MainAppContent() {
           currentTab.toUpperCase() === 'EVENTS_ATTENDANCE' ||
           currentTab.toUpperCase() === 'EVENTS') && (
           <EventsAndPenalties />
+        )}
+        </>
         )}
       </main>
 

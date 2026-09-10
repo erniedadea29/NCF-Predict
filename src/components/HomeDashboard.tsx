@@ -42,6 +42,7 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
     scopedSafRecords, 
     userDepartment,
     isDepartmentRestricted,
+    isViewOnlyReviewer,
     setActiveTab
   } = useApp();
 
@@ -190,29 +191,37 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
         </div>
       </div>
 
-      {/* Quick Action Hub */}
+      {/* Quick Action Hub — Draft Proposal / Add Transaction are initiation
+          actions Dean/Adviser must never reach, matching the same gate
+          already enforced on their dedicated Transactions/Budget tabs
+          (Section 1: Advisers & Deans can only approve/reject, never
+          initiate). */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <button
-          onClick={onOpenCreateProposal}
-          className="p-3.5 bg-white hover:bg-emerald-50/50 border border-slate-200 rounded-xl flex flex-col items-start text-left transition shadow-2xs group cursor-pointer"
-        >
-          <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center mb-2 group-hover:scale-105 transition">
-            <FileText className="w-4 h-4" />
-          </div>
-          <span className="text-xs font-bold text-slate-800">Draft {userDepartment} Proposal</span>
-          <span className="text-[11px] text-slate-500">5-Stage Approval Flow</span>
-        </button>
+        {!isViewOnlyReviewer && (
+          <button
+            onClick={onOpenCreateProposal}
+            className="p-3.5 bg-white hover:bg-emerald-50/50 border border-slate-200 rounded-xl flex flex-col items-start text-left transition shadow-2xs group cursor-pointer"
+          >
+            <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center mb-2 group-hover:scale-105 transition">
+              <FileText className="w-4 h-4" />
+            </div>
+            <span className="text-xs font-bold text-slate-800">Draft {userDepartment} Proposal</span>
+            <span className="text-[11px] text-slate-500">5-Stage Approval Flow</span>
+          </button>
+        )}
 
-        <button
-          onClick={onOpenAddTransaction}
-          className="p-3.5 bg-white hover:bg-emerald-50/50 border border-slate-200 rounded-xl flex flex-col items-start text-left transition shadow-2xs group cursor-pointer"
-        >
-          <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center mb-2 group-hover:scale-105 transition">
-            <PlusCircle className="w-4 h-4" />
-          </div>
-          <span className="text-xs font-bold text-slate-800">Add {userDepartment} Transaction</span>
-          <span className="text-[11px] text-slate-500">Record Income / Expense</span>
-        </button>
+        {!isViewOnlyReviewer && (
+          <button
+            onClick={onOpenAddTransaction}
+            className="p-3.5 bg-white hover:bg-emerald-50/50 border border-slate-200 rounded-xl flex flex-col items-start text-left transition shadow-2xs group cursor-pointer"
+          >
+            <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center mb-2 group-hover:scale-105 transition">
+              <PlusCircle className="w-4 h-4" />
+            </div>
+            <span className="text-xs font-bold text-slate-800">Add {userDepartment} Transaction</span>
+            <span className="text-[11px] text-slate-500">Record Income / Expense</span>
+          </button>
+        )}
 
         <button
           onClick={() => setActiveTab('saf_students')}
@@ -345,12 +354,14 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
           <div className="text-center py-8 bg-slate-50 rounded-xl border border-dashed border-slate-200 space-y-2">
             <FileText className="w-8 h-8 text-slate-400 mx-auto" />
             <p className="text-xs text-slate-500">No active budget proposals drafted yet for {userDepartment}.</p>
-            <button
-              onClick={onOpenCreateProposal}
-              className="text-xs font-bold text-emerald-700 hover:underline cursor-pointer"
-            >
-              + Create first {userDepartment} proposal
-            </button>
+            {!isViewOnlyReviewer && (
+              <button
+                onClick={onOpenCreateProposal}
+                className="text-xs font-bold text-emerald-700 hover:underline cursor-pointer"
+              >
+                + Create first {userDepartment} proposal
+              </button>
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">

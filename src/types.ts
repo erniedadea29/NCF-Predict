@@ -17,11 +17,13 @@ export type UserRole =
   | 'officer_treasurer'      // Role 1: Treasurer (Draft, Line Items, SAF Cash-in)
   | 'officer_governor'       // Role 2: Governor/Vice Gov - Executive Committee (Review)
   | 'council_member'         // Role 3: Council Members (Resolution/Voting/Comment notes)
-  | 'csc_adviser'            // Role 4: Student Council Advisers (Approval)
-  | 'dean'                   // Role 5: Dean (Approval/Fund Release/Overall)
+  | 'csc_adviser'            // Role 4: Student Council Advisers (Approval) — promotion-only, assigned by a Dean
+  | 'dean'                   // Role 5: Dean (Approval/Fund Release/Overall) — promotion-only, assigned by an Admin
   | 'student'                // Student (View SAF, Attendance, Penalties)
-  | 'admin'                  // System Administrator (full access, mirrors Supabase profiles.role)
-  | 'cashier';                // SAF Cashier (collect/verify SAF payments, additive alongside treasurer)
+  | 'admin'                  // Department Admin — promotion-only, assigned by the Super Admin (one per department)
+  | 'cashier'                // SAF Cashier (collect/verify SAF payments, additive alongside treasurer)
+  | 'super_admin'            // System-wide governance role; promotes Admins. Self-registers once, then locked out.
+  | 'employee';               // Generic pre-promotion staff account; no special access until promoted to Admin/Dean/Adviser
 
 export interface User {
   id: string;
@@ -179,6 +181,7 @@ export interface DepartmentTransaction {
   status: 'Completed' | 'Pending' | 'Processing' | 'Rejected';
   reference_code: string;
   description?: string;
+  created_by?: string; // profiles.id of whoever created this row — powers PAST OFFICER/PAST ADVISER archives
   reviewed_by?: string;
   reviewed_at?: string;
 }
@@ -371,6 +374,7 @@ export interface BudgetProposal {
   created_at: string;
   updated_at: string;
   created_by_officer: string;
+  requested_by?: string; // profiles.id of the creator — powers PAST OFFICER/PAST ADVISER archives
   treasurer_notes?: string;
   
   // Line items (Requirement definition & price evaluation)

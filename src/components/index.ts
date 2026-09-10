@@ -20,3 +20,5 @@ export * from './ManageUsersView';
 export * from './ReceiptUploadField';
 export * from './ResetPasswordPage';
 export * from './ReimbursementReviewPanel';
+export * from './SearchableUserSelect';
+export * from './PastRecordsView';

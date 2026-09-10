@@ -60,7 +60,9 @@ const deriveOfficerPosition = (role: UserRole, department?: DepartmentCode): str
     case 'council_member': return `${department} Council Representative`;
     case 'csc_adviser': return 'Student Affairs & CSC Adviser';
     case 'dean': return 'College Dean & Executive Director';
-    case 'admin': return 'System Administrator';
+    case 'admin': return `${department} Department Admin`;
+    case 'super_admin': return 'Super Administrator';
+    case 'employee': return 'Employee';
     default: return `${department} Student Member`;
   }
 };
@@ -89,6 +91,7 @@ interface AppContextType {
   isReadOnlyStudent: boolean;
   isViewOnlyReviewer: boolean;
   isAdminSystemOnly: boolean;
+  isEmployeeAwaitingAssignment: boolean;
   registerUser: (userData: {
     name: string;
     email: string;
@@ -102,10 +105,15 @@ interface AppContextType {
     section?: string;
     password: string;
     contact_number?: string;
-  }) => Promise<{ success: boolean; message: string; user?: User }>;
+  }) => Promise<{ success: boolean; message: string; user?: User; requiresOtp?: boolean }>;
+  verifyRegistrationOtp: (email: string, code: string) => Promise<{ success: boolean; message: string }>;
   requestPasswordReset: (email: string) => Promise<{ success: boolean; message: string }>;
+  verifyPasswordResetOtp: (email: string, code: string) => Promise<{ success: boolean; message: string }>;
   updatePassword: (newPassword: string) => Promise<{ success: boolean; message: string }>;
   isPasswordRecovery: boolean;
+  // True once a Super Admin account exists — RegisterPage hides the Super
+  // Admin option from the dropdown once this flips true.
+  superAdminExists: boolean;
 
   // Two-Factor Authentication (TOTP) — replaces the earlier SSO plan.
   // Enrolled factors for the current user, and the login-time challenge
@@ -126,6 +134,11 @@ interface AppContextType {
   // Officer promotion (Adviser-only)
   promoteToOfficer: (studentProfileId: string, slotKey: OfficerSlotKey) => Promise<{ success: boolean; message: string }>;
   vacateOfficerPosition: (profileId: string) => Promise<{ success: boolean; message: string }>;
+
+  // Promotion hierarchy: Super Admin -> Admin -> Dean -> Adviser
+  promoteEmployeeToAdmin: (employeeProfileId: string, departmentCode: DepartmentCode) => Promise<{ success: boolean; message: string }>;
+  promoteEmployeeToDean: (employeeProfileId: string) => Promise<{ success: boolean; message: string }>;
+  promoteEmployeeToAdviser: (employeeProfileId: string) => Promise<{ success: boolean; message: string }>;
 
   // Notifications
   notifications: NotificationItem[];
@@ -284,6 +297,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // never causes a brief flash into the dashboard before landing on login.
   const suppressAuthEventsRef = useRef(false);
 
+  // Holds a student registration's roster details between "signUp sent the
+  // OTP email" and "the code was verified" — create_student_with_saf needs
+  // a live session (auth.uid()), which only exists after verifyOtp succeeds,
+  // so this can't run inside registerUserInner anymore when confirmation is
+  // required.
+  const pendingRegistrationRef = useRef<{
+    email: string;
+    isStudent: boolean;
+    student_number: string;
+    first_name: string;
+    last_name: string;
+    course: string;
+    year_level: string;
+    section: string;
+    department: DepartmentCode;
+    course_id?: number;
+    displayName: string;
+    officer_position: string;
+  } | null>(null);
+
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const [authModalMode, setAuthModalMode] = useState<'login' | 'register'>('login');
   const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(false);
@@ -291,21 +324,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [courses, setCourses] = useState<Course[]>([]);
   const [takenRoleSlots, setTakenRoleSlots] = useState<{ course_id: number | null; department_code?: string | null; slot_key: string }[]>([]);
+  const [superAdminExists, setSuperAdminExists] = useState<boolean>(true); // fail-safe true until confirmed otherwise
 
   // Fetched unconditionally (not gated on isAuthenticated) — the registration
-  // form needs both of these before anyone is logged in. Both are backed by
+  // form needs all three before anyone is logged in. All are backed by
   // public-readable/anon-callable DB objects for exactly this reason.
   useEffect(() => {
     let cancelled = false;
     (async () => {
       const client = getSupabase();
-      const [{ data: courseRows }, { data: slotRows }] = await Promise.all([
+      const [{ data: courseRows }, { data: slotRows }, { data: superAdminFlag }] = await Promise.all([
         client.from('courses').select('id, department_code, name, code, is_active').eq('is_active', true).order('name'),
-        client.rpc('get_taken_role_slots')
+        client.rpc('get_taken_role_slots'),
+        client.rpc('super_admin_exists')
       ]);
       if (cancelled) return;
       if (courseRows) setCourses(courseRows as Course[]);
       if (slotRows) setTakenRoleSlots(slotRows);
+      if (typeof superAdminFlag === 'boolean') setSuperAdminExists(superAdminFlag);
     })();
     return () => { cancelled = true; };
   }, []);
@@ -500,7 +536,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     activesem_id: row.semester_id != null ? String(row.semester_id) : '',
     department: row.department_code || 'ALL',
     school_year: activeSemester.school_year_label,
-    created_at: row.created_at
+    created_at: row.created_at,
+    status: row.status || undefined,
+    proposed_by: row.proposed_by || undefined,
+    reviewed_by: row.reviewed_by || undefined,
+    review_remarks: row.review_remarks || undefined,
+    published_at: row.published_at || undefined
   });
 
   const mapAttendanceRow = (row: any): EventAttendance => {
@@ -523,7 +564,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       penalty_paid: row.penalty_paid,
       penalty_paid_date: row.penalty_paid_date || undefined,
       receipt_no: row.receipt_no || undefined,
-      notes: row.notes || undefined
+      notes: row.notes || undefined,
+      photo_url: row.photo_url || undefined
     };
   };
 
@@ -725,6 +767,39 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // ============================================================
+  // Promotion hierarchy: Super Admin -> Admin -> Dean -> Adviser.
+  // One holder per department per school year (role_slots), and
+  // deactivating any holder auto-frees their slot server-side (a
+  // DB trigger), so re-promoting into a freed slot needs no extra
+  // client-side action beyond the existing deactivateUser call.
+  // ============================================================
+  const promoteEmployeeToAdmin = async (employeeProfileId: string, departmentCode: DepartmentCode): Promise<{ success: boolean; message: string }> => {
+    const client = getSupabase();
+    const { error } = await client.rpc('promote_employee_to_admin', {
+      p_employee_profile_id: employeeProfileId, p_department_code: departmentCode
+    });
+    if (error) return { success: false, message: error.message };
+    setUserAccounts(prev => prev.map(u => u.id === employeeProfileId ? { ...u, role: 'admin', department: departmentCode } : u));
+    return { success: true, message: `Promoted to Admin of ${departmentCode}.` };
+  };
+
+  const promoteEmployeeToDean = async (employeeProfileId: string): Promise<{ success: boolean; message: string }> => {
+    const client = getSupabase();
+    const { error } = await client.rpc('promote_employee_to_dean', { p_employee_profile_id: employeeProfileId });
+    if (error) return { success: false, message: error.message };
+    setUserAccounts(prev => prev.map(u => u.id === employeeProfileId ? { ...u, role: 'dean' } : u));
+    return { success: true, message: 'Promoted to Dean.' };
+  };
+
+  const promoteEmployeeToAdviser = async (employeeProfileId: string): Promise<{ success: boolean; message: string }> => {
+    const client = getSupabase();
+    const { error } = await client.rpc('promote_employee_to_adviser', { p_employee_profile_id: employeeProfileId });
+    if (error) return { success: false, message: error.message };
+    setUserAccounts(prev => prev.map(u => u.id === employeeProfileId ? { ...u, role: 'csc_adviser' } : u));
+    return { success: true, message: 'Promoted to Adviser.' };
+  };
+
+  // ============================================================
   // Notifications
   // ============================================================
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
@@ -835,6 +910,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     created_at: row.created_at,
     updated_at: row.updated_at,
     created_by_officer: row.requested_by_name,
+    requested_by: row.requested_by || undefined,
     treasurer_notes: row.treasurer_notes || undefined,
     line_items: (row.budget_request_items || []).map((li: any): BudgetLineItem => ({
       id: li.id, item_desc: li.description, category: li.category,
@@ -1321,7 +1397,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     section?: string;
     password: string;
     contact_number?: string;
-  }): Promise<{ success: boolean; message: string; user?: User }> => {
+  }): Promise<{ success: boolean; message: string; user?: User; requiresOtp?: boolean }> => {
     if (!userData.password || userData.password.length < 6) {
       return { success: false, message: 'Password must be at least 6 characters.' };
     }
@@ -1335,12 +1411,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (userData.role === 'student' && !isGbox) {
       return { success: false, message: 'Student accounts must use an @gbox.ncf.edu.ph email address.' };
     }
-    if (['admin', 'dean', 'csc_adviser'].includes(userData.role)) {
+    // Admin/Dean/Adviser are promotion-only now (see promoteEmployeeToAdmin/
+    // Dean/Adviser below) — they never reach signUp through this path at all,
+    // but the domain rule still applies to the two roles that *do* self-register
+    // as staff-ish accounts: Employee and (once, before one exists) Super Admin.
+    if (['employee', 'super_admin'].includes(userData.role)) {
       if (isGbox) {
-        return { success: false, message: 'Admin, Dean, and Adviser accounts must use an @ncf.edu.ph email address, not @gbox.ncf.edu.ph.' };
+        return { success: false, message: 'Employee and Super Admin accounts must use an @ncf.edu.ph email address, not @gbox.ncf.edu.ph.' };
       }
       if (!isNcf) {
-        return { success: false, message: 'Admin, Dean, and Adviser accounts must use an @ncf.edu.ph email address.' };
+        return { success: false, message: 'Employee and Super Admin accounts must use an @ncf.edu.ph email address.' };
       }
     }
 
@@ -1361,7 +1441,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       officer_position?: string; course?: string; year_level?: string; section?: string;
       password: string; contact_number?: string;
     }
-  ): Promise<{ success: boolean; message: string; user?: User }> => {
+  ): Promise<{ success: boolean; message: string; user?: User; requiresOtp?: boolean }> => {
 
     const { data, error } = await client.auth.signUp({
       email: cleanEmail,
@@ -1380,9 +1460,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       let message = error.message;
       if (/already registered|already exists/i.test(error.message)) {
         message = `Mayroon nang nakarehistrong account gamit ang email na "${cleanEmail}". Mangyaring mag-log in na lamang.`;
-      } else if (/already taken for this course/i.test(error.message)) {
-        message = 'That role is already taken for this course this school year. Pick a different course or role.';
-      } else if (/must use an? @/i.test(error.message)) {
+      } else if (/already taken for this|already exists/i.test(error.message)) {
+        message = error.message;
+      } else if (/must use an? @|promotion only|Super Admin account already exists/i.test(error.message)) {
         message = error.message; // our own trigger's message, already clear
       }
       return { success: false, message };
@@ -1393,24 +1473,46 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const officer_position = userData.officer_position || deriveOfficerPosition(userData.role, userData.department);
     const course = userData.course || deriveCourse(userData.department);
-    const year_level = userData.year_level || (userData.role === 'dean' || userData.role === 'csc_adviser' ? 'Faculty/Admin' : '1st Year');
-    const section = userData.section || (userData.role === 'dean' || userData.role === 'csc_adviser' ? 'Administration' : `${userData.department}-1A`);
+    const year_level = userData.year_level || '1st Year';
+    const section = userData.section || `${userData.department}-1A`;
+    const isStudent = userData.role === 'student';
 
-    // Without an active session (e.g. email confirmation required), we can't
-    // call the students RPC yet (it authorizes via the caller's own auth.uid()).
+    const student_number = (userData.student_number?.trim())
+      || (isStudent ? `2024-${Math.floor(10000 + Math.random() * 90000)}` : '');
+    const parts = userData.name.trim().split(' ');
+    const firstName = parts.slice(0, -1).join(' ') || parts[0];
+    const lastName = parts.length > 1 ? parts[parts.length - 1] : 'Student';
+
+    // No session back yet == email confirmation is required (the normal,
+    // expected case with the OTP flow enabled in the Supabase dashboard).
+    // The students RPC needs a live session (auth.uid()), so it can't run
+    // yet — stash everything it'll need and let verifyRegistrationOtp finish
+    // the job once the 6-digit code is confirmed.
     if (!data.session) {
+      pendingRegistrationRef.current = {
+        email: cleanEmail,
+        isStudent,
+        student_number,
+        first_name: firstName,
+        last_name: lastName,
+        course,
+        year_level,
+        section,
+        department: userData.department,
+        course_id: userData.course_id,
+        displayName: userData.name.trim(),
+        officer_position
+      };
       return {
         success: true,
-        message: `Account created for ${userData.name}. Please check your email to confirm your account before logging in.`
+        requiresOtp: true,
+        message: `We sent a 6-digit verification code to ${cleanEmail}. Enter it below to finish creating your account.`
       };
     }
 
-    let student_number = userData.student_number?.trim();
-    if (userData.role === 'student') {
-      student_number = student_number || `2024-${Math.floor(10000 + Math.random() * 90000)}`;
-      const parts = userData.name.trim().split(' ');
-      const firstName = parts.slice(0, -1).join(' ') || parts[0];
-      const lastName = parts.length > 1 ? parts[parts.length - 1] : 'Student';
+    // Confirmation is off project-side (defensive fallback) — finish
+    // immediately using the session signUp already returned.
+    if (isStudent) {
       const { error: rpcError } = await client.rpc('create_student_with_saf', {
         p_student_number: student_number,
         p_first_name: firstName,
@@ -1442,6 +1544,73 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       success: true,
       message: `Account created for ${userData.name.trim()} as ${officer_position}. Please log in.`
     };
+  };
+
+  // Completes a registration whose signUp() sent a 6-digit code instead of
+  // establishing a session immediately. Suppresses the global auth listener
+  // for the same reason loginUser/registerUser already do — the transient
+  // verify session shouldn't flash the app into a logged-in state.
+  const verifyRegistrationOtp = async (email: string, code: string): Promise<{ success: boolean; message: string }> => {
+    const client = getSupabase();
+    const cleanEmail = email.trim().toLowerCase();
+    suppressAuthEventsRef.current = true;
+    try {
+      const { data, error } = await client.auth.verifyOtp({ email: cleanEmail, token: code.trim(), type: 'signup' });
+      if (error || !data.user) {
+        return { success: false, message: 'Invalid or expired code. Please check the code and try again.' };
+      }
+
+      const pending = pendingRegistrationRef.current;
+      if (pending && pending.email === cleanEmail && pending.isStudent) {
+        const { error: rpcError } = await client.rpc('create_student_with_saf', {
+          p_student_number: pending.student_number,
+          p_first_name: pending.first_name,
+          p_last_name: pending.last_name,
+          p_course: pending.course,
+          p_year_level: pending.year_level,
+          p_section: pending.section,
+          p_email: cleanEmail,
+          p_department_code: pending.department,
+          p_semester_id: activeSemester.semester_id ? Number(activeSemester.semester_id) : null,
+          p_profile_id: data.user.id,
+          p_course_id: pending.course_id ?? null
+        });
+        if (rpcError) {
+          await client.auth.signOut();
+          const dupMessage = /duplicate key|unique constraint/i.test(rpcError.message)
+            ? `Student ID "${pending.student_number}" is already taken. Please use a different one.`
+            : `Verified, but the student roster entry failed: ${rpcError.message}`;
+          return { success: false, message: dupMessage };
+        }
+      }
+
+      pendingRegistrationRef.current = null;
+      await client.auth.signOut();
+      return { success: true, message: 'Email verified! Your account is ready — please log in.' };
+    } finally {
+      suppressAuthEventsRef.current = false;
+    }
+  };
+
+  // Same code-instead-of-link idea for password reset — see requestPasswordReset
+  // below for the email-send half of this flow.
+  const verifyPasswordResetOtp = async (email: string, code: string): Promise<{ success: boolean; message: string }> => {
+    const client = getSupabase();
+    suppressAuthEventsRef.current = true;
+    try {
+      const { data, error } = await client.auth.verifyOtp({ email: email.trim().toLowerCase(), token: code.trim(), type: 'recovery' });
+      if (error || !data.session) {
+        return { success: false, message: 'Invalid or expired code. Please check the code and try again.' };
+      }
+      // verifyOtp establishes a real recovery session — drive the app into
+      // the same "set a new password" screen a clicked recovery link uses,
+      // explicitly rather than relying on onAuthStateChange to fire
+      // PASSWORD_RECOVERY for a verifyOtp-established session.
+      setIsPasswordRecovery(true);
+      return { success: true, message: 'Code verified — set your new password below.' };
+    } finally {
+      suppressAuthEventsRef.current = false;
+    }
   };
 
   const updateOwnProfile = async (updates: {
@@ -1807,6 +1976,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     status: row.status,
     reference_code: row.reference_code || row.id,
     description: row.notes || undefined,
+    created_by: row.created_by || undefined,
     reviewed_by: row.reviewed_by || undefined,
     reviewed_at: row.reviewed_at || undefined
   });
@@ -2462,15 +2632,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const userDepartment: DepartmentCode = currentUser.department || 'CAF';
   // Every role is locked to its own registered department — Adviser, Dean,
   // and Student explicitly included (a CCS Adviser must never see COE's
-  // events/transactions/SAF/students/proposals, etc.). Only Admin stays
-  // unrestricted, since it's a system-management role with no department
-  // of its own and its nav no longer surfaces any of these scoped views
-  // anyway (trimmed to Manage Users only). Previously Adviser/Dean were
-  // deliberately excluded here for a "cross-department oversight" design
-  // that has since been superseded by course/department-scoped staff
-  // accounts — every `scopedX` list below now honors this for all of
-  // them.
-  const isDepartmentRestricted = currentUser.role !== 'admin';
+  // events/transactions/SAF/students/proposals, etc.). Admin and Super Admin
+  // stay unrestricted: Admin is a system-management role with no department
+  // of its own scoped view (nav trimmed to Manage Users only), and Super
+  // Admin is department-less by definition (it promotes one Admin per
+  // department, cross-department). Previously Adviser/Dean were deliberately
+  // excluded here for a "cross-department oversight" design that has since
+  // been superseded by course/department-scoped staff accounts — every
+  // `scopedX` list below now honors this for all of them.
+  const isDepartmentRestricted = !['admin', 'super_admin'].includes(currentUser.role);
 
   const scopedDepartmentInfo: DepartmentInfo = departments[userDepartment] || departments.CAF;
 
@@ -2513,7 +2683,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Event approval, which are gated separately, so this is narrower than
   // isReadOnlyStudent and applied only to those specific screens.
   const isViewOnlyReviewer = currentUser.role === 'dean' || currentUser.role === 'csc_adviser';
-  const isAdminSystemOnly = currentUser.role === 'admin';
+  // Super Admin gets the exact same system-management-only nav as Admin —
+  // Manage Users (promotion panels) and nothing else.
+  const isAdminSystemOnly = currentUser.role === 'admin' || currentUser.role === 'super_admin';
+  const isEmployeeAwaitingAssignment = currentUser.role === 'employee';
 
   return (
     <AppContext.Provider
@@ -2525,10 +2698,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isReadOnlyStudent,
         isViewOnlyReviewer,
         isAdminSystemOnly,
+        isEmployeeAwaitingAssignment,
         registerUser,
+        verifyRegistrationOtp,
         requestPasswordReset,
+        verifyPasswordResetOtp,
         updatePassword,
         isPasswordRecovery,
+        superAdminExists,
         mfaFactors,
         mfaChallengePending: mfaChallenge !== null,
         mfaEnrollStart,
@@ -2540,6 +2717,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         takenRoleSlots,
         promoteToOfficer,
         vacateOfficerPosition,
+        promoteEmployeeToAdmin,
+        promoteEmployeeToDean,
+        promoteEmployeeToAdviser,
         notifications,
         markNotificationRead,
         proposeEvent,
