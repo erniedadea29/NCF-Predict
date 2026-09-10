@@ -557,19 +557,28 @@ export const ManageUsersView: React.FC = () => {
     );
   };
 
-  const AccountListContainer: React.FC<{ title: string; users: UserAccountSummary[] }> = ({ title, users }) => (
-    <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-      <div className="px-4 py-2.5 border-b border-slate-100 bg-slate-50/80">
-        <p className="text-xs font-extrabold text-slate-700 uppercase tracking-wider">{title} ({users.length})</p>
+  const AccountListContainer: React.FC<{ title: string; users: UserAccountSummary[]; accent?: 'emerald' | 'indigo' | 'slate' }> = ({ title, users, accent = 'slate' }) => {
+    const accentClasses = {
+      emerald: 'bg-[#00873E] text-white',
+      indigo: 'bg-indigo-600 text-white',
+      slate: 'bg-slate-800 text-white'
+    }[accent];
+    return (
+      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden h-full flex flex-col">
+        <div className="px-4 py-3 border-b border-slate-100">
+          <span className={`inline-block px-3 py-1 rounded-full text-xs font-extrabold uppercase tracking-wider ${accentClasses}`}>
+            {title} ({users.length})
+          </span>
+        </div>
+        <div className="divide-y divide-slate-100 flex-1">
+          {users.map(renderAccountRow)}
+          {users.length === 0 && (
+            <div className="p-6 text-center text-xs text-slate-400">No {title.toLowerCase()} found.</div>
+          )}
+        </div>
       </div>
-      <div className="divide-y divide-slate-100">
-        {users.map(renderAccountRow)}
-        {users.length === 0 && (
-          <div className="p-6 text-center text-xs text-slate-400">No {title.toLowerCase()} found.</div>
-        )}
-      </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="space-y-5">
@@ -598,9 +607,13 @@ export const ManageUsersView: React.FC = () => {
 
       {isSuperAdminView ? (
         <div className="space-y-4">
-          <AccountListContainer title="Students" users={studentUsers} />
-          <AccountListContainer title="Employees" users={employeeUsers} />
-          <AccountListContainer title="Staff & Officers" users={staffUsers} />
+          {/* Student / Employee side by side — the two easiest-to-confuse
+              roles get their own labeled column instead of sharing a list. */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <AccountListContainer title="Student" users={studentUsers} accent="emerald" />
+            <AccountListContainer title="Employee" users={employeeUsers} accent="indigo" />
+          </div>
+          <AccountListContainer title="Staff & Officers" users={staffUsers} accent="slate" />
         </div>
       ) : (
         <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
