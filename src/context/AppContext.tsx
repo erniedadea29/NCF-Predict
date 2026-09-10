@@ -170,6 +170,7 @@ interface AppContextType {
   }) => Promise<{ success: boolean; message: string; tempPassword?: string }>;
   deactivateUser: (profileId: string) => Promise<void>;
   reactivateUser: (profileId: string) => Promise<void>;
+  deleteUserAccount: (profileId: string) => Promise<{ success: boolean; message: string }>;
 
   // SAF Clearance
   clearances: ClearanceRecord[];
@@ -699,6 +700,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const { error } = await client.from('profiles').update({ is_active: true }).eq('id', profileId);
     if (error) { console.error('Failed to reactivate user', error); return; }
     setUserAccounts(prev => prev.map(u => u.id === profileId ? { ...u, is_active: true } : u));
+  };
+
+  // Super Admin only — a real, permanent removal (not the usual
+  // soft-deactivate). The RPC itself blocks this whenever the account has
+  // any transaction/proposal/event/SAF/clearance history on record, so it
+  // only ever succeeds for a genuinely clean account; everything else is
+  // still handled via deactivateUser above.
+  const deleteUserAccount = async (profileId: string): Promise<{ success: boolean; message: string }> => {
+    const client = getSupabase();
+    const { error } = await client.rpc('delete_user_account', { p_profile_id: profileId });
+    if (error) return { success: false, message: error.message };
+    setUserAccounts(prev => prev.filter(u => u.id !== profileId));
+    return { success: true, message: 'Account permanently deleted.' };
   };
 
   // Receipt paths are stored (never signed URLs, which expire) — this
@@ -2731,6 +2745,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addUserAccount,
         deactivateUser,
         reactivateUser,
+        deleteUserAccount,
         clearances,
         generateClearance,
         getSignedReceiptUrl,
