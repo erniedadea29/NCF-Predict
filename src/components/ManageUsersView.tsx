@@ -3,6 +3,7 @@ import { useApp } from '../context/AppContext';
 import { UserRole, OfficerSlotKey, OFFICER_POSITION_LABELS, DepartmentCode, UserAccountSummary } from '../types';
 import { DEPARTMENTS } from '../data/mockData';
 import { SearchableUserSelect } from './SearchableUserSelect';
+import { AdviserHandoverSection } from './PastRecordsView';
 import {
   ShieldCheck,
   ShieldOff,
@@ -702,6 +703,12 @@ export const ManageUsersView: React.FC = () => {
       {currentUser.role === 'admin' && <DeanPromotionPanel />}
       {currentUser.role === 'dean' && <AdviserPromotionPanel />}
       {currentUser.role === 'csc_adviser' && <OfficerPromotionPanel />}
+
+      {/* Admin's only page is this one, so the handover-file approval queue
+          (Adviser Handover spec) lives here for them, instead of a
+          dedicated tab like Dean/Adviser get via Historical Audit File /
+          Past Officer. */}
+      {currentUser.role === 'admin' && <AdviserHandoverSection />}
 
       <div className="relative">
         <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />

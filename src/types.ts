@@ -82,6 +82,31 @@ export interface UserAccountSummary {
   officer_position?: string;
 }
 
+// Adviser Handover: an outgoing Adviser's single activity-log/records file,
+// auto-visible to their department's Admin+Dean, or reachable by a
+// successor Adviser only after an Admin/Dean approves their request.
+export interface AdviserHandoverFile {
+  id: string;
+  adviser_id: string;
+  adviser_name?: string;
+  department_code: DepartmentCode;
+  file_path: string;
+  generated_at: string;
+}
+
+export interface AdviserHandoverRequest {
+  id: string;
+  file_id: string;
+  requester_id: string;
+  requester_name?: string;
+  department_code: DepartmentCode;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  decided_by?: string;
+  decided_at?: string;
+  remarks?: string;
+  created_at: string;
+}
+
 export interface ClearanceRecord {
   id: string;
   student_id: string;

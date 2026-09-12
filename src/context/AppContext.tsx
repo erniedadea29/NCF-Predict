@@ -24,7 +24,9 @@ import {
   Course,
   NotificationItem,
   OfficerSlotKey,
-  OFFICER_POSITION_LABELS
+  OFFICER_POSITION_LABELS,
+  AdviserHandoverFile,
+  AdviserHandoverRequest
 } from '../types';
 import {
   DEPARTMENTS,
@@ -144,6 +146,15 @@ interface AppContextType {
   // Notifications
   notifications: NotificationItem[];
   markNotificationRead: (id: string) => Promise<void>;
+
+  // Adviser Handover: send/request/approve the single activity-log &
+  // previous-records file, read-only for whoever views it.
+  handoverFiles: AdviserHandoverFile[];
+  handoverRequests: AdviserHandoverRequest[];
+  sendAdviserHandoverFile: () => Promise<{ success: boolean; message: string }>;
+  requestAdviserHandoverFile: (fileId: string) => Promise<{ success: boolean; message: string }>;
+  reviewAdviserHandoverRequest: (requestId: string, decision: 'APPROVED' | 'REJECTED', remarks?: string) => Promise<{ success: boolean; message: string }>;
+  getSignedHandoverFileUrl: (path: string) => Promise<string | null>;
 
   // Events approval workflow
   proposeEvent: (event: Omit<SchoolEvent, 'id' | 'created_at' | 'status'>) => Promise<{ success: boolean; message: string }>;
@@ -854,6 +865,213 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const { error } = await client.from('notifications').update({ read_at: new Date().toISOString() }).eq('id', id);
     if (error) { console.error('Failed to mark notification read', error); return; }
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, read_at: new Date().toISOString() } : n));
+  };
+
+  // ============================================================
+  // Adviser Handover: an outgoing Adviser sends a single read-only PDF
+  // bundling their activity log & department's previous records to the
+  // Admin+Dean of their department. A successor Adviser can request the
+  // same file, but only gains access once an Admin or Dean approves it —
+  // enforced server-side by RLS on adviser_handover_files/storage, not just
+  // by this list being filtered.
+  // ============================================================
+  const [handoverFiles, setHandoverFiles] = useState<AdviserHandoverFile[]>([]);
+  const [handoverRequests, setHandoverRequests] = useState<AdviserHandoverRequest[]>([]);
+
+  const refreshHandoverData = async () => {
+    const client = getSupabase();
+    const [filesRes, requestsRes] = await Promise.all([
+      client.from('adviser_handover_files').select('*, profiles!adviser_handover_files_adviser_id_fkey(full_name)').order('generated_at', { ascending: false }),
+      client.from('adviser_handover_requests').select('*, profiles!adviser_handover_requests_requester_id_fkey(full_name)').order('created_at', { ascending: false })
+    ]);
+    if (!filesRes.error && filesRes.data) {
+      setHandoverFiles(filesRes.data.map((f: any): AdviserHandoverFile => ({
+        id: f.id, adviser_id: f.adviser_id, adviser_name: f.profiles?.full_name,
+        department_code: f.department_code, file_path: f.file_path, generated_at: f.generated_at
+      })));
+    }
+    if (!requestsRes.error && requestsRes.data) {
+      setHandoverRequests(requestsRes.data.map((r: any): AdviserHandoverRequest => ({
+        id: r.id, file_id: r.file_id, requester_id: r.requester_id, requester_name: r.profiles?.full_name,
+        department_code: r.department_code, status: r.status, decided_by: r.decided_by || undefined,
+        decided_at: r.decided_at || undefined, remarks: r.remarks || undefined, created_at: r.created_at
+      })));
+    }
+  };
+
+  useEffect(() => {
+    if (!isAuthenticated) { setHandoverFiles([]); setHandoverRequests([]); return; }
+    // Only Adviser/Dean/Admin/Super Admin ever have rows visible to them
+    // under RLS anyway — everyone else's query just comes back empty, so no
+    // role gate is needed here beyond being logged in.
+    refreshHandoverData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated]);
+
+  // Builds the single "activity log & previous records" PDF for the
+  // department the Adviser is currently scoped to — transactions, budget
+  // proposals (with their nested liquidation & reimbursement outcomes), and
+  // events/attendance/penalty enforcement, covering their whole term.
+  const buildAdviserHandoverPdf = (): Blob => {
+    const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const centerX = pageWidth / 2;
+    let y = 60;
+
+    const ensureRoom = (needed: number) => {
+      if (y + needed > pageHeight - 50) { doc.addPage(); y = 60; }
+    };
+    const sectionHeader = (title: string) => {
+      ensureRoom(50);
+      y += 10;
+      doc.setDrawColor(0, 135, 62);
+      doc.setLineWidth(1);
+      doc.line(60, y, pageWidth - 60, y);
+      y += 20;
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(12);
+      doc.setTextColor(0, 135, 62);
+      doc.text(title, 60, y);
+      doc.setTextColor(0, 0, 0);
+      y += 18;
+    };
+    const line = (text: string, opts?: { bold?: boolean; size?: number }) => {
+      ensureRoom(16);
+      doc.setFont('helvetica', opts?.bold ? 'bold' : 'normal');
+      doc.setFontSize(opts?.size || 9.5);
+      doc.text(text, 60, y);
+      y += 15;
+    };
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.text('NAGA COLLEGE FOUNDATION (NCF)', centerX, y, { align: 'center' });
+    y += 18;
+    doc.setFontSize(11);
+    doc.text('Supreme Student Council — Adviser Handover File', centerX, y, { align: 'center' });
+    y += 14;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.text('Complete Activity Log & Previous Records (Read-Only)', centerX, y, { align: 'center' });
+    y += 20;
+    doc.setDrawColor(0, 135, 62);
+    doc.setLineWidth(1.5);
+    doc.line(60, y, pageWidth - 60, y);
+    y += 26;
+
+    line(`Adviser: ${currentUser.name}`, { bold: true });
+    line(`Department: ${userDepartment} — ${scopedDepartmentInfo.name}`);
+    line(`Generated: ${new Date().toLocaleString()}`);
+    line(`School Year: ${activeSemester.school_year_label} • ${activeSemester.semester_name}`);
+
+    sectionHeader(`Transactions (${scopedTransactions.length})`);
+    if (scopedTransactions.length === 0) {
+      line('No transactions on record.');
+    } else {
+      scopedTransactions.forEach(tx => {
+        line(`${tx.date} • ${tx.reference_code} • ${tx.category} • ${tx.title} — ${tx.type === 'INCOME' ? '+' : '-'}₱${tx.amount.toFixed(2)} (${tx.status})`);
+      });
+    }
+
+    sectionHeader(`Budget Proposals (${scopedProposals.length})`);
+    if (scopedProposals.length === 0) {
+      line('No budget proposals on record.');
+    } else {
+      scopedProposals.forEach(p => {
+        line(`${p.budget_title} — ₱${p.total_budget_amount.toFixed(2)} — ${p.budget_status.replace(/_/g, ' ')}`, { bold: true });
+        if (p.liquidation) {
+          line(`  Liquidation: ${p.liquidation.status} — spent ₱${p.liquidation.total_spent.toFixed(2)} of ₱${p.liquidation.total_released.toFixed(2)}`);
+        }
+        p.reimbursements.forEach(r => {
+          line(`  Reimbursement: ${r.officer_name} — ₱${r.amount_spent.toFixed(2)} — ${r.reimbursement_status}`);
+        });
+      });
+    }
+
+    sectionHeader(`Events (${scopedEvents.length})`);
+    if (scopedEvents.length === 0) {
+      line('No events on record.');
+    } else {
+      scopedEvents.forEach(ev => {
+        line(`${ev.event_date} • ${ev.event_title} — ${ev.venue} — ${ev.status || 'PUBLISHED'}`);
+      });
+    }
+
+    sectionHeader(`Attendance & Penalty Enforcement (${scopedAttendances.length})`);
+    if (scopedAttendances.length === 0) {
+      line('No attendance/penalty records on record.');
+    } else {
+      scopedAttendances.forEach(att => {
+        const penaltyNote = att.penalty_amount > 0 ? ` — Penalty ₱${att.penalty_amount.toFixed(2)} (${att.penalty_paid ? 'Paid' : 'Unpaid'})` : '';
+        line(`${att.student_name} • ${att.event_title} — ${att.status}${penaltyNote}`);
+      });
+    }
+
+    sectionHeader('Certification');
+    line('This file is a read-only record generated for continuity and handover reference. It cannot be', { size: 9 });
+    line('edited by a newly elected Adviser — it exists solely so incoming leadership can review what', { size: 9 });
+    line('took place during the previous term.', { size: 9 });
+
+    return doc.output('blob');
+  };
+
+  // Adviser action: generate + upload the file now, notify Admin+Dean
+  // immediately (Section: "send" needs no approval — the Adviser themself
+  // is choosing to share it).
+  const sendAdviserHandoverFile = async (): Promise<{ success: boolean; message: string }> => {
+    if (currentUser.role !== 'csc_adviser') return { success: false, message: 'Only an Adviser can send a handover file.' };
+    const client = getSupabase();
+    try {
+      const pdfBlob = buildAdviserHandoverPdf();
+      const storagePath = `handover/${userDepartment}/${currentUser.id}/${Date.now()}.pdf`;
+      const { error: uploadErr } = await client.storage.from('handover-files').upload(storagePath, pdfBlob, {
+        contentType: 'application/pdf', upsert: true
+      });
+      if (uploadErr) return { success: false, message: uploadErr.message };
+
+      const { error: rpcErr } = await client.rpc('send_adviser_handover_file', { p_file_path: storagePath });
+      if (rpcErr) return { success: false, message: rpcErr.message };
+
+      await refreshHandoverData();
+      return { success: true, message: 'Activity log & records file sent to your Admin and Dean.' };
+    } catch (e: any) {
+      return { success: false, message: e?.message || 'Failed to generate/send the handover file.' };
+    }
+  };
+
+  // Adviser action: request access to an existing handover file from their
+  // own department (e.g. a successor requesting their predecessor's file).
+  const requestAdviserHandoverFile = async (fileId: string): Promise<{ success: boolean; message: string }> => {
+    const client = getSupabase();
+    const { error } = await client.rpc('request_adviser_handover_file', { p_file_id: fileId });
+    if (error) return { success: false, message: error.message };
+    await refreshHandoverData();
+    return { success: true, message: 'Request sent — awaiting Admin or Dean approval.' };
+  };
+
+  // Admin/Dean action: approve or reject a pending handover file access request.
+  const reviewAdviserHandoverRequest = async (
+    requestId: string, decision: 'APPROVED' | 'REJECTED', remarks?: string
+  ): Promise<{ success: boolean; message: string }> => {
+    const client = getSupabase();
+    const { error } = await client.rpc('review_adviser_handover_request', {
+      p_request_id: requestId, p_decision: decision, p_remarks: remarks || null
+    });
+    if (error) return { success: false, message: error.message };
+    await refreshHandoverData();
+    return { success: true, message: decision === 'APPROVED' ? 'Access approved.' : 'Request rejected.' };
+  };
+
+  // Signed link to view/download a handover file — RLS on the bucket
+  // itself is what actually enforces "read-only unless sender/admin/dean/
+  // approved requester"; this just resolves a path someone is already
+  // allowed to see into a short-lived viewable link.
+  const getSignedHandoverFileUrl = async (path: string): Promise<string | null> => {
+    const client = getSupabase();
+    const { data, error } = await client.storage.from('handover-files').createSignedUrl(path, 300);
+    if (error || !data) { console.error('Failed to sign handover file URL', error); return null; }
+    return data.signedUrl;
   };
 
   // ============================================================
@@ -2760,6 +2978,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         demoteToEmployee,
         notifications,
         markNotificationRead,
+        handoverFiles,
+        handoverRequests,
+        sendAdviserHandoverFile,
+        requestAdviserHandoverFile,
+        reviewAdviserHandoverRequest,
+        getSignedHandoverFileUrl,
         proposeEvent,
         reviewEvent,
         adviserReviewLiquidation,
