@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { DEPARTMENTS } from '../data/mockData';
 import { BudgetProposal, DepartmentCode } from '../types';
+import { downloadCsv } from '../utils/csvExport';
 import {
   Wallet,
   Receipt,
@@ -35,15 +36,6 @@ interface LiquidationReportDashboardProps {
 
 const peso = (n: number) =>
   `₱${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
-// Escapes a value for safe CSV placement (mirrors TransactionsView's exporter)
-const csvEscape = (val: string | number) => {
-  const s = String(val ?? '');
-  if (/[",\n]/.test(s)) {
-    return `"${s.replace(/"/g, '""')}"`;
-  }
-  return s;
-};
 
 export const LiquidationReportDashboard: React.FC<LiquidationReportDashboardProps> = ({
   onOpenLiquidationModal
@@ -183,17 +175,7 @@ export const LiquidationReportDashboard: React.FC<LiquidationReportDashboardProp
       r.proposal.budget_return?.cash_in_reference || 'N/A'
     ]);
 
-    const rowsOut = [header, ...dataRows];
-    const csvContent = rowsOut.map(row => row.map(csvEscape).join(',')).join('\r\n');
-    const blob = new Blob(['﻿' + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `NCF_Liquidation_Report_${activeSemester.school_year_label.replace(/\s+/g, '_')}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    downloadCsv(`NCF_Liquidation_Report_${activeSemester.school_year_label.replace(/\s+/g, '_')}.csv`, header, dataRows);
   };
 
   return (

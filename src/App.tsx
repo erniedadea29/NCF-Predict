@@ -88,9 +88,15 @@ function MainAppContent() {
         )}
 
         {(currentTab.toUpperCase() === 'BUDGET_PROPOSALS' ||
+          currentTab.toUpperCase() === 'BUDGET_APPROVALS' ||
           currentTab.toUpperCase() === 'BUDGET' ||
           currentTab.toUpperCase() === 'REIMBURSE') && (
-          isViewOnlyReviewer ? (
+          // Dean/Adviser's own "Reimbursement" tab still goes to the
+          // reimbursement-claims queue; their new "Budget Approvals" tab
+          // (and everyone else's Budget tab) goes to the actual proposal
+          // workflow, where Adviser/Dean's Approve/Revision/Reject panels
+          // and Dean's stage tracker actually live (Section 1/3a).
+          (isViewOnlyReviewer && currentTab.toUpperCase() !== 'BUDGET_APPROVALS') ? (
             <ReimbursementReviewPanel />
           ) : (
             <BudgetProposalWorkflow

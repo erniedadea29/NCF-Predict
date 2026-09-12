@@ -46,6 +46,10 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
     setActiveTab
   } = useApp();
 
+  // Dean/Adviser's "budget" tab is the separate Reimbursement queue — their
+  // actual proposal-approval pipeline lives at "budget_approvals" (Section 1/3a).
+  const proposalsTabId = isViewOnlyReviewer ? 'budget_approvals' : 'budget';
+
   // Department-scoped budget calculations
   const totalAllocated = isDepartmentRestricted 
     ? scopedDepartmentInfo.allocated 
@@ -343,7 +347,7 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
             <p className="text-xs text-slate-500">Live Stage & Sign-off Tracking ({scopedProposals.length} total for {userDepartment})</p>
           </div>
           <button
-            onClick={() => setActiveTab('budget')}
+            onClick={() => setActiveTab(proposalsTabId)}
             className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 flex items-center gap-1 cursor-pointer"
           >
             Manage Proposals <ArrowRight className="w-3.5 h-3.5" />
@@ -368,7 +372,7 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
             {scopedProposals.slice(0, 3).map((prop) => (
               <div 
                 key={prop.id}
-                onClick={() => setActiveTab('budget')}
+                onClick={() => setActiveTab(proposalsTabId)}
                 className="p-4 rounded-xl border border-slate-200 hover:border-emerald-400 bg-slate-50/40 hover:bg-emerald-50/20 transition cursor-pointer flex flex-col justify-between space-y-3"
               >
                 <div>

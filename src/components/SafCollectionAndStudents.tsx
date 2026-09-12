@@ -6,6 +6,7 @@ import {
   DepartmentCode
 } from '../types';
 import { DEPARTMENTS } from '../data/mockData';
+import { downloadCsv } from '../utils/csvExport';
 import {
   Receipt,
   Search,
@@ -14,7 +15,8 @@ import {
   Printer,
   ShieldCheck,
   ShieldAlert,
-  RefreshCw
+  RefreshCw,
+  Download
 } from 'lucide-react';
 
 interface SafCollectionAndStudentsProps {
@@ -37,6 +39,11 @@ export const SafCollectionAndStudents: React.FC<SafCollectionAndStudentsProps> =
     generateClearance,
     isViewOnlyReviewer
   } = useApp();
+
+  // Section 1f: SAF payment collection stays Treasurer/Assistant Treasurer-only
+  // (both share the officer_treasurer role) and requires a confirmation
+  // remark validating receipt — no longer any officer role.
+  const canCollectPayment = currentUser.role === 'officer_treasurer';
 
   // Students land in the SAF ledger automatically the moment they register
   // under a course (create_student_with_saf runs during registration) —
@@ -76,8 +83,8 @@ export const SafCollectionAndStudents: React.FC<SafCollectionAndStudentsProps> =
 
   const handleProcessPayment = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!payingSafRecord) return;
-    recordSafPayment(payingSafRecord.id, 'Cash', paymentNotes);
+    if (!payingSafRecord || !paymentNotes.trim()) return;
+    recordSafPayment(payingSafRecord.id, 'Cash', paymentNotes.trim());
     setPayingSafRecord(null);
     setPaymentNotes('');
   };
@@ -163,6 +170,16 @@ export const SafCollectionAndStudents: React.FC<SafCollectionAndStudentsProps> =
     doc.save(`NCF_SAF_Receipt_${rec.student_number}.pdf`);
   };
 
+  // Section 1h: bulk "Export Report (CSV)" over the currently filtered SAF ledger.
+  const exportSafCsv = () => {
+    const header = ['Student Name', 'Student Number', 'Course', 'Section', 'Department', 'SAF Fee (PHP)', 'Status', 'Reference No.'];
+    const dataRows = filteredSaf.map(rec => [
+      rec.student_name, rec.student_number, rec.course, rec.section, rec.department,
+      rec.amount.toFixed(2), rec.paid ? 'PAID' : 'UNPAID', rec.double_entry?.reference_no || 'N/A'
+    ]);
+    downloadCsv(`NCF_SAF_Ledger_${activeSemester.school_year_label.replace(/\s+/g, '_')}.csv`, header, dataRows);
+  };
+
   return (
     <div className="space-y-6">
       {/* Top Banner & Summary Cards */}
@@ -176,6 +193,14 @@ export const SafCollectionAndStudents: React.FC<SafCollectionAndStudentsProps> =
             <span className="font-bold text-slate-800">CREDIT: Cash on Hand</span> ({activeSemester.school_year_label})
           </p>
         </div>
+        <button
+          onClick={exportSafCsv}
+          disabled={filteredSaf.length === 0}
+          className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-[#00873E] hover:bg-[#007033] disabled:bg-slate-300 text-white shadow-xs transition cursor-pointer disabled:cursor-not-allowed shrink-0"
+        >
+          <Download className="w-3.5 h-3.5" />
+          <span>Export Report (CSV)</span>
+        </button>
       </div>
 
       {/* SAF Double Entry Metric Cards */}
@@ -366,13 +391,15 @@ export const SafCollectionAndStudents: React.FC<SafCollectionAndStudentsProps> =
                             </button>
                           ) : isViewOnlyReviewer ? (
                             <span className="px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 text-[11px] font-bold">Unpaid</span>
-                          ) : (
+                          ) : canCollectPayment ? (
                             <button
                               onClick={() => setPayingSafRecord(rec)}
                               className="px-3 py-1 rounded-lg bg-[#00873E] hover:bg-[#007033] text-white text-xs font-bold shadow-2xs transition cursor-pointer"
                             >
                               Cash-In
                             </button>
+                          ) : (
+                            <span className="px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 text-[11px] font-bold">Pending Treasurer</span>
                           )}
                         </td>
                       </tr>
@@ -543,14 +570,16 @@ export const SafCollectionAndStudents: React.FC<SafCollectionAndStudentsProps> =
               </div>
 
               <div className="space-y-1">
-                <label className="font-bold text-slate-700">Notes / Remarks</label>
+                <label className="font-bold text-slate-700">Confirmation Remark <span className="text-rose-500">*</span></label>
                 <input
                   type="text"
+                  required
                   placeholder="e.g. Paid at Treasury window counter 1"
                   value={paymentNotes}
                   onChange={(e) => setPaymentNotes(e.target.value)}
                   className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200"
                 />
+                <p className="text-[10px] text-slate-400">Required — validates that payment was actually received.</p>
               </div>
 
               <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-[11px] font-mono text-emerald-900 space-y-0.5">
@@ -559,7 +588,8 @@ export const SafCollectionAndStudents: React.FC<SafCollectionAndStudentsProps> =
 
               <button
                 type="submit"
-                className="w-full py-3 bg-[#00873E] hover:bg-[#007033] text-white font-bold rounded-2xl shadow-md transition cursor-pointer"
+                disabled={!paymentNotes.trim()}
+                className="w-full py-3 bg-[#00873E] hover:bg-[#007033] text-white font-bold rounded-2xl shadow-md transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Confirm Payment & Issue Official Receipt
               </button>

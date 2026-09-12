@@ -94,17 +94,24 @@ export const Header: React.FC = () => {
   // Dean/Adviser: course-scoped, mostly view-only. No general "Budget and
   // Proposals" or "Draft CCS Proposal" sections — the Budget tab here
   // renders Reimbursement-only content (gated inside BudgetProposalWorkflow).
-  // The archive tab differs by level: Dean sees "Past Adviser", Adviser
-  // sees "Past Officer" (Section 4).
+  // The archive tab differs by level (Section 3b/4): Dean's covers both
+  // past Advisers and past Officers ("Historical Audit File"), Adviser's
+  // covers just past Officers ("Past Officer").
   const reviewerNav = [
     { id: 'home', label: 'Home' },
     { id: 'transactions', label: 'Transactions' },
+    // Section 1/3a: Adviser/Dean need an actual route to the approval
+    // pipeline (Approve/Request Revision/Reject + Dean's stage tracker) —
+    // previously the only "budget"-ish tab they had went straight to the
+    // separate Reimbursement queue, so a submitted proposal had nowhere to
+    // surface for them to act on it.
+    { id: 'budget_approvals', label: 'Budget Approvals' },
     { id: 'budget', label: 'Reimbursement' },
     { id: 'liquidation_reports', label: 'Liquidation Reports' },
     { id: 'saf_students', label: 'SAF' },
     { id: 'events_attendance', label: 'Events & Penalties' },
     currentUser.role === 'dean'
-      ? { id: 'past_adviser', label: 'Past Adviser' }
+      ? { id: 'past_adviser', label: 'Historical Audit File' }
       : { id: 'past_officer', label: 'Past Officer' },
     { id: 'manage_users', label: 'Manage Users' }
   ];
@@ -150,17 +157,19 @@ export const Header: React.FC = () => {
 
         {/* Action Pills */}
         <div className="flex items-center gap-2 sm:gap-3">
-          {/* Academic Year Pill - editable for staff, read-only for students */}
+          {/* Academic Year Pill — editing is Admin/Super Admin only (Sections
+              2 & 4: Adviser/Dean are explicitly restricted from changing the
+              school year); everyone else, including students, is read-only. */}
           <button
-            onClick={() => !isReadOnlyStudent && setIsSyModalOpen(true)}
+            onClick={() => isAdminSystemOnly && setIsSyModalOpen(true)}
             className={`flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#00873E] text-white font-medium text-xs shadow-xs transition ${
-              isReadOnlyStudent ? 'cursor-default opacity-90' : 'hover:bg-[#007033] cursor-pointer'
+              isAdminSystemOnly ? 'hover:bg-[#007033] cursor-pointer' : 'cursor-default opacity-90'
             }`}
-            title={isReadOnlyStudent ? 'Current academic period' : 'Click to edit Semester & School Year'}
+            title={isAdminSystemOnly ? 'Click to edit Semester & School Year' : 'Current academic period — only Admin/Super Admin can change this'}
           >
             <Calendar className="w-3 h-3 opacity-80" />
             <span>{activeSemester.school_year_label}</span>
-            {!isReadOnlyStudent && <Pencil className="w-3 h-3 opacity-70" />}
+            {isAdminSystemOnly && <Pencil className="w-3 h-3 opacity-70" />}
           </button>
 
           {/* Mobile Shell Simulation Toggle */}

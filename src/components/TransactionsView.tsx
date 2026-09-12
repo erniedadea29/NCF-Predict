@@ -6,6 +6,7 @@ import {
   DepartmentCode 
 } from '../types';
 import { DEPARTMENTS } from '../data/mockData';
+import { csvEscape, downloadCsv } from '../utils/csvExport';
 import {
   Plus,
   Download,
@@ -90,13 +91,15 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ onOpenAddMod
     return true;
   });
 
-  // Escapes a value for safe CSV placement (wraps in quotes, doubles inner quotes)
-  const csvEscape = (val: string | number) => {
-    const s = String(val ?? '');
-    if (/[",\n]/.test(s)) {
-      return `"${s.replace(/"/g, '""')}"`;
-    }
-    return s;
+  // Section 1h: bulk "Export Report (CSV)" over the currently filtered list
+  // — separate from the single-receipt export below, which stays per-row.
+  const exportFilteredCsv = () => {
+    const header = ['Reference Code', 'Date', 'Department', 'Category', 'Title', 'Type', 'Amount (PHP)', 'Status', 'Notes'];
+    const dataRows = filteredTransactions.map(tx => [
+      tx.reference_code, tx.date, tx.department, tx.category, tx.title, tx.type,
+      tx.amount.toFixed(2), tx.status, tx.description || 'N/A'
+    ]);
+    downloadCsv(`NCF_Transactions_${activeSemester.school_year_label.replace(/\s+/g, '_')}.csv`, header, dataRows);
   };
 
   const exportSingleTransactionReceipt = (tx: DepartmentTransaction) => {
@@ -155,10 +158,18 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ onOpenAddMod
         {/* Toggle Archive & Refresh */}
         <div className="flex items-center gap-2">
           <button
+            onClick={exportFilteredCsv}
+            disabled={filteredTransactions.length === 0}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-[#00873E] hover:bg-[#007033] disabled:bg-slate-300 text-white shadow-2xs transition cursor-pointer disabled:cursor-not-allowed"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Export Report (CSV)</span>
+          </button>
+          <button
             onClick={() => setShowArchived(!showArchived)}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer ${
-              showArchived 
-                ? 'bg-slate-800 text-white border-slate-800' 
+              showArchived
+                ? 'bg-slate-800 text-white border-slate-800'
                 : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
             }`}
           >

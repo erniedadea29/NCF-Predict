@@ -139,6 +139,7 @@ interface AppContextType {
   promoteEmployeeToAdmin: (employeeProfileId: string, departmentCode: DepartmentCode) => Promise<{ success: boolean; message: string }>;
   promoteEmployeeToDean: (employeeProfileId: string) => Promise<{ success: boolean; message: string }>;
   promoteEmployeeToAdviser: (employeeProfileId: string) => Promise<{ success: boolean; message: string }>;
+  demoteToEmployee: (profileId: string) => Promise<{ success: boolean; message: string }>;
 
   // Notifications
   notifications: NotificationItem[];
@@ -228,7 +229,7 @@ interface AppContextType {
   penalties: EventAttendance[];
   recordAttendance: (eventId: string, studentId: string, status: 'Present' | 'Absent' | 'Excused', remarks?: string) => void;
   updateAttendancePhoto: (attendanceId: string, photoPath: string) => Promise<void>;
-  payPenalty: (attendanceId: string, receiptNo?: string) => void;
+  payPenalty: (attendanceId: string, receiptNo?: string, confirmationRemark?: string) => void;
 
   // Budget Proposals & 5-Stage Approval Workflow
   proposals: BudgetProposal[];
@@ -245,7 +246,7 @@ interface AppContextType {
   requestCashout: (budgetId: string, amount: number, purpose: string, proofDocs: { name: string; type: string; url: string; date: string }[]) => void;
   addExpense: (budgetId: string, desc: string, category: string, amount: number, proof: { name: string; type: string; url: string; invoice_number: string }) => void;
   requestReimbursement: (expenseId: string, budgetId: string, amount: number, remarks: string) => void;
-  approveReimbursement: (reimbursementId: string) => void;
+  approveReimbursement: (reimbursementId: string, decision?: 'Approved' | 'Rejected', remarks?: string) => void;
   submitLiquidation: (budgetId: string, accountingSummary: { category: string; spent: number; line_item_count: number }[], notes: string) => void;
   recordBudgetReturn: (budgetId: string, amount: number, remarks: string) => void;
 
@@ -811,6 +812,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (error) return { success: false, message: error.message };
     setUserAccounts(prev => prev.map(u => u.id === employeeProfileId ? { ...u, role: 'csc_adviser' } : u));
     return { success: true, message: 'Promoted to Adviser.' };
+  };
+
+  // Demote a Dean/Adviser/Admin back to Employee — unlike deactivateUser
+  // this keeps the account fully active (they can still log in), it just
+  // reverts the role and frees the role_slots claim, so the person
+  // themselves becomes eligible for re-promotion later. The RPC itself
+  // enforces who may demote whom (Super Admin->Admin, Admin->Dean/Adviser
+  // in their own department, Dean->Adviser in their own department).
+  const demoteToEmployee = async (profileId: string): Promise<{ success: boolean; message: string }> => {
+    const client = getSupabase();
+    const { error } = await client.rpc('demote_to_employee', { p_profile_id: profileId });
+    if (error) return { success: false, message: error.message };
+    setUserAccounts(prev => prev.map(u => u.id === profileId ? { ...u, role: 'employee', officer_position: undefined } : u));
+    return { success: true, message: 'Demoted to Employee.' };
   };
 
   // ============================================================
@@ -2196,16 +2211,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setAttendances(prev => prev.map(att => att.id === attendanceId ? { ...att, photo_url: photoPath } : att));
   };
 
-  const payPenalty = async (attendanceId: string, receiptNo?: string) => {
+  const payPenalty = async (attendanceId: string, receiptNo?: string, confirmationRemark?: string) => {
     const client = getSupabase();
     const rNo = receiptNo || `PEN-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`;
     const formattedDate = new Date().toISOString().slice(0, 10);
+    // Section 1f: payment stays pending until a Treasurer/Assistant Treasurer
+    // attaches a confirmation remark validating receipt — the remark is
+    // required by the UI (EventsAndPenalties.tsx) and stored verbatim here.
+    const settleNote = confirmationRemark ? `Penalty settled at Treasury — ${confirmationRemark}` : 'Penalty settled at Treasury';
 
     const { error } = await client.from('event_attendance').update({
       penalty_paid: true,
       penalty_paid_date: formattedDate,
       receipt_no: rNo,
-      notes: 'Penalty settled at Treasury'
+      notes: settleNote
     }).eq('id', attendanceId);
     if (error) { console.error('Failed to record penalty payment', error); return; }
 
@@ -2214,7 +2233,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       penalty_paid: true,
       penalty_paid_date: formattedDate,
       receipt_no: rNo,
-      notes: 'Penalty settled at Treasury'
+      notes: settleNote
     } : att));
 
     const attRecord = attendances.find(a => a.id === attendanceId);
@@ -2562,18 +2581,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } : p));
   };
 
-  const approveReimbursement = async (reimbursementId: string) => {
+  const approveReimbursement = async (reimbursementId: string, decision: 'Approved' | 'Rejected' = 'Approved', remarks?: string) => {
     const client = getSupabase();
-    const { error } = await client.from('reimbursements').update({ status: 'Approved' }).eq('id', reimbursementId);
-    if (error) { console.error('Failed to approve reimbursement', error); return; }
+    const updatePayload: Record<string, unknown> = { status: decision };
+    if (remarks) updatePayload.remarks = remarks;
+    const { error } = await client.from('reimbursements').update(updatePayload).eq('id', reimbursementId);
+    if (error) { console.error('Failed to update reimbursement', error); return; }
 
     setProposals(prev => prev.map(p => {
       const matchReimb = p.reimbursements.find(r => r.id === reimbursementId);
       if (matchReimb) {
         return {
           ...p,
-          reimbursements: p.reimbursements.map(r => r.id === reimbursementId ? { ...r, reimbursement_status: 'Approved' } : r),
-          expenses: p.expenses.map(e => e.id === matchReimb.expense_id ? { ...e, reimbursement_status: 'Approved' } : e)
+          reimbursements: p.reimbursements.map(r => r.id === reimbursementId ? { ...r, reimbursement_status: decision, remarks: remarks || r.remarks } : r),
+          // A rejection sends the underlying expense back to unclaimed so
+          // the officer can re-submit; approval marks it settled.
+          expenses: p.expenses.map(e => e.id === matchReimb.expense_id ? { ...e, reimbursement_status: decision === 'Approved' ? 'Approved' : 'None' } : e)
         };
       }
       return p;
@@ -2734,6 +2757,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         promoteEmployeeToAdmin,
         promoteEmployeeToDean,
         promoteEmployeeToAdviser,
+        demoteToEmployee,
         notifications,
         markNotificationRead,
         proposeEvent,

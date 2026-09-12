@@ -12,7 +12,8 @@ import {
   Crown,
   Landmark,
   GraduationCap,
-  Trash2
+  Trash2,
+  Archive
 } from 'lucide-react';
 
 const ROLE_OPTIONS: { value: UserRole; label: string }[] = [
@@ -141,8 +142,8 @@ const OfficerPromotionPanel: React.FC = () => {
               </div>
               <button onClick={() => handleVacate(o.id)} disabled={submitting}
                 className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-[11px] font-bold transition cursor-pointer disabled:opacity-50 shrink-0"
-                title="Vacate position — reverts to student">
-                <UserMinus className="w-3.5 h-3.5" /> Vacate
+                title="Demote — reverts to student, keeps the account active">
+                <UserMinus className="w-3.5 h-3.5" /> Demote
               </button>
             </div>
           ))}
@@ -154,7 +155,7 @@ const OfficerPromotionPanel: React.FC = () => {
 
 // Super Admin promotes one Admin per department (up to all 8).
 const AdminPromotionPanel: React.FC = () => {
-  const { userAccounts, promoteEmployeeToAdmin, deactivateUser } = useApp();
+  const { userAccounts, promoteEmployeeToAdmin, deactivateUser, demoteToEmployee } = useApp();
   const [departmentCode, setDepartmentCode] = useState<DepartmentCode>('CAF');
   const [employeeId, setEmployeeId] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -184,6 +185,14 @@ const AdminPromotionPanel: React.FC = () => {
     setMessage({ type: 'success', text: 'Deactivated — that department\'s Admin slot is now open for a new promotion.' });
   };
 
+  const handleDemote = async (profileId: string) => {
+    setSubmitting(true);
+    setMessage(null);
+    const res = await demoteToEmployee(profileId);
+    setSubmitting(false);
+    setMessage({ type: res.success ? 'success' : 'error', text: res.success ? 'Demoted to Employee — they remain active and can be re-promoted later.' : res.message });
+  };
+
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-4 sm:p-5 space-y-4">
       <div className="flex items-center gap-2">
@@ -191,7 +200,8 @@ const AdminPromotionPanel: React.FC = () => {
         <h3 className="font-extrabold text-slate-900 text-sm sm:text-base">Promote Employee to Admin</h3>
       </div>
       <p className="text-[11px] text-slate-500 -mt-2">
-        One Admin per department per school year, across all 8 departments. Deactivating an Admin frees their department's slot immediately.
+        One Admin per department per school year, across all 8 departments. Demote reverts them to Employee (still active, re-promotable);
+        Deactivate blocks their login entirely. Either one frees the department's slot immediately.
       </p>
 
       {message && (
@@ -253,11 +263,18 @@ const AdminPromotionPanel: React.FC = () => {
                 <p className="text-xs font-bold text-slate-900 truncate">{a.full_name}</p>
                 <p className="text-[10px] text-slate-500 truncate">{a.department} • {a.email}</p>
               </div>
-              <button onClick={() => handleDeactivate(a.id)} disabled={submitting}
-                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-[11px] font-bold transition cursor-pointer disabled:opacity-50 shrink-0"
-                title="Deactivate — frees this department's Admin slot">
-                <ShieldOff className="w-3.5 h-3.5" /> Deactivate
-              </button>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button onClick={() => handleDemote(a.id)} disabled={submitting}
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 text-[11px] font-bold transition cursor-pointer disabled:opacity-50"
+                  title="Demote to Employee — stays active, eligible for re-promotion">
+                  <UserMinus className="w-3.5 h-3.5" /> Demote
+                </button>
+                <button onClick={() => handleDeactivate(a.id)} disabled={submitting}
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-[11px] font-bold transition cursor-pointer disabled:opacity-50"
+                  title="Deactivate — frees this department's Admin slot">
+                  <ShieldOff className="w-3.5 h-3.5" /> Deactivate
+                </button>
+              </div>
             </div>
           ))}
         </div>
@@ -268,7 +285,7 @@ const AdminPromotionPanel: React.FC = () => {
 
 // Admin promotes exactly one Dean, in the Admin's own department.
 const DeanPromotionPanel: React.FC = () => {
-  const { userAccounts, currentUser, promoteEmployeeToDean, deactivateUser } = useApp();
+  const { userAccounts, currentUser, promoteEmployeeToDean, deactivateUser, demoteToEmployee } = useApp();
   const [employeeId, setEmployeeId] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -295,6 +312,14 @@ const DeanPromotionPanel: React.FC = () => {
     setMessage({ type: 'success', text: 'Deactivated — the Dean slot for your department is now open for a new promotion.' });
   };
 
+  const handleDemote = async (profileId: string) => {
+    setSubmitting(true);
+    setMessage(null);
+    const res = await demoteToEmployee(profileId);
+    setSubmitting(false);
+    setMessage({ type: res.success ? 'success' : 'error', text: res.success ? 'Demoted to Employee — they remain active and can be re-promoted later.' : res.message });
+  };
+
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-4 sm:p-5 space-y-4">
       <div className="flex items-center gap-2">
@@ -302,7 +327,8 @@ const DeanPromotionPanel: React.FC = () => {
         <h3 className="font-extrabold text-slate-900 text-sm sm:text-base">Promote Employee to Dean</h3>
       </div>
       <p className="text-[11px] text-slate-500 -mt-2">
-        Exactly one Dean for {currentUser.department} this school year. Deactivating your Dean frees the slot immediately.
+        Exactly one Dean for {currentUser.department} this school year. Demote reverts them to Employee (still active, re-promotable);
+        Deactivate blocks their login entirely. Either one frees the slot immediately.
       </p>
 
       {message && (
@@ -319,11 +345,18 @@ const DeanPromotionPanel: React.FC = () => {
             <p className="text-xs font-bold text-slate-900 truncate">{currentDean.full_name}</p>
             <p className="text-[10px] text-slate-500 truncate">{currentDean.email}</p>
           </div>
-          <button onClick={() => handleDeactivate(currentDean.id)} disabled={submitting}
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-[11px] font-bold transition cursor-pointer disabled:opacity-50 shrink-0"
-            title="Deactivate — frees the Dean slot">
-            <ShieldOff className="w-3.5 h-3.5" /> Deactivate
-          </button>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button onClick={() => handleDemote(currentDean.id)} disabled={submitting}
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 text-[11px] font-bold transition cursor-pointer disabled:opacity-50"
+              title="Demote to Employee — stays active, eligible for re-promotion">
+              <UserMinus className="w-3.5 h-3.5" /> Demote
+            </button>
+            <button onClick={() => handleDeactivate(currentDean.id)} disabled={submitting}
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-[11px] font-bold transition cursor-pointer disabled:opacity-50"
+              title="Deactivate — frees the Dean slot">
+              <ShieldOff className="w-3.5 h-3.5" /> Deactivate
+            </button>
+          </div>
         </div>
       ) : (
         <form onSubmit={handlePromote} className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3">
@@ -350,7 +383,7 @@ const DeanPromotionPanel: React.FC = () => {
 
 // Dean promotes exactly one Adviser, in the Dean's own department.
 const AdviserPromotionPanel: React.FC = () => {
-  const { userAccounts, currentUser, promoteEmployeeToAdviser, deactivateUser } = useApp();
+  const { userAccounts, currentUser, promoteEmployeeToAdviser, deactivateUser, demoteToEmployee } = useApp();
   const [employeeId, setEmployeeId] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -377,6 +410,14 @@ const AdviserPromotionPanel: React.FC = () => {
     setMessage({ type: 'success', text: 'Deactivated — the Adviser slot for your department is now open for a new promotion.' });
   };
 
+  const handleDemote = async (profileId: string) => {
+    setSubmitting(true);
+    setMessage(null);
+    const res = await demoteToEmployee(profileId);
+    setSubmitting(false);
+    setMessage({ type: res.success ? 'success' : 'error', text: res.success ? 'Demoted to Employee — they remain active and can be re-promoted later.' : res.message });
+  };
+
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-4 sm:p-5 space-y-4">
       <div className="flex items-center gap-2">
@@ -384,7 +425,8 @@ const AdviserPromotionPanel: React.FC = () => {
         <h3 className="font-extrabold text-slate-900 text-sm sm:text-base">Promote Employee to Adviser</h3>
       </div>
       <p className="text-[11px] text-slate-500 -mt-2">
-        Exactly one Adviser for {currentUser.department} this school year. Deactivating your Adviser frees the slot immediately.
+        Exactly one Adviser for {currentUser.department} this school year. Demote reverts them to Employee (still active, re-promotable);
+        Deactivate blocks their login entirely. Either one frees the slot immediately.
       </p>
 
       {message && (
@@ -401,11 +443,18 @@ const AdviserPromotionPanel: React.FC = () => {
             <p className="text-xs font-bold text-slate-900 truncate">{currentAdviser.full_name}</p>
             <p className="text-[10px] text-slate-500 truncate">{currentAdviser.email}</p>
           </div>
-          <button onClick={() => handleDeactivate(currentAdviser.id)} disabled={submitting}
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-[11px] font-bold transition cursor-pointer disabled:opacity-50 shrink-0"
-            title="Deactivate — frees the Adviser slot">
-            <ShieldOff className="w-3.5 h-3.5" /> Deactivate
-          </button>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button onClick={() => handleDemote(currentAdviser.id)} disabled={submitting}
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 text-[11px] font-bold transition cursor-pointer disabled:opacity-50"
+              title="Demote to Employee — stays active, eligible for re-promotion">
+              <UserMinus className="w-3.5 h-3.5" /> Demote
+            </button>
+            <button onClick={() => handleDeactivate(currentAdviser.id)} disabled={submitting}
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-[11px] font-bold transition cursor-pointer disabled:opacity-50"
+              title="Deactivate — frees the Adviser slot">
+              <ShieldOff className="w-3.5 h-3.5" /> Deactivate
+            </button>
+          </div>
         </div>
       ) : (
         <form onSubmit={handlePromote} className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3">
@@ -431,7 +480,7 @@ const AdviserPromotionPanel: React.FC = () => {
 };
 
 export const ManageUsersView: React.FC = () => {
-  const { userAccounts, deactivateUser, reactivateUser, deleteUserAccount, currentUser, isDepartmentRestricted, userDepartment } = useApp();
+  const { userAccounts, deactivateUser, reactivateUser, deleteUserAccount, demoteToEmployee, currentUser, isDepartmentRestricted, userDepartment } = useApp();
 
   // Dean/Adviser only manage accounts within their own registered
   // department — Admin/Super Admin (unrestricted) still see everyone
@@ -462,17 +511,45 @@ export const ManageUsersView: React.FC = () => {
     if (!res.success) setDeleteError({ id: profileId, message: res.message });
   };
 
+  const [demotingId, setDemotingId] = useState<string | null>(null);
+  const [demoteError, setDemoteError] = useState<{ id: string; message: string } | null>(null);
+
+  const handleDemoteAccount = async (profileId: string) => {
+    setDemotingId(profileId);
+    setDemoteError(null);
+    const res = await demoteToEmployee(profileId);
+    setDemotingId(null);
+    if (!res.success) setDemoteError({ id: profileId, message: res.message });
+  };
+
+  // Who the current viewer is allowed to demote back to Employee — mirrors
+  // demote_to_employee's own server-side rule exactly (Super Admin->Admin,
+  // Admin->Dean/Adviser in their own department, Dean->Adviser in theirs).
+  const canDemote = (u: UserAccountSummary): boolean => {
+    if (u.id === currentUser.id) return false;
+    if (currentUser.role === 'super_admin') return u.role === 'admin';
+    if (currentUser.role === 'admin') return (u.role === 'dean' || u.role === 'csc_adviser') && u.department === currentUser.department;
+    if (currentUser.role === 'dean') return u.role === 'csc_adviser' && u.department === currentUser.department;
+    return false;
+  };
+
+  // Deactivated accounts get their own "Archived" section instead of
+  // showing inline (with a badge) inside the active lists — Section 5.
+  const activeFilteredUsers = filteredUsers.filter(u => u.is_active);
+  const archivedFilteredUsers = filteredUsers.filter(u => !u.is_active);
+
   // Super Admin sees the whole system at once, so Student and Employee
   // accounts get their own containers instead of one mixed list — everyone
   // else's role check is unambiguous already (only two roles are this
   // easy to confuse at a glance).
   const isSuperAdminView = currentUser.role === 'super_admin';
-  const studentUsers = filteredUsers.filter(u => u.role === 'student');
-  const employeeUsers = filteredUsers.filter(u => u.role === 'employee');
-  const staffUsers = filteredUsers.filter(u => u.role !== 'student' && u.role !== 'employee');
+  const studentUsers = activeFilteredUsers.filter(u => u.role === 'student');
+  const employeeUsers = activeFilteredUsers.filter(u => u.role === 'employee');
+  const staffUsers = activeFilteredUsers.filter(u => u.role !== 'student' && u.role !== 'employee');
 
   const renderAccountRow = (u: UserAccountSummary) => {
     const canHardDelete = currentUser.role === 'super_admin' && u.id !== currentUser.id && u.role !== 'super_admin';
+    const demotable = canDemote(u);
     return (
       <div key={u.id} className="p-3.5 space-y-2">
         <div className="flex items-center justify-between gap-3">
@@ -514,6 +591,16 @@ export const ManageUsersView: React.FC = () => {
                 </button>
               )
             )}
+            {demotable && (
+              <button
+                onClick={() => handleDemoteAccount(u.id)}
+                disabled={demotingId === u.id}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 text-[11px] font-bold transition cursor-pointer disabled:opacity-50"
+                title="Demote — reverts to Employee, keeps the account active and eligible for re-promotion later"
+              >
+                <UserMinus className="w-3.5 h-3.5" /> {demotingId === u.id ? 'Demoting...' : 'Demote'}
+              </button>
+            )}
             {canHardDelete && confirmingDeleteId !== u.id && (
               <button
                 onClick={() => { setConfirmingDeleteId(u.id); setDeleteError(null); }}
@@ -553,21 +640,28 @@ export const ManageUsersView: React.FC = () => {
             {deleteError.message}
           </div>
         )}
+
+        {demoteError && demoteError.id === u.id && (
+          <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-xl px-3 py-2 text-xs">
+            {demoteError.message}
+          </div>
+        )}
       </div>
     );
   };
 
-  const AccountListContainer: React.FC<{ title: string; users: UserAccountSummary[]; accent?: 'emerald' | 'indigo' | 'slate' }> = ({ title, users, accent = 'slate' }) => {
+  const AccountListContainer: React.FC<{ title: string; users: UserAccountSummary[]; accent?: 'emerald' | 'indigo' | 'slate' | 'rose'; icon?: React.ReactNode }> = ({ title, users, accent = 'slate', icon }) => {
     const accentClasses = {
       emerald: 'bg-[#00873E] text-white',
       indigo: 'bg-indigo-600 text-white',
-      slate: 'bg-slate-800 text-white'
+      slate: 'bg-slate-800 text-white',
+      rose: 'bg-rose-100 text-rose-800'
     }[accent];
     return (
       <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden h-full flex flex-col">
         <div className="px-4 py-3 border-b border-slate-100">
-          <span className={`inline-block px-3 py-1 rounded-full text-xs font-extrabold uppercase tracking-wider ${accentClasses}`}>
-            {title} ({users.length})
+          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold uppercase tracking-wider ${accentClasses}`}>
+            {icon} {title} ({users.length})
           </span>
         </div>
         <div className="divide-y divide-slate-100 flex-1">
@@ -579,6 +673,19 @@ export const ManageUsersView: React.FC = () => {
       </div>
     );
   };
+
+  // A dedicated, separately-labeled "Archived" container for deactivated
+  // accounts (Section 5) — kept distinct from Deactivate's own inline
+  // badge so archived accounts read as a deliberate holding area, not
+  // clutter mixed into the active lists.
+  const ArchivedSection = () => (
+    <AccountListContainer
+      title="Archived"
+      users={archivedFilteredUsers}
+      accent="rose"
+      icon={<Archive className="w-3.5 h-3.5" />}
+    />
+  );
 
   return (
     <div className="space-y-5">
@@ -614,15 +721,19 @@ export const ManageUsersView: React.FC = () => {
             <AccountListContainer title="Employee" users={employeeUsers} accent="indigo" />
           </div>
           <AccountListContainer title="Staff & Officers" users={staffUsers} accent="slate" />
+          <ArchivedSection />
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-          <div className="divide-y divide-slate-100">
-            {filteredUsers.map(renderAccountRow)}
-            {filteredUsers.length === 0 && (
-              <div className="p-8 text-center text-xs text-slate-400">No users found.</div>
-            )}
+        <div className="space-y-4">
+          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+            <div className="divide-y divide-slate-100">
+              {activeFilteredUsers.map(renderAccountRow)}
+              {activeFilteredUsers.length === 0 && (
+                <div className="p-8 text-center text-xs text-slate-400">No users found.</div>
+              )}
+            </div>
           </div>
+          <ArchivedSection />
         </div>
       )}
     </div>

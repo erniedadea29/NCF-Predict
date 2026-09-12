@@ -7,25 +7,27 @@ import {
   DepartmentCode 
 } from '../types';
 import { DEPARTMENTS } from '../data/mockData';
-import { 
-  FileText, 
-  CheckCircle2, 
-  AlertCircle, 
-  Clock, 
-  Printer, 
-  ThumbsUp, 
-  ThumbsDown, 
-  MinusCircle, 
-  MessageSquare, 
-  Plus, 
-  DollarSign, 
-  Send, 
-  ShieldCheck, 
-  Lock, 
+import { downloadCsv } from '../utils/csvExport';
+import {
+  FileText,
+  CheckCircle2,
+  AlertCircle,
+  Clock,
+  Printer,
+  ThumbsUp,
+  ThumbsDown,
+  MinusCircle,
+  MessageSquare,
+  Plus,
+  DollarSign,
+  Send,
+  ShieldCheck,
+  Lock,
   ArrowRight,
   Upload,
   Receipt,
-  FileCheck
+  FileCheck,
+  Download
 } from 'lucide-react';
 import { PrintableProposalModal } from './PrintableProposalModal';
 
@@ -54,8 +56,15 @@ export const BudgetProposalWorkflow: React.FC<BudgetProposalWorkflowProps> = ({
     addProposalNote,
     adviserApproveProposal,
     deanApproveProposal,
-    isReadOnlyStudent
+    isReadOnlyStudent,
+    isViewOnlyReviewer
   } = useApp();
+
+  // Adviser/Dean reach this component via the new "Budget Approvals" tab
+  // (Section 1/3a) purely to review/act on a proposal at their stage — they
+  // never draft proposals or touch the post-approval financial flow, so
+  // those officer-only actions stay hidden for them same as for students.
+  const hideOfficerActions = isReadOnlyStudent || isViewOnlyReviewer;
 
   // Students only ever see fully-approved-and-released budgets (Section 3)
   // — never drafts or ones still mid-review.
@@ -78,9 +87,9 @@ export const BudgetProposalWorkflow: React.FC<BudgetProposalWorkflowProps> = ({
       case 'COUNCIL_VOTING':
         return { label: '3. Council Resolution & Voting', color: 'bg-blue-100 text-blue-800 border-blue-300' };
       case 'CSC_ADVISER_APPROVAL':
-        return { label: '4. CSC Adviser Approval', color: 'bg-indigo-100 text-indigo-800 border-indigo-300' };
+        return { label: 'Waiting for Approval — Adviser', color: 'bg-indigo-100 text-indigo-800 border-indigo-300' };
       case 'DEAN_APPROVAL':
-        return { label: '5. Dean Final Approval', color: 'bg-rose-100 text-rose-800 border-rose-300' };
+        return { label: 'Waiting for Approval — Dean', color: 'bg-rose-100 text-rose-800 border-rose-300' };
       case 'APPROVED_RELEASED':
         return { label: 'Approved & Funds Released', color: 'bg-emerald-100 text-emerald-800 border-emerald-300' };
       case 'FOR_REVISION':
@@ -99,6 +108,16 @@ export const BudgetProposalWorkflow: React.FC<BudgetProposalWorkflowProps> = ({
 
   const userVoted = activeProposal?.votes?.find(v => v.council_member_id === currentUser.id);
 
+  // Section 1h: bulk "Export Report (CSV)" over the currently visible proposal list.
+  const exportProposalsCsv = () => {
+    const header = ['Budget Title', 'Department', 'Stage', 'Requested By', 'Total Amount (PHP)', 'Created', 'Last Updated'];
+    const dataRows = displayProposals.map(p => [
+      p.budget_title, p.department, getStageBadge(p.budget_status)?.label || p.budget_status,
+      p.created_by_officer, p.total_budget_amount.toFixed(2), p.created_at, p.updated_at
+    ]);
+    downloadCsv(`NCF_Budget_Proposals_${activeSemester.school_year_label.replace(/\s+/g, '_')}.csv`, header, dataRows);
+  };
+
   return (
     <div className="space-y-6">
       {/* Top Header */}
@@ -113,8 +132,16 @@ export const BudgetProposalWorkflow: React.FC<BudgetProposalWorkflowProps> = ({
           </p>
         </div>
 
-        {!isReadOnlyStudent && (
-          <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={exportProposalsCsv}
+            disabled={displayProposals.length === 0}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 disabled:bg-slate-50 disabled:text-slate-300 text-slate-700 shadow-2xs transition cursor-pointer disabled:cursor-not-allowed"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Export Report (CSV)</span>
+          </button>
+          {!hideOfficerActions && (
             <button
               onClick={onOpenCreateProposal}
               className="flex items-center gap-1.5 px-4 py-2 bg-[#00873E] hover:bg-[#007033] text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer"
@@ -122,8 +149,8 @@ export const BudgetProposalWorkflow: React.FC<BudgetProposalWorkflowProps> = ({
               <Plus className="w-4 h-4" />
               <span>+ Draft New Proposal</span>
             </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Active Role Perspective Bar */}
@@ -155,7 +182,7 @@ export const BudgetProposalWorkflow: React.FC<BudgetProposalWorkflowProps> = ({
               <div className="text-center py-8 px-3 bg-slate-50 rounded-xl border border-dashed border-slate-200 space-y-2">
                 <FileText className="w-8 h-8 text-slate-300 mx-auto" />
                 <p className="text-xs text-slate-500 font-medium">No proposals drafted yet for {userDepartment}.</p>
-                {!isReadOnlyStudent && (
+                {!hideOfficerActions && (
                   <button
                     onClick={onOpenCreateProposal}
                     className="px-3 py-1.5 bg-[#00873E] text-white text-xs font-bold rounded-lg shadow-xs cursor-pointer hover:bg-[#007033]"
@@ -355,13 +382,23 @@ export const BudgetProposalWorkflow: React.FC<BudgetProposalWorkflowProps> = ({
 
               {/* ACTION PANELS BASED ON CURRENT USER ROLE & PROPOSAL STATUS */}
               <div className="pt-2 border-t border-slate-100 space-y-4">
-                {/* 1. Officer Actions (Submit Draft) */}
-                {currentUser.role === 'officer_treasurer' && activeProposal.budget_status === 'DRAFT' && (
+                {/* 1. Officer Actions (Submit Draft, or resubmit after revision) */}
+                {currentUser.role === 'officer_treasurer' && (activeProposal.budget_status === 'DRAFT' || activeProposal.budget_status === 'FOR_REVISION') && (
                   <div className="p-4 bg-amber-50 rounded-2xl border border-amber-200 space-y-3">
                     <div className="flex items-center gap-2 text-amber-900 font-bold text-xs">
                       <AlertCircle className="w-4 h-4 text-amber-600" />
-                      <span>Draft ready — submit for Adviser review?</span>
+                      <span>{activeProposal.budget_status === 'FOR_REVISION' ? 'Sent back for revision — edit and resubmit' : 'Draft ready — submit for Adviser review?'}</span>
                     </div>
+                    {activeProposal.budget_status === 'FOR_REVISION' && (activeProposal.adviser_approval?.remarks || activeProposal.dean_approval?.remarks) && (
+                      <div className="p-3 bg-white rounded-xl border border-amber-300 text-xs text-amber-900 space-y-1">
+                        {activeProposal.dean_approval?.decision === 'REVISION' && activeProposal.dean_approval.remarks && (
+                          <p><strong>Dean:</strong> {activeProposal.dean_approval.remarks}</p>
+                        )}
+                        {activeProposal.adviser_approval?.decision === 'REVISION' && activeProposal.adviser_approval.remarks && (
+                          <p><strong>Adviser:</strong> {activeProposal.adviser_approval.remarks}</p>
+                        )}
+                      </div>
+                    )}
                     <p className="text-xs text-amber-800">
                       This sends the request straight to your CSC Adviser, who forwards it to the Dean for final approval.
                     </p>
@@ -369,7 +406,7 @@ export const BudgetProposalWorkflow: React.FC<BudgetProposalWorkflowProps> = ({
                       onClick={() => submitProposalForReview(activeProposal.id)}
                       className="px-4 py-2 bg-[#00873E] hover:bg-[#007033] text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer"
                     >
-                      Submit Request →
+                      {activeProposal.budget_status === 'FOR_REVISION' ? 'Resubmit Request →' : 'Submit Request →'}
                     </button>
                   </div>
                 )}
@@ -441,40 +478,84 @@ export const BudgetProposalWorkflow: React.FC<BudgetProposalWorkflowProps> = ({
                   </div>
                 )}
 
-                {/* 4. CSC Adviser Approval */}
+                {/* 4. CSC Adviser Approval — Approve forwards to Dean; Request
+                    Revision / Reject both route back to the Officer (Section 1). */}
                 {currentUser.role === 'csc_adviser' && activeProposal.budget_status === 'CSC_ADVISER_APPROVAL' && (
                   <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-200 space-y-3">
                     <span className="font-bold text-xs text-emerald-900 block">Student Council Adviser Formal Approval</span>
                     <p className="text-xs text-emerald-800">
                       Council resolution passed with {activeProposal.votes.length} votes. Recommend approval to College Dean?
                     </p>
-                    <button
-                      onClick={() => adviserApproveProposal(activeProposal.id, 'APPROVED', 'Approved by CSC Adviser.')}
-                      className="px-4 py-2 bg-[#00873E] hover:bg-[#007033] text-white text-xs font-bold rounded-xl shadow-xs cursor-pointer"
-                    >
-                      ✓ Approve & Forward to Dean
-                    </button>
+                    <input
+                      type="text"
+                      placeholder="Remarks (required if requesting revision or rejecting)..."
+                      value={reviewRemarks}
+                      onChange={(e) => setReviewRemarks(e.target.value)}
+                      className="w-full px-3 py-2 text-xs bg-white rounded-xl border border-emerald-200"
+                    />
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        onClick={() => adviserApproveProposal(activeProposal.id, 'APPROVED', reviewRemarks || 'Approved by CSC Adviser.')}
+                        className="px-4 py-2 bg-[#00873E] hover:bg-[#007033] text-white text-xs font-bold rounded-xl shadow-xs cursor-pointer"
+                      >
+                        ✓ Approve & Forward to Dean
+                      </button>
+                      <button
+                        onClick={() => adviserApproveProposal(activeProposal.id, 'REVISION', reviewRemarks || 'Needs revision before it can move forward.')}
+                        className="px-3 py-2 bg-orange-100 hover:bg-orange-200 text-orange-800 text-xs font-bold rounded-xl cursor-pointer"
+                      >
+                        Request Revision
+                      </button>
+                      <button
+                        onClick={() => adviserApproveProposal(activeProposal.id, 'REJECTED', reviewRemarks || 'Rejected by CSC Adviser.')}
+                        className="px-3 py-2 bg-rose-100 hover:bg-rose-200 text-rose-800 text-xs font-bold rounded-xl cursor-pointer"
+                      >
+                        ✗ Reject
+                      </button>
+                    </div>
                   </div>
                 )}
 
-                {/* 5. Dean Approval & Fund Release */}
+                {/* 5. Dean Approval & Fund Release — Approve releases funds;
+                    Request Revision / Reject both route back to the Officer. */}
                 {currentUser.role === 'dean' && activeProposal.budget_status === 'DEAN_APPROVAL' && (
                   <div className="p-4 bg-rose-50 rounded-2xl border border-rose-200 space-y-3">
                     <span className="font-bold text-xs text-rose-900 block">Dean Executive Approval & Fund Release Authorization</span>
                     <p className="text-xs text-rose-800">
                       Authorize full disbursement of ₱{activeProposal.total_budget_amount.toLocaleString('en-US')} from Student Activity Fund (SAF)?
                     </p>
-                    <button
-                      onClick={() => deanApproveProposal(activeProposal.id, 'APPROVED_FUND_RELEASE', 'Executive Approval & Fund Release authorized.')}
-                      className="px-5 py-2.5 bg-[#00873E] hover:bg-[#007033] text-white text-xs font-extrabold rounded-xl shadow-md cursor-pointer"
-                    >
-                      ✓ Approve & Authorize Fund Release
-                    </button>
+                    <input
+                      type="text"
+                      placeholder="Remarks (required if requesting revision or rejecting)..."
+                      value={reviewRemarks}
+                      onChange={(e) => setReviewRemarks(e.target.value)}
+                      className="w-full px-3 py-2 text-xs bg-white rounded-xl border border-rose-200"
+                    />
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        onClick={() => deanApproveProposal(activeProposal.id, 'APPROVED_FUND_RELEASE', reviewRemarks || 'Executive Approval & Fund Release authorized.')}
+                        className="px-5 py-2.5 bg-[#00873E] hover:bg-[#007033] text-white text-xs font-extrabold rounded-xl shadow-md cursor-pointer"
+                      >
+                        ✓ Approve & Authorize Fund Release
+                      </button>
+                      <button
+                        onClick={() => deanApproveProposal(activeProposal.id, 'REVISION', reviewRemarks || 'Needs revision before fund release.')}
+                        className="px-3 py-2 bg-orange-100 hover:bg-orange-200 text-orange-800 text-xs font-bold rounded-xl cursor-pointer"
+                      >
+                        Request Revision
+                      </button>
+                      <button
+                        onClick={() => deanApproveProposal(activeProposal.id, 'REJECTED', reviewRemarks || 'Rejected by Dean.')}
+                        className="px-3 py-2 bg-rose-100 hover:bg-rose-200 text-rose-800 text-xs font-bold rounded-xl cursor-pointer"
+                      >
+                        ✗ Reject
+                      </button>
+                    </div>
                   </div>
                 )}
 
                 {/* Post-Approval Financial Flow Actions (Budget Requests, Expenses, Reimbursements, Liquidation, Return) */}
-                {!isReadOnlyStudent && activeProposal.budget_status === 'APPROVED_RELEASED' && (
+                {!hideOfficerActions && activeProposal.budget_status === 'APPROVED_RELEASED' && (
                   <div className="p-4 bg-slate-900 text-white rounded-2xl space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-xs text-emerald-400 flex items-center gap-1.5">

@@ -3,6 +3,7 @@ import { useApp } from '../context/AppContext';
 import { DepartmentCode, SchoolEvent, EventAttendance } from '../types';
 import { DEPARTMENTS } from '../data/mockData';
 import { ReceiptUploadField } from './ReceiptUploadField';
+import { downloadCsv } from '../utils/csvExport';
 import {
   Calendar,
   Plus,
@@ -21,7 +22,8 @@ import {
   Sparkles,
   TrendingUp,
   XCircle,
-  Hourglass
+  Hourglass,
+  Download
 } from 'lucide-react';
 
 const OFFICER_ROLES = ['officer_treasurer', 'officer_governor', 'council_member'];
@@ -115,6 +117,10 @@ export const EventsAndPenalties: React.FC = () => {
   // Dean/Adviser get view-only Penalties/Attendance (Section 5) — they can
   // still approve/reject events above, just not run attendance/collect fines.
   const canManageAttendance = !isReadOnlyStudent && !isViewOnlyReviewer;
+  // Section 1f: payment collection (SAF, events, penalties) stays
+  // Treasurer/Assistant Treasurer-only — both share the officer_treasurer
+  // role — and requires a confirmation remark validating receipt.
+  const canCollectPayment = currentUser.role === 'officer_treasurer';
 
   // New Event Form State
   const [eventTitle, setEventTitle] = useState('');
@@ -137,6 +143,10 @@ export const EventsAndPenalties: React.FC = () => {
 
   // Settlement feedback
   const [settledReceipt, setSettledReceipt] = useState<{ studentName: string; receiptNo: string; amount: number } | null>(null);
+  // Section 1f: Collect opens a small confirmation-remark prompt instead of
+  // settling in one click — the remark is required before payPenalty fires.
+  const [payingPenalty, setPayingPenalty] = useState<{ attendanceId: string; studentName: string; amount: number } | null>(null);
+  const [penaltyRemark, setPenaltyRemark] = useState('');
   const [attendanceSearch, setAttendanceSearch] = useState('');
 
   const displayEvents = (isDepartmentRestricted ? scopedEvents : events).filter(isEventVisible);
@@ -200,10 +210,32 @@ export const EventsAndPenalties: React.FC = () => {
   };
 
   const handleSettlePenalty = (attendanceId: string, studentName: string, amount: number) => {
+    setPayingPenalty({ attendanceId, studentName, amount });
+    setPenaltyRemark('');
+  };
+
+  const handleConfirmSettlePenalty = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!payingPenalty || !penaltyRemark.trim()) return;
     const receiptNo = `PEN-${userDepartment}-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
-    payPenalty(attendanceId, receiptNo);
-    setSettledReceipt({ studentName, receiptNo, amount });
+    payPenalty(payingPenalty.attendanceId, receiptNo, penaltyRemark.trim());
+    setSettledReceipt({ studentName: payingPenalty.studentName, receiptNo, amount: payingPenalty.amount });
+    setPayingPenalty(null);
+    setPenaltyRemark('');
     setTimeout(() => setSettledReceipt(null), 5000);
+  };
+
+  // Section 1h: bulk "Export Report (CSV)" over the currently filtered
+  // penalties/attendance roster.
+  const exportPenaltiesCsv = () => {
+    const header = ['Student Name', 'Student Number', 'Event Title', 'Attendance Status', 'Remarks', 'Penalty Fine (PHP)', 'Payment Status', 'Receipt No.'];
+    const dataRows = filteredAttendances.map(att => [
+      att.student_name, att.student_number, att.event_title, att.status,
+      att.notes || '', (att.penalty_amount ?? 0).toFixed(2),
+      att.penalty_amount > 0 ? (att.penalty_paid ? 'PAID' : 'UNPAID') : 'N/A',
+      att.receipt_no || 'N/A'
+    ]);
+    downloadCsv(`NCF_Penalties_Attendance_${activeSemester.school_year_label.replace(/\s+/g, '_')}.csv`, header, dataRows);
   };
 
   const filteredEvents = displayEvents.filter(ev => {
@@ -339,6 +371,49 @@ export const EventsAndPenalties: React.FC = () => {
                 )}
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Treasurer confirmation-remark prompt — payment stays pending until
+          this is filled in (Section 1f). */}
+      {payingPenalty && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl border border-slate-200 overflow-hidden">
+            <div className="px-6 py-4 bg-[#00873E] text-white flex items-center justify-between">
+              <div>
+                <h3 className="font-extrabold text-base">Confirm Penalty Payment</h3>
+                <p className="text-xs text-emerald-100">Treasurer confirmation required to settle</p>
+              </div>
+              <button onClick={() => setPayingPenalty(null)} className="text-white hover:opacity-80">✕</button>
+            </div>
+            <form onSubmit={handleConfirmSettlePenalty} className="p-6 space-y-4 text-xs">
+              <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-1">
+                <p className="font-bold text-slate-900">{payingPenalty.studentName}</p>
+                <p className="text-emerald-700 font-extrabold text-base pt-1">
+                  Penalty Amount: ₱{payingPenalty.amount.toFixed(2)}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <label className="font-bold text-slate-700">Confirmation Remark <span className="text-rose-500">*</span></label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Received in cash at Treasury window"
+                  value={penaltyRemark}
+                  onChange={(e) => setPenaltyRemark(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200"
+                />
+                <p className="text-[10px] text-slate-400">Required — validates that payment was actually received.</p>
+              </div>
+              <button
+                type="submit"
+                disabled={!penaltyRemark.trim()}
+                className="w-full py-3 bg-[#00873E] hover:bg-[#007033] text-white font-bold rounded-2xl shadow-md transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Confirm & Settle Payment
+              </button>
+            </form>
           </div>
         </div>
       )}
@@ -627,6 +702,14 @@ export const EventsAndPenalties: React.FC = () => {
               <option value="ABSENT">All Absences</option>
               <option value="PRESENT">Present Students</option>
             </select>
+            <button
+              onClick={exportPenaltiesCsv}
+              disabled={filteredAttendances.length === 0}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-[#00873E] hover:bg-[#007033] disabled:bg-slate-300 text-white shadow-2xs transition cursor-pointer disabled:cursor-not-allowed shrink-0"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Export Report (CSV)</span>
+            </button>
           </div>
 
           <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-xs">
@@ -737,7 +820,7 @@ export const EventsAndPenalties: React.FC = () => {
                               ) : (
                                 <span className="text-slate-400 text-xs font-medium">Cleared</span>
                               )
-                            ) : hasPenalty && !isPaid ? (
+                            ) : hasPenalty && !isPaid && canCollectPayment ? (
                               <button
                                 onClick={() => handleSettlePenalty(att.id, att.student_name, amount)}
                                 className="px-3 py-1.5 bg-[#00873E] hover:bg-[#007033] text-white font-bold rounded-xl text-xs shadow-xs transition cursor-pointer flex items-center gap-1 ml-auto"
@@ -745,6 +828,10 @@ export const EventsAndPenalties: React.FC = () => {
                                 <Receipt className="w-3.5 h-3.5" />
                                 <span>Collect ₱{amount.toFixed(2)}</span>
                               </button>
+                            ) : hasPenalty && !isPaid ? (
+                              <span className="text-amber-600 text-xs font-bold">
+                                Pending Treasurer confirmation
+                              </span>
                             ) : hasPenalty && isPaid ? (
                               <span className="text-emerald-700 text-xs font-bold flex items-center justify-end gap-1">
                                 <CheckCircle2 className="w-3.5 h-3.5" />
