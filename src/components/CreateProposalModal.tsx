@@ -4,6 +4,39 @@ import { DepartmentCode, BudgetLineItem } from '../types';
 import { DEPARTMENTS } from '../data/mockData';
 import { X, Plus, Trash2, Check, FileText, Calculator, Layers, AlertCircle } from 'lucide-react';
 
+/**
+ * Number input that clears a 0 when focused so the user can type right away,
+ * and falls back to 0 if left empty on blur.
+ */
+const ClearOnFocusNumberInput: React.FC<
+  Omit<React.InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange' | 'type'> & {
+    value: number;
+    onValueChange: (value: number) => void;
+  }
+> = ({ value, onValueChange, onFocus, onBlur, ...rest }) => {
+  // While focused, show the raw text being typed instead of the stored number.
+  const [draft, setDraft] = useState<string | null>(null);
+  return (
+    <input
+      {...rest}
+      type="number"
+      value={draft ?? (value === 0 ? '' : String(value))}
+      onFocus={(e) => {
+        setDraft(value === 0 ? '' : String(value));
+        onFocus?.(e);
+      }}
+      onChange={(e) => {
+        setDraft(e.target.value);
+        onValueChange(parseFloat(e.target.value) || 0);
+      }}
+      onBlur={(e) => {
+        setDraft(null);
+        onBlur?.(e);
+      }}
+    />
+  );
+};
+
 interface CreateProposalModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -66,7 +99,7 @@ export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({ isOpen
         id: `li_${Date.now()}`,
         item_desc: '',
         category: 'Materials & Supplies',
-        quantity: 1,
+        quantity: 0,
         unit_cost: 0,
         estimated_amount: 0,
         remarks: ''
@@ -280,12 +313,13 @@ export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({ isOpen
                     <div>
                       <div className="flex items-center gap-1">
                         <span className="text-[10px] text-slate-400">Qty:</span>
-                        <input
-                          type="number"
+                        <ClearOnFocusNumberInput
+                          step="1"
                           min="1"
                           required
+                          placeholder="0"
                           value={item.quantity}
-                          onChange={(e) => updateLineItem(item.id, { quantity: parseInt(e.target.value) || 1 })}
+                          onValueChange={(v) => updateLineItem(item.id, { quantity: Math.trunc(v) })}
                           className="w-full px-2 py-1.5 bg-white rounded-lg border border-slate-200 font-bold text-center"
                         />
                       </div>
@@ -293,13 +327,13 @@ export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({ isOpen
                     <div>
                       <div className="flex items-center gap-1">
                         <span className="text-[10px] text-slate-400">Unit: ₱</span>
-                        <input
-                          type="number"
+                        <ClearOnFocusNumberInput
                           step="0.01"
                           min="0"
                           required
+                          placeholder="0.00"
                           value={item.unit_cost}
-                          onChange={(e) => updateLineItem(item.id, { unit_cost: parseFloat(e.target.value) || 0 })}
+                          onValueChange={(v) => updateLineItem(item.id, { unit_cost: v })}
                           className="w-full px-2 py-1.5 bg-white rounded-lg border border-slate-200 font-bold"
                         />
                       </div>
