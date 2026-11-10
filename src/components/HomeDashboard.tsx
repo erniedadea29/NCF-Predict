@@ -183,7 +183,7 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
             </div>
 
             <div className="bg-white/10 backdrop-blur-xs rounded-xl p-3 border border-white/15">
-              <p className="text-[11px] text-emerald-100 font-medium">AI ARIMA-LSTM Forecast</p>
+              <p className="text-[11px] text-emerald-100 font-medium">Random Forest Forecast</p>
               <p className="text-lg sm:text-xl font-bold text-white">₱{(forecastAmount / 1000).toFixed(1)}k</p>
             </div>
 

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useMemo } from 'react';
 import { 
   User, 
   UserRole, 
@@ -37,10 +37,11 @@ import {
   MOCK_SCHOOL_EVENTS,
   MOCK_ATTENDANCES,
   MOCK_PROPOSALS,
-  MOCK_FORECAST
+  HISTORICAL_SEMESTER_SPENDING
 } from '../data/mockData';
 import { isSupabaseLiveConfigured, getSupabase, getIsolatedSupabase } from '../lib/supabaseClient';
 import { jsPDF } from 'jspdf';
+import { buildRandomForestForecast } from '../lib/budgetForecast';
 
 // Shown before a real Supabase session is restored / while logged out.
 // currentUser stays non-null everywhere else in this file; AuthGate (App.tsx)
@@ -1256,7 +1257,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated]);
 
-  const [forecastMetric] = useState<ForecastMetric>(MOCK_FORECAST);
+  // Random Forest forecast, retrained whenever department financials or the semester change.
+  const forecastMetric = useMemo<ForecastMetric>(
+    () => buildRandomForestForecast({ departments, history: HISTORICAL_SEMESTER_SPENDING, activeSemester }),
+    [departments, activeSemester]
+  );
+  // Departments with their `forecast` field filled in from the Random Forest model.
+  const forecastedDepartments = useMemo<Record<DepartmentCode, DepartmentInfo>>(() => {
+    const next = { ...departments };
+    forecastMetric.departments.forEach(f => {
+      if (next[f.code]) next[f.code] = { ...next[f.code], forecast: f.forecast };
+    });
+    return next;
+  }, [departments, forecastMetric]);
   const [activeTab, setActiveTab] = useState<string>('home');
   const [mobileFrameMode, setMobileFrameMode] = useState<boolean>(false);
   const [selectedProposalIdForModal, setSelectedProposalIdForModal] = useState<string | null>(null);
@@ -2897,12 +2910,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // `scopedX` list below now honors this for all of them.
   const isDepartmentRestricted = !['admin', 'super_admin'].includes(currentUser.role);
 
-  const scopedDepartmentInfo: DepartmentInfo = departments[userDepartment] || departments.CAF;
+  const scopedDepartmentInfo: DepartmentInfo = forecastedDepartments[userDepartment] || forecastedDepartments.CAF;
 
   // Scoped lists: Only contains the user's department if restricted
   const scopedDepartmentList: DepartmentInfo[] = isDepartmentRestricted
     ? [scopedDepartmentInfo]
-    : Object.values(departments);
+    : Object.values(forecastedDepartments);
 
   const scopedTransactions: DepartmentTransaction[] = isDepartmentRestricted
     ? transactions.filter(t => t.department === userDepartment)
@@ -3027,7 +3040,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         closeRegisterModal,
         activeSemester,
         updateActiveSemester,
-        departments,
+        departments: forecastedDepartments,
         updateDepartmentAllocated,
         students,
         addStudent,

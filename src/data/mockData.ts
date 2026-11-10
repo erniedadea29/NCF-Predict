@@ -8,9 +8,10 @@ import {
   SchoolEvent, 
   EventAttendance, 
   BudgetProposal,
-  ForecastMetric,
   ActiveSemester
 } from '../types';
+import { mulberry32, gaussian } from '../lib/randomForest';
+import type { HistoricalSemesterSpending } from '../lib/budgetForecast';
 
 export const DEPARTMENTS: Record<DepartmentCode, DepartmentInfo> = {
   CAF: {
@@ -1510,21 +1511,43 @@ export const MOCK_PROPOSALS: BudgetProposal[] = [
   }
 ];
 
-export const MOCK_FORECAST: ForecastMetric = {
-  rmse: 1245,
-  mae: 987,
-  mape: 5.7,
-  r2: 0.943,
-  model_name: 'ARIMA - LSTM Hybrid',
-  training_years: 3,
-  departments: [
-    { code: 'CAF', name: 'Accountancy & Finance', allocated: 85000, forecast: 79200, diff: -5800, confidence: 97, status: 'Active' },
-    { code: 'CAS', name: 'Arts & Sciences', allocated: 72000, forecast: 68500, diff: -3500, confidence: 97, status: 'Active' },
-    { code: 'CBM', name: 'Business & Management', allocated: 90000, forecast: 88400, diff: -1600, confidence: 97, status: 'Active' },
-    { code: 'CCJE', name: 'Criminal Justice Education', allocated: 65000, forecast: 61000, diff: -4000, confidence: 97, status: 'Active' },
-    { code: 'CCS', name: 'Computer Studies', allocated: 95000, forecast: 92700, diff: -2300, confidence: 97, status: 'Active' },
-    { code: 'COE', name: 'Engineering', allocated: 110000, forecast: 105600, diff: -4400, confidence: 97, status: 'Active' },
-    { code: 'CHS', name: 'Health Sciences', allocated: 88000, forecast: 83100, diff: -4900, confidence: 97, status: 'Active' },
-    { code: 'CTED', name: 'Teachers Education', allocated: 70000, forecast: 67800, diff: -2200, confidence: 97, status: 'Active' }
-  ]
-};
+/**
+ * Historical semester spending used to train the Random Forest forecaster.
+ * Seeded placeholder data (3 past school years x 8 departments) - replace with
+ * real past-semester figures (e.g. from the `transactions` table) when available.
+ */
+export const HISTORICAL_SEMESTER_SPENDING: HistoricalSemesterSpending[] = (() => {
+  const rng = mulberry32(2024);
+  const years = [
+    { label: 'SY 2021-22', budgetScale: 0.86 },
+    { label: 'SY 2022-23', budgetScale: 0.92 },
+    { label: 'SY 2023-24', budgetScale: 0.97 }
+  ];
+  // Typical end-of-semester utilization per department
+  const baseUtil: Record<DepartmentCode, number> = {
+    CAF: 0.93, CAS: 0.95, CBM: 0.98, CCJE: 0.94, CCS: 0.975, COE: 0.96, CHS: 0.945, CTED: 0.97
+  };
+  // Typical cumulative share of the semester's spend reached by each month
+  const curve = [0.14, 0.34, 0.6, 0.83, 1];
+  const records: HistoricalSemesterSpending[] = [];
+  for (const year of years) {
+    for (const code of Object.keys(DEPARTMENTS) as DepartmentCode[]) {
+      const allocated = Math.round((DEPARTMENTS[code].allocated * year.budgetScale) / 100) * 100;
+      const pace = gaussian(rng) * 0.05; // fast early spenders tend to finish higher
+      const util = Math.min(1.03, baseUtil[code] + pace * 0.25 + gaussian(rng) * 0.01);
+      let prev = 0;
+      const shape = curve.map((c, i) => {
+        const v = i === curve.length - 1 ? 1 : c * (1 + pace + gaussian(rng) * 0.04);
+        prev = Math.min(1, Math.max(prev, v));
+        return prev;
+      });
+      records.push({
+        school_year: year.label,
+        department: code,
+        allocated,
+        monthly_cumulative: shape.map(f => Math.round((f * util * allocated) / 10) * 10)
+      });
+    }
+  }
+  return records;
+})();

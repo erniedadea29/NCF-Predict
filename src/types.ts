@@ -446,6 +446,30 @@ export interface BudgetProposal {
   budget_return?: BudgetReturnRecord;
 }
 
+export interface ForecastTrajectoryPoint {
+  /** Predicted cumulative spend at the end of this month. */
+  predicted: number;
+  lower: number;
+  upper: number;
+}
+
+export interface ForecastDepartment {
+  code: DepartmentCode;
+  name: string;
+  allocated: number;
+  spent: number;
+  /** Predicted total spend at the end of the semester. */
+  forecast: number;
+  /** forecast - allocated (negative = projected surplus). */
+  diff: number;
+  confidence: number;
+  status: string;
+  /** 95% prediction interval for the end-of-semester forecast. */
+  lower: number;
+  upper: number;
+  trajectory: ForecastTrajectoryPoint[];
+}
+
 export interface ForecastMetric {
   rmse: number;
   mae: number;
@@ -453,13 +477,11 @@ export interface ForecastMetric {
   r2: number;
   model_name: string;
   training_years: number;
-  departments: {
-    code: DepartmentCode;
-    name: string;
-    allocated: number;
-    forecast: number;
-    diff: number;
-    confidence: number;
-    status: string;
-  }[];
+  n_trees: number;
+  months_elapsed: number;
+  month_labels: string[];
+  /** Mean cumulative utilization (spent / allocated) at each month across history. */
+  historical_util_by_month: number[];
+  feature_importances: { feature: string; label: string; importance: number }[];
+  departments: ForecastDepartment[];
 }
