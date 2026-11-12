@@ -567,6 +567,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [events, setEvents] = useState<SchoolEvent[]>(MOCK_SCHOOL_EVENTS);
   const [attendances, setAttendances] = useState<EventAttendance[]>(MOCK_ATTENDANCES);
+  // Attendance (and its fines) only counts for events the Adviser/Dean
+  // approved. Rows of pending or rejected events are hidden everywhere.
+  const usableAttendances = useMemo(() => {
+    const blocked = new Set(
+      events.filter(e => e.status && e.status !== 'PUBLISHED' && e.status !== 'APPROVED').map(e => e.id)
+    );
+    return blocked.size ? attendances.filter(a => !blocked.has(a.event_id)) : attendances;
+  }, [attendances, events]);
 
   const mapEventRow = (row: any): SchoolEvent => ({
     id: row.id,
@@ -2721,6 +2729,11 @@ ${error?.message || 'The database did not save it.'}`);
         : statusOrIsPresent;
 
     const targetEvent = events.find(e => e.id === eventId);
+    // Attendance only opens once the Adviser/Dean approved the event.
+    if (targetEvent?.status && targetEvent.status !== 'PUBLISHED' && targetEvent.status !== 'APPROVED') {
+      alert('Attendance can only be taken after the Adviser or Dean approves this event.');
+      return;
+    }
     const stud = students.find(s => s.id === studentIdOrNumber || s.student_number === studentIdOrNumber);
     if (!stud) return;
 
@@ -3413,8 +3426,8 @@ ${error?.message || 'The database did not save the report.'}`);
     : events;
 
   const scopedAttendances: EventAttendance[] = isDepartmentRestricted
-    ? attendances.filter(a => a.department === userDepartment)
-    : attendances;
+    ? usableAttendances.filter(a => a.department === userDepartment)
+    : usableAttendances;
 
   const scopedPenalties: EventAttendance[] = scopedAttendances;
 
@@ -3533,8 +3546,8 @@ ${error?.message || 'The database did not save the report.'}`);
         events,
         addEvent,
         createEvent: addEvent,
-        attendances,
-        penalties: attendances,
+        attendances: usableAttendances,
+        penalties: usableAttendances,
         recordAttendance,
         updateAttendancePhoto,
         payPenalty,

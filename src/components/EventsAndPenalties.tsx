@@ -117,6 +117,10 @@ export const EventsAndPenalties: React.FC = () => {
   // Dean/Adviser get view-only Penalties/Attendance (Section 5) — they can
   // still approve/reject events above, just not run attendance/collect fines.
   const canManageAttendance = !isReadOnlyStudent && !isViewOnlyReviewer;
+  // Attendance can only be taken once the Adviser/Dean approved (published)
+  // the event. Legacy rows with no status count as approved.
+  const isEventApproved = (ev: SchoolEvent) =>
+    !ev.status || ev.status === 'PUBLISHED' || ev.status === 'APPROVED';
   // Section 1f: payment collection (SAF, events, penalties) stays
   // Treasurer/Assistant Treasurer-only — both share the officer_treasurer
   // role — and requires a confirmation remark validating receipt.
@@ -659,7 +663,20 @@ export const EventsAndPenalties: React.FC = () => {
                       <span className="text-[11px] text-slate-400 font-medium">
                         {ev.school_year || activeSemester.school_year_label}
                       </span>
-                      {canManageAttendance && (
+                      {canManageAttendance && !isEventApproved(ev) && (
+                        <span
+                          title="Attendance opens once the Adviser or Dean approves this event."
+                          className={`px-3 py-2 rounded-xl text-[11px] font-bold border flex items-center gap-1.5 ${
+                            ev.status === 'REJECTED'
+                              ? 'bg-rose-50 text-rose-700 border-rose-200'
+                              : 'bg-amber-50 text-amber-800 border-amber-200'
+                          }`}
+                        >
+                          <Clock className="w-3.5 h-3.5" />
+                          {ev.status === 'REJECTED' ? 'Rejected: no attendance' : 'Attendance opens after approval'}
+                        </span>
+                      )}
+                      {canManageAttendance && isEventApproved(ev) && (
                         <button
                           onClick={() => setSelectedEventForAttendance(ev)}
                           className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 shadow-xs"
