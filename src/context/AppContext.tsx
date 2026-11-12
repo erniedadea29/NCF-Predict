@@ -46,6 +46,13 @@ import { jsPDF } from 'jspdf';
 import { getPredictionApiHealth, predictBudgetRequest, predictionApiConfigProblem, PREDICT_API_URL } from '../lib/predictionApi';
 import { roleLabel } from '../utils/roleLabels';
 
+/**
+ * TEMPORARY switch (requested): when true, the Super Admin can permanently
+ * delete accounts even if they have activity on record. Set to false to
+ * restore the original rule (accounts with history can only be deactivated).
+ */
+export const ALLOW_DELETE_WITH_HISTORY = true;
+
 // Shown before a real Supabase session is restored / while logged out.
 // currentUser stays non-null everywhere else in this file; AuthGate (App.tsx)
 // never renders anything that reads it until isAuthenticated is true.
@@ -748,8 +755,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // still handled via deactivateUser above.
   const deleteUserAccount = async (profileId: string): Promise<{ success: boolean; message: string }> => {
     const client = getSupabase();
-    const { error } = await client.rpc('delete_user_account', { p_profile_id: profileId });
-    if (error) return { success: false, message: error.message };
+    // TEMPORARY: while ALLOW_DELETE_WITH_HISTORY is on, the Super Admin can
+    // delete accounts that have activity on record (force_delete_user_account).
+    // Set it to false to go back to the original rule (delete_user_account
+    // refuses accounts with history; use Deactivate instead).
+    const fn = ALLOW_DELETE_WITH_HISTORY ? 'force_delete_user_account' : 'delete_user_account';
+    const { error } = await client.rpc(fn, { p_profile_id: profileId });
+    if (error) {
+      if (error.code === 'PGRST202' || error.code === '42883') {
+        return { success: false, message: 'Run supabase/migrations/20261113_force_delete_user.sql in the Supabase SQL Editor first.' };
+      }
+      return { success: false, message: error.message };
+    }
     setUserAccounts(prev => prev.filter(u => u.id !== profileId));
     return { success: true, message: 'Account permanently deleted.' };
   };

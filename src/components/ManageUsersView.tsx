@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useApp } from '../context/AppContext';
+import { useApp, ALLOW_DELETE_WITH_HISTORY } from '../context/AppContext';
 import { UserRole, OfficerSlotKey, OFFICER_POSITION_LABELS, DepartmentCode, UserAccountSummary } from '../types';
 import { DEPARTMENTS } from '../data/mockData';
 import { SearchableUserSelect } from './SearchableUserSelect';
@@ -616,7 +616,14 @@ export const ManageUsersView: React.FC = () => {
 
         {canHardDelete && confirmingDeleteId === u.id && (
           <div className="flex items-center justify-between gap-2 bg-slate-900 text-white rounded-xl px-3 py-2 text-xs">
-            <span>Permanently delete <strong>{u.full_name}</strong>? This cannot be undone.</span>
+            <span>
+              Permanently delete <strong>{u.full_name}</strong>? This cannot be undone.
+              {ALLOW_DELETE_WITH_HISTORY && (
+                <span className="block text-[11px] text-slate-300 mt-0.5">
+                  Their transactions, requests and reports are kept but no longer linked to them; notes and votes they wrote are deleted.
+                </span>
+              )}
+            </span>
             <div className="flex items-center gap-2 shrink-0">
               <button
                 onClick={() => setConfirmingDeleteId(null)}
