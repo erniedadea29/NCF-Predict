@@ -1,7 +1,10 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { BudgetProposal } from '../types';
 import { DEPARTMENTS } from '../data/mockData';
+import { getSupabase, isSupabaseLiveConfigured } from '../lib/supabaseClient';
 import { Printer, X, Download, CheckCircle, ShieldCheck } from 'lucide-react';
+
+type Signatories = { governor: string; adviser: string; dean: string };
 
 interface PrintableProposalModalProps {
   proposal: BudgetProposal | null;
@@ -13,7 +16,29 @@ interface PrintableProposalModalProps {
 }
 
 export const PrintableProposalModal: React.FC<PrintableProposalModalProps> = ({ proposal, isOpen, onClose, redactSignatures }) => {
+  // Real names for the Governor / Adviser / Dean signature blocks, from the
+  // get_budget_request_signatories RPC (users can't read other profiles
+  // directly under RLS). Falls back to whatever names the proposal carries.
+  const [signatories, setSignatories] = useState<Signatories>({ governor: '', adviser: '', dean: '' });
+  useEffect(() => {
+    if (!isOpen || !proposal || !isSupabaseLiveConfigured()) return;
+    let cancelled = false;
+    setSignatories({ governor: '', adviser: '', dean: '' });
+    (async () => {
+      const { data, error } = await getSupabase().rpc('get_budget_request_signatories', { p_proposal_id: proposal.id });
+      if (cancelled) return;
+      if (error) { console.warn('Could not load signatory names', error); return; }
+      const row = Array.isArray(data) ? data[0] : data;
+      if (row) setSignatories({ governor: row.governor || '', adviser: row.adviser || '', dean: row.dean || '' });
+    })();
+    return () => { cancelled = true; };
+  }, [isOpen, proposal?.id]);
+
   if (!isOpen || !proposal) return null;
+
+  const governorName = signatories.governor || proposal.executive_review?.reviewed_by || '';
+  const adviserName = proposal.adviser_approval?.adviser_name || signatories.adviser;
+  const deanName = proposal.dean_approval?.dean_name || signatories.dean;
 
   const handlePrint = () => {
     window.print();
@@ -27,7 +52,8 @@ export const PrintableProposalModal: React.FC<PrintableProposalModalProps> = ({ 
     redactSignatures ? (
       <div className="bg-black h-4 mx-2 rounded-sm" aria-label="Redacted" />
     ) : (
-      <p className="font-bold text-slate-900 border-b border-slate-400 pb-1 mx-2">{name}</p>
+      // Blank signature line when nobody has signed yet — never a placeholder name.
+      <p className="font-bold text-slate-900 border-b border-slate-400 pb-1 mx-2">{name || ' '}</p>
     )
   );
 
@@ -164,31 +190,13 @@ export const PrintableProposalModal: React.FC<PrintableProposalModalProps> = ({ 
             </div>
           </div>
 
-          {/* Official Notes Section */}
-          {proposal.notes && proposal.notes.length > 0 && (
-            <div className="space-y-2 font-sans">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800">
-                II. Council Remarks & Official Notes
-              </h4>
-              <div className="space-y-1.5 border border-slate-200 rounded-lg p-3 bg-amber-50/30 text-xs">
-                {proposal.notes.map((n) => (
-                  <div key={n.id} className="pb-1 border-b border-amber-100 last:border-0 last:pb-0">
-                    <span className="font-bold text-slate-900">{n.author_name} ({n.author_role}): </span>
-                    <span className="text-slate-700">{n.note_content}</span>
-                    <span className="text-[10px] text-slate-400 ml-2">({n.created_at})</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Signatory Blocks - 5-Stage Roles */}
+          {/* Signatory Blocks */}
           <div className="pt-6 font-sans space-y-6">
             <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800">
-              III. Review, Resolution & Executive Approvals
+              II. Review & Executive Approvals
             </h4>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-6 text-xs text-center">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs text-center">
               {/* 1. Prepared by Treasurer */}
               <div className="border border-slate-200 p-3 rounded-lg flex flex-col justify-between h-28">
                 <p className="text-[10px] text-slate-400 uppercase font-bold">1. Prepared / Drafted by:</p>
@@ -204,40 +212,29 @@ export const PrintableProposalModal: React.FC<PrintableProposalModalProps> = ({ 
               <div className="border border-slate-200 p-3 rounded-lg flex flex-col justify-between h-28">
                 <p className="text-[10px] text-slate-400 uppercase font-bold">2. Executive Review:</p>
                 <div>
-                  <Signatory name={proposal.executive_review?.reviewed_by || 'Gov. Clarisse Mendoza'} />
+                  <Signatory name={governorName} />
                   <p className="text-[10px] text-slate-500 mt-0.5">
-                    {proposal.executive_review ? `Endorsed (${proposal.executive_review.date})` : 'Pending Review'}
+                    {proposal.executive_review ? `Governor • Endorsed (${proposal.executive_review.date})` : 'College Governor'}
                   </p>
                 </div>
               </div>
 
-              {/* 3. Council Resolution */}
+              {/* 3. CSC Adviser Approval */}
               <div className="border border-slate-200 p-3 rounded-lg flex flex-col justify-between h-28">
-                <p className="text-[10px] text-slate-400 uppercase font-bold">3. Council Resolution:</p>
+                <p className="text-[10px] text-slate-400 uppercase font-bold">3. Recommended Approval:</p>
                 <div>
-                  <Signatory name={proposal.council_resolution?.resolution_number || 'CSC-RES-2024-VOTING'} />
-                  <p className="text-[10px] text-slate-500 mt-0.5">
-                    {proposal.votes.filter(v => v.vote === 'IN_FAVOR').length} Votes in Favor
-                  </p>
-                </div>
-              </div>
-
-              {/* 4. CSC Adviser Approval */}
-              <div className="border border-slate-200 p-3 rounded-lg flex flex-col justify-between h-28">
-                <p className="text-[10px] text-slate-400 uppercase font-bold">4. Recommended Approval:</p>
-                <div>
-                  <Signatory name={proposal.adviser_approval?.adviser_name || 'Prof. Ramon Villanueva, MBA'} />
+                  <Signatory name={adviserName} />
                   <p className="text-[10px] text-slate-500 mt-0.5">
                     {proposal.adviser_approval ? `Approved (${proposal.adviser_approval.date})` : 'CSC Adviser Approval'}
                   </p>
                 </div>
               </div>
 
-              {/* 5. Dean Final Approval & Fund Release */}
-              <div className="border border-slate-200 p-3 rounded-lg flex flex-col justify-between h-28 sm:col-span-2">
-                <p className="text-[10px] text-slate-400 uppercase font-bold">5. Final Approval & Fund Release Authorization:</p>
+              {/* 4. Dean Final Approval & Fund Release (last signatory) */}
+              <div className="border border-slate-200 p-3 rounded-lg flex flex-col justify-between h-28">
+                <p className="text-[10px] text-slate-400 uppercase font-bold">4. Final Approval & Fund Release Authorization:</p>
                 <div>
-                  <Signatory name={proposal.dean_approval?.dean_name || 'Dr. Evelyn Santos, DIT'} />
+                  <Signatory name={deanName} />
                   <p className="text-[10px] text-slate-500 mt-0.5">
                     {proposal.dean_approval?.release_authorized
                       ? `Fund Release Approved & Released (${proposal.dean_approval.date})`

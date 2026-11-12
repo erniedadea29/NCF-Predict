@@ -702,6 +702,7 @@ export const EventsAndPenalties: React.FC = () => {
               <option value="ABSENT">All Absences</option>
               <option value="PRESENT">Present Students</option>
             </select>
+            {!isReadOnlyStudent && (
             <button
               onClick={exportPenaltiesCsv}
               disabled={filteredAttendances.length === 0}
@@ -710,6 +711,7 @@ export const EventsAndPenalties: React.FC = () => {
               <Download className="w-3.5 h-3.5" />
               <span>Export Report (CSV)</span>
             </button>
+            )}
           </div>
 
           <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-xs">

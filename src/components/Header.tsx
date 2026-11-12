@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { resolveNotificationTab, tabLabel } from '../utils/notificationRoute';
 import { useApp } from '../context/AppContext';
 import {
   Calendar,
@@ -76,7 +77,8 @@ export const Header: React.FC = () => {
   const fullNav = [
     { id: 'home', label: 'Home' },
     { id: 'transactions', label: 'Transactions' },
-    { id: 'budget', label: 'Budget, Proposals & Reimbursement' },
+    { id: 'budget', label: 'Budget & Proposals' },
+    { id: 'reimbursement', label: 'Reimbursement' },
     { id: 'liquidation_reports', label: 'Liquidation Reports' },
     { id: 'saf_students', label: 'SAF & Students' },
     { id: 'events_attendance', label: 'Events & Penalties' },
@@ -86,7 +88,6 @@ export const Header: React.FC = () => {
 
   const studentNav = [
     { id: 'student_portal', label: 'My Student Portal' },
-    { id: 'budget', label: 'Budget' },
     { id: 'expenses', label: 'Expenses' },
     { id: 'events_attendance', label: 'Events & Penalties' }
   ];
@@ -106,7 +107,7 @@ export const Header: React.FC = () => {
     // separate Reimbursement queue, so a submitted proposal had nowhere to
     // surface for them to act on it.
     { id: 'budget_approvals', label: 'Budget Approvals' },
-    { id: 'budget', label: 'Reimbursement' },
+    { id: 'reimbursement', label: 'Reimbursement' },
     { id: 'liquidation_reports', label: 'Liquidation Reports' },
     { id: 'saf_students', label: 'SAF' },
     { id: 'events_attendance', label: 'Events & Penalties' },
@@ -207,19 +208,30 @@ export const Header: React.FC = () => {
                   <p className="px-3 py-6 text-center text-xs text-slate-400">No notifications yet.</p>
                 ) : (
                   <div className="py-1">
-                    {notifications.map(n => (
-                      <button
-                        key={n.id}
-                        onClick={() => { if (!n.read_at) markNotificationRead(n.id); }}
-                        className={`w-full text-left px-3 py-2 text-xs transition cursor-pointer ${
-                          n.read_at ? 'hover:bg-slate-50' : 'bg-emerald-50/60 hover:bg-emerald-50'
-                        }`}
-                      >
-                        <p className={`font-bold ${n.read_at ? 'text-slate-700' : 'text-emerald-900'}`}>{n.title}</p>
-                        {n.body && <p className="text-slate-500 mt-0.5">{n.body}</p>}
-                        <p className="text-[10px] text-slate-400 mt-1">{new Date(n.created_at).toLocaleString()}</p>
-                      </button>
-                    ))}
+                    {notifications.map(n => {
+                      // Clicking opens the page the notification is about (and marks it read).
+                      const target = resolveNotificationTab(n, currentUser.role, navList.map(item => item.id));
+                      return (
+                        <button
+                          key={n.id}
+                          onClick={() => {
+                            if (!n.read_at) markNotificationRead(n.id);
+                            if (target) setActiveTab(target);
+                            setNotifOpen(false);
+                          }}
+                          className={`w-full text-left px-3 py-2 text-xs transition cursor-pointer ${
+                            n.read_at ? 'hover:bg-slate-50' : 'bg-emerald-50/60 hover:bg-emerald-50'
+                          }`}
+                        >
+                          <p className={`font-bold ${n.read_at ? 'text-slate-700' : 'text-emerald-900'}`}>{n.title}</p>
+                          {n.body && <p className="text-slate-500 mt-0.5">{n.body}</p>}
+                          <p className="text-[10px] text-slate-400 mt-1 flex items-center justify-between gap-2">
+                            <span>{new Date(n.created_at).toLocaleString()}</span>
+                            {target && <span className="font-bold text-[#00873E] shrink-0">Open {tabLabel(target, navList)} →</span>}
+                          </p>
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
               </div>

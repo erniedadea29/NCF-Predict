@@ -3,6 +3,8 @@ import { useApp } from '../context/AppContext';
 import { DEPARTMENTS } from '../data/mockData';
 import { BudgetProposal, DepartmentCode } from '../types';
 import { downloadCsv } from '../utils/csvExport';
+import { canPrepareLiquidation } from '../utils/liquidation';
+import { formatDateTime } from '../utils/roleLabels';
 import {
   Wallet,
   Receipt,
@@ -15,10 +17,13 @@ import {
   AlertCircle,
   FileText,
   PieChart,
-  ShieldCheck
+  ShieldCheck,
+  Plus,
+  X,
+  XCircle
 } from 'lucide-react';
 
-type LiquidationStatusFilter = 'ALL' | 'AWAITING_LIQUIDATION' | 'PENDING_RETURN' | 'RETURNED';
+type LiquidationStatusFilter = 'ALL' | 'AWAITING_LIQUIDATION' | 'UNDER_REVIEW' | 'PENDING_RETURN' | 'RETURNED';
 
 interface LiquidationRow {
   proposal: BudgetProposal;
@@ -45,7 +50,8 @@ export const LiquidationReportDashboard: React.FC<LiquidationReportDashboardProp
     isDepartmentRestricted,
     userDepartment,
     scopedDepartmentInfo,
-    activeSemester
+    activeSemester,
+    currentUser
   } = useApp();
 
   const [statusFilter, setStatusFilter] = useState<LiquidationStatusFilter>('ALL');
@@ -53,6 +59,7 @@ export const LiquidationReportDashboard: React.FC<LiquidationReportDashboardProp
     isDepartmentRestricted ? userDepartment : 'ALL'
   );
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   // Only proposals that have reached fund release are relevant to liquidation & return
   const releasedProposals = useMemo(
@@ -63,16 +70,22 @@ export const LiquidationReportDashboard: React.FC<LiquidationReportDashboardProp
   const rows: LiquidationRow[] = useMemo(() => {
     return releasedProposals.map(p => {
       const totalReleased = p.cashouts.reduce((s, c) => s + c.amount_released, 0) || p.total_budget_amount;
-      const totalSpent = p.expenses.reduce((s, e) => s + e.amount_spent, 0);
+      const liq = p.liquidation;
+      // Once a liquidation report exists, "spent" is what the Treasurer liquidated in it;
+      // before that, it's the expenses recorded against the budget.
+      const totalSpent = liq
+        ? liq.accounting_summary.reduce((s, l) => s + l.spent, 0)
+        : p.expenses.reduce((s, e) => s + e.amount_spent, 0);
       const balance = Math.max(0, totalReleased - totalSpent);
-      const hasLiquidation = Boolean(p.liquidation);
+      const hasLiquidation = Boolean(liq);
       const hasReturn = Boolean(p.budget_return);
 
-      const statusForFilter: Exclude<LiquidationStatusFilter, 'ALL'> = hasReturn
-        ? 'RETURNED'
-        : hasLiquidation
-        ? 'PENDING_RETURN'
-        : 'AWAITING_LIQUIDATION';
+      // Follows the actual liquidation status: only an Audited report moves on to fund return.
+      const statusForFilter: Exclude<LiquidationStatusFilter, 'ALL'> =
+        hasReturn ? 'RETURNED'
+        : !liq || liq.status === 'FOR_REVISION' ? 'AWAITING_LIQUIDATION'
+        : liq.status === 'Audited' ? (balance > 0 ? 'PENDING_RETURN' : 'RETURNED')
+        : 'UNDER_REVIEW';
 
       return { proposal: p, totalReleased, totalSpent, balance, hasLiquidation, hasReturn, statusFilter: statusForFilter };
     });
@@ -126,23 +139,50 @@ export const LiquidationReportDashboard: React.FC<LiquidationReportDashboardProp
     return true;
   });
 
-  const getStatusBadge = (status: Exclude<LiquidationStatusFilter, 'ALL'>) => {
-    switch (status) {
+  const getStatusBadge = (row: LiquidationRow) => {
+    const liqStatus = row.proposal.liquidation?.status;
+    switch (row.statusFilter) {
       case 'AWAITING_LIQUIDATION':
-        return { label: 'Awaiting Liquidation', color: 'bg-amber-100 text-amber-800 border-amber-300', icon: Clock };
+        return liqStatus === 'FOR_REVISION'
+          ? { label: 'Returned for Revision', color: 'bg-orange-100 text-orange-800 border-orange-300', icon: AlertCircle }
+          : { label: 'Awaiting Liquidation', color: 'bg-amber-100 text-amber-800 border-amber-300', icon: Clock };
+      case 'UNDER_REVIEW':
+        return liqStatus === 'Rejected'
+          ? { label: 'Liquidation Rejected', color: 'bg-rose-100 text-rose-800 border-rose-300', icon: XCircle }
+          : { label: liqStatus === 'PENDING_DEAN' ? 'Under Review: Dean' : 'Under Review: Adviser', color: 'bg-indigo-100 text-indigo-800 border-indigo-300', icon: ShieldCheck };
       case 'PENDING_RETURN':
-        return { label: 'Pending Fund Return', color: 'bg-blue-100 text-blue-800 border-blue-300', icon: AlertCircle };
+        return { label: 'Audited: Pending Fund Return', color: 'bg-blue-100 text-blue-800 border-blue-300', icon: AlertCircle };
       case 'RETURNED':
-        return { label: 'Fully Closed & Returned', color: 'bg-emerald-100 text-emerald-800 border-emerald-300', icon: CheckCircle2 };
+        return { label: 'Fully Closed', color: 'bg-emerald-100 text-emerald-800 border-emerald-300', icon: CheckCircle2 };
     }
   };
 
   const statusPills: { id: LiquidationStatusFilter; label: string }[] = [
     { id: 'ALL', label: 'All' },
     { id: 'AWAITING_LIQUIDATION', label: 'Awaiting Liquidation' },
+    { id: 'UNDER_REVIEW', label: 'Under Review' },
     { id: 'PENDING_RETURN', label: 'Pending Fund Return' },
     { id: 'RETURNED', label: 'Fully Closed' }
   ];
+
+  // "+ New Liquidation Report": every approved budget, and whether this user can prepare its report now.
+  const isOfficer = ['officer_treasurer', 'officer_governor', 'council_member'].includes(currentUser.role);
+  const pickerRows = releasedProposals.map(p => {
+    const liq = p.liquidation;
+    const isPreparer = canPrepareLiquidation(p, currentUser);
+    const open = !liq || liq.status === 'FOR_REVISION';
+    return {
+      proposal: p,
+      canCreate: isPreparer && open,
+      action: liq?.status === 'FOR_REVISION' ? 'Revise' : 'Create',
+      reason: !open
+        ? `Report already submitted (${liq!.status === 'PENDING_ADVISER' ? 'Under Review: Adviser' : liq!.status === 'PENDING_DEAN' ? 'Under Review: Dean' : liq!.status})`
+        : !isPreparer
+        ? `Only ${p.created_by_officer || 'the Treasurer who filed this request'} can prepare it`
+        : ''
+    };
+  }).sort((a, b) => Number(b.canCreate) - Number(a.canCreate));
+  const creatableCount = pickerRows.filter(r => r.canCreate).length;
 
   const exportCsv = () => {
     const header = [
@@ -198,15 +238,77 @@ export const LiquidationReportDashboard: React.FC<LiquidationReportDashboardProp
           </p>
         </div>
 
-        <button
-          onClick={exportCsv}
-          disabled={filteredRows.length === 0}
-          className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-[#00873E] hover:bg-[#007033] disabled:bg-slate-300 text-white shadow-xs transition cursor-pointer disabled:cursor-not-allowed"
-        >
-          <Download className="w-3.5 h-3.5" />
-          <span>Export Report (CSV)</span>
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={exportCsv}
+            disabled={filteredRows.length === 0}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 disabled:bg-slate-50 disabled:text-slate-300 text-slate-700 transition cursor-pointer disabled:cursor-not-allowed"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Export Report (CSV)</span>
+          </button>
+          {isOfficer && (
+            <button
+              onClick={() => setPickerOpen(o => !o)}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-[#00873E] hover:bg-[#007033] text-white shadow-xs transition cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>New Liquidation Report{creatableCount > 0 ? ` (${creatableCount})` : ''}</span>
+            </button>
+          )}
+        </div>
       </div>
+
+      {/* Budget picker for a new liquidation report */}
+      {isOfficer && pickerOpen && (
+        <div className="bg-white rounded-2xl border border-emerald-200 shadow-xs p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-black text-slate-900">New Liquidation Report</h3>
+              <p className="text-[11px] text-slate-500">Choose the approved budget to liquidate. Only the Treasurer who filed a budget request prepares its report.</p>
+            </div>
+            <button onClick={() => setPickerOpen(false)} className="text-slate-400 hover:text-slate-700 cursor-pointer" title="Close">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          {pickerRows.length === 0 ? (
+            <p className="text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-xl p-3">
+              No approved budgets yet. A liquidation report can be prepared once a budget proposal is approved and its funds are released.
+            </p>
+          ) : (
+            <div className="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden">
+              {pickerRows.map(r => (
+                <div key={r.proposal.id} className="flex items-center justify-between gap-3 px-3 py-2.5 text-xs">
+                  <div className="min-w-0">
+                    <p className="font-bold text-slate-900 truncate">
+                      <span className={`mr-1.5 px-1.5 py-0.5 rounded text-[10px] font-black border ${DEPARTMENTS[r.proposal.department]?.badgeBg || 'bg-slate-100'}`}>{r.proposal.department}</span>
+                      {r.proposal.budget_title}
+                    </p>
+                    <p className="text-[11px] text-slate-500 truncate">
+                      {peso(r.proposal.total_budget_amount)} • {r.canCreate ? 'Ready to liquidate' : r.reason}
+                    </p>
+                  </div>
+                  {r.canCreate ? (
+                    <button
+                      onClick={() => { setPickerOpen(false); onOpenLiquidationModal(r.proposal.id); }}
+                      className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#00873E] hover:bg-[#007033] text-white text-[11px] font-bold cursor-pointer"
+                    >
+                      <FileText className="w-3.5 h-3.5" /> {r.action} Report
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => { setPickerOpen(false); onOpenLiquidationModal(r.proposal.id); }}
+                      className="shrink-0 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold cursor-pointer"
+                    >
+                      View
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Summary Stat Tiles */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -352,7 +454,7 @@ export const LiquidationReportDashboard: React.FC<LiquidationReportDashboardProp
         <div className="space-y-3">
           {filteredRows.map((r) => {
             const deptInfo = DEPARTMENTS[r.proposal.department];
-            const badge = getStatusBadge(r.statusFilter);
+            const badge = getStatusBadge(r);
             const StatusIcon = badge.icon;
             const liq = r.proposal.liquidation;
             const ret = r.proposal.budget_return;
@@ -374,7 +476,7 @@ export const LiquidationReportDashboard: React.FC<LiquidationReportDashboardProp
                     </div>
                     <div>
                       <h4 className="font-bold text-sm text-slate-900">{r.proposal.budget_title}</h4>
-                      <p className="text-[11px] text-slate-400">Fund released {r.proposal.updated_at}</p>
+                      <p className="text-[11px] text-slate-400">Fund released {formatDateTime(r.proposal.updated_at)}</p>
                     </div>
                   </div>
 
@@ -390,7 +492,7 @@ export const LiquidationReportDashboard: React.FC<LiquidationReportDashboardProp
                     <p className="font-black text-sm text-slate-900">{peso(r.totalReleased)}</p>
                   </div>
                   <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Spent</span>
+                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{r.hasLiquidation ? 'Liquidated' : 'Spent'}</span>
                     <p className="font-black text-sm text-slate-900">{peso(r.totalSpent)}</p>
                   </div>
                   <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100">
@@ -411,7 +513,9 @@ export const LiquidationReportDashboard: React.FC<LiquidationReportDashboardProp
 
                 <div className="flex items-center justify-between pl-2 pt-2 border-t border-slate-100">
                   <span className="text-[11px] text-slate-400">
-                    {liq ? `Submitted by ${liq.submitted_by} on ${liq.submitted_date}` : 'No liquidation submitted yet'}
+                    {liq
+                      ? `Submitted${liq.submitted_by ? ` by ${liq.submitted_by}` : ''} on ${liq.submitted_date} • ${liq.status}`
+                      : `No liquidation submitted yet • To be prepared by ${r.proposal.created_by_officer || 'the requesting Treasurer'}`}
                     {ret ? ` • Returned ${ret.date_returned} (Ref: ${ret.cash_in_reference})` : ''}
                   </span>
 
@@ -421,7 +525,11 @@ export const LiquidationReportDashboard: React.FC<LiquidationReportDashboardProp
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-bold transition cursor-pointer"
                     >
                       <FileText className="w-3.5 h-3.5" />
-                      {r.statusFilter === 'AWAITING_LIQUIDATION' ? 'Audit Liquidation' : 'Process Fund Return'}
+                      {r.statusFilter === 'AWAITING_LIQUIDATION' && canPrepareLiquidation(r.proposal, currentUser)
+                        ? (liq?.status === 'FOR_REVISION' ? 'Revise Liquidation Report' : 'Prepare Liquidation Report')
+                        : r.statusFilter === 'PENDING_RETURN'
+                        ? 'Process Fund Return'
+                        : 'View Liquidation Report'}
                     </button>
                   )}
                 </div>

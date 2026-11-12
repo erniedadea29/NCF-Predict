@@ -10,8 +10,6 @@ import {
   BudgetProposal,
   ActiveSemester
 } from '../types';
-import { mulberry32, gaussian } from '../lib/randomForest';
-import type { HistoricalSemesterSpending } from '../lib/budgetForecast';
 
 export const DEPARTMENTS: Record<DepartmentCode, DepartmentInfo> = {
   CAF: {
@@ -1510,44 +1508,3 @@ export const MOCK_PROPOSALS: BudgetProposal[] = [
     reimbursements: []
   }
 ];
-
-/**
- * Historical semester spending used to train the Random Forest forecaster.
- * Seeded placeholder data (3 past school years x 8 departments) - replace with
- * real past-semester figures (e.g. from the `transactions` table) when available.
- */
-export const HISTORICAL_SEMESTER_SPENDING: HistoricalSemesterSpending[] = (() => {
-  const rng = mulberry32(2024);
-  const years = [
-    { label: 'SY 2021-22', budgetScale: 0.86 },
-    { label: 'SY 2022-23', budgetScale: 0.92 },
-    { label: 'SY 2023-24', budgetScale: 0.97 }
-  ];
-  // Typical end-of-semester utilization per department
-  const baseUtil: Record<DepartmentCode, number> = {
-    CAF: 0.93, CAS: 0.95, CBM: 0.98, CCJE: 0.94, CCS: 0.975, COE: 0.96, CHS: 0.945, CTED: 0.97
-  };
-  // Typical cumulative share of the semester's spend reached by each month
-  const curve = [0.14, 0.34, 0.6, 0.83, 1];
-  const records: HistoricalSemesterSpending[] = [];
-  for (const year of years) {
-    for (const code of Object.keys(DEPARTMENTS) as DepartmentCode[]) {
-      const allocated = Math.round((DEPARTMENTS[code].allocated * year.budgetScale) / 100) * 100;
-      const pace = gaussian(rng) * 0.05; // fast early spenders tend to finish higher
-      const util = Math.min(1.03, baseUtil[code] + pace * 0.25 + gaussian(rng) * 0.01);
-      let prev = 0;
-      const shape = curve.map((c, i) => {
-        const v = i === curve.length - 1 ? 1 : c * (1 + pace + gaussian(rng) * 0.04);
-        prev = Math.min(1, Math.max(prev, v));
-        return prev;
-      });
-      records.push({
-        school_year: year.label,
-        department: code,
-        allocated,
-        monthly_cumulative: shape.map(f => Math.round((f * util * allocated) / 10) * 10)
-      });
-    }
-  }
-  return records;
-})();

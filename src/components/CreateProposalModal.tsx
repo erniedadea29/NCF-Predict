@@ -42,6 +42,17 @@ interface CreateProposalModalProps {
   onClose: () => void;
 }
 
+// A new, empty line item: the Treasurer fills in every value (nothing pre-filled).
+const blankLineItem = (): BudgetLineItem => ({
+  id: `li_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+  item_desc: '',
+  category: 'Materials & Supplies',
+  quantity: 0,
+  unit_cost: 0,
+  estimated_amount: 0,
+  remarks: ''
+});
+
 export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({ isOpen, onClose }) => {
   const { 
     createProposal,
@@ -58,53 +69,36 @@ export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({ isOpen
   const [linkedSemester, setLinkedSemester] = useState<string>('');
   const [treasurerNotes, setTreasurerNotes] = useState('Verified unit costs against campus supplier price quotations.');
 
-  // Line items for requirements & price evaluation
-  const [lineItems, setLineItems] = useState<BudgetLineItem[]>([
-    {
-      id: `li_${Date.now()}_1`,
-      item_desc: 'Materials, Badges, & Program Printing',
-      category: 'Materials & Supplies',
-      quantity: 50,
-      unit_cost: 45.00,
-      estimated_amount: 2250.00,
-      remarks: 'Official participant badges and program leaflets'
-    },
-    {
-      id: `li_${Date.now()}_2`,
-      item_desc: 'Speaker Honorarium / Resource Person',
-      category: 'Honorarium / Speakers',
-      quantity: 2,
-      unit_cost: 2500.00,
-      estimated_amount: 5000.00,
-      remarks: 'Keynote and technical workshop facilitator'
-    }
-  ]);
+  // Line items for requirements & price evaluation: starts with ONE blank
+  // item; the Treasurer adds more with "+ Add Item".
+  const [lineItems, setLineItems] = useState<BudgetLineItem[]>(() => [blankLineItem()]);
 
   if (!isOpen) return null;
 
+  // Same categories the trained Random Forest was trained on (see
+  // TRAIN_MODEL/request_mapping.py), so its estimates are reliable.
+  // Contingency has no training equivalent and is estimated with low confidence.
   const categories = [
+    'Food & Catering',
     'Materials & Supplies',
     'Honorarium / Speakers',
-    'Food & Refreshments',
     'Venue & Logistics',
-    'Prizes & Awards',
+    'Prizes / Tokens',
+    'Printing & Documentation',
+    'Decorations & Layout',
+    'Registration & Online Platform Fees',
+    'Photography / Documentation',
+    'Internet & Connectivity',
+    'Transportation',
+    'Souvenirs / Giveaways',
+    'Sound & Lighting Equipment',
     'Equipment / Rentals',
+    'Security & First Aid',
     'Contingency'
   ];
 
   const addLineItem = () => {
-    setLineItems(prev => [
-      ...prev,
-      {
-        id: `li_${Date.now()}`,
-        item_desc: '',
-        category: 'Materials & Supplies',
-        quantity: 0,
-        unit_cost: 0,
-        estimated_amount: 0,
-        remarks: ''
-      }
-    ]);
+    setLineItems(prev => [...prev, blankLineItem()]);
   };
 
   const updateLineItem = (id: string, updates: Partial<BudgetLineItem>) => {
@@ -157,6 +151,11 @@ export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({ isOpen
       line_items: lineItems
     });
 
+    // The modal stays mounted between uses, so start the next request fresh.
+    setTitle('');
+    setDescription('');
+    setLinkedSemester('');
+    setLineItems([blankLineItem()]);
     onClose();
   };
 

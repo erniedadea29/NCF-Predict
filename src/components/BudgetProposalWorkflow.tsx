@@ -27,9 +27,14 @@ import {
   Upload,
   Receipt,
   FileCheck,
-  Download
+  Download,
+  Search,
+  X
 } from 'lucide-react';
 import { PrintableProposalModal } from './PrintableProposalModal';
+import { BudgetPredictionPanel } from './BudgetPredictionPanel';
+import { canPrepareLiquidation } from '../utils/liquidation';
+import { formatDateTime } from '../utils/roleLabels';
 
 interface BudgetProposalWorkflowProps {
   onOpenCreateProposal: () => void;
@@ -75,10 +80,27 @@ export const BudgetProposalWorkflow: React.FC<BudgetProposalWorkflowProps> = ({
   const [printableProposal, setPrintableProposal] = useState<BudgetProposal | null>(null);
   const [newComment, setNewComment] = useState<string>('');
   const [reviewRemarks, setReviewRemarks] = useState<string>('');
+  const [proposalSearch, setProposalSearch] = useState<string>('');
 
   const activeProposal = displayProposals.find(p => p.id === selectedProposalId) || displayProposals[0];
 
-  const getStageBadge = (stage: ProposalStage) => {
+  // Sidebar search: matches title, department, status, requester and amount.
+  const searchTerm = proposalSearch.trim().toLowerCase();
+  const listedProposals = searchTerm
+    ? displayProposals.filter(p => [
+        p.budget_title,
+        p.budget_description,
+        p.department,
+        DEPARTMENTS[p.department]?.name,
+        p.budget_status.replace(/_/g, ' '),
+        getStageBadge(p.budget_status)?.label,
+        p.created_by_officer,
+        p.total_budget_amount.toFixed(2),
+        p.total_budget_amount.toLocaleString('en-US')
+      ].some(field => (field || '').toLowerCase().includes(searchTerm)))
+    : displayProposals;
+
+  function getStageBadge(stage: ProposalStage) {
     switch(stage) {
       case 'DRAFT':
         return { label: '1. Treasurer Draft', color: 'bg-amber-100 text-amber-800 border-amber-300' };
@@ -97,7 +119,7 @@ export const BudgetProposalWorkflow: React.FC<BudgetProposalWorkflowProps> = ({
       case 'REJECTED':
         return { label: 'Rejected', color: 'bg-red-100 text-red-800 border-red-300' };
     }
-  };
+  }
 
   const handleAddNote = (e: React.FormEvent) => {
     e.preventDefault();
@@ -125,7 +147,7 @@ export const BudgetProposalWorkflow: React.FC<BudgetProposalWorkflowProps> = ({
         <div>
           <h2 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">
             <FileText className="w-5 h-5 text-emerald-600" />
-            Budget Proposal & Reimbursement
+            Budget Proposals
           </h2>
           <p className="text-xs text-slate-500">
             Draft a request, submit it for Adviser review, and track it through to Dean fund release ({activeSemester.school_year_label})
@@ -169,7 +191,8 @@ export const BudgetProposalWorkflow: React.FC<BudgetProposalWorkflowProps> = ({
           <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs space-y-2">
             <div className="flex items-center justify-between px-1">
               <h3 className="text-xs font-black text-slate-400 uppercase tracking-wider">
-                {isDepartmentRestricted ? `${userDepartment} Proposals (${displayProposals.length})` : `All Proposals (${displayProposals.length})`}
+                {isDepartmentRestricted ? `${userDepartment} Proposals` : 'All Proposals'}{' '}
+                ({searchTerm ? `${listedProposals.length} of ${displayProposals.length}` : displayProposals.length})
               </h3>
               {isDepartmentRestricted && (
                 <span className="text-[10px] bg-blue-100 text-blue-900 font-bold px-1.5 py-0.5 rounded">
@@ -177,6 +200,28 @@ export const BudgetProposalWorkflow: React.FC<BudgetProposalWorkflowProps> = ({
                 </span>
               )}
             </div>
+
+            {displayProposals.length > 0 && (
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={proposalSearch}
+                  onChange={(e) => setProposalSearch(e.target.value)}
+                  placeholder="Search title, status, amount..."
+                  className="w-full pl-8 pr-8 py-2 text-xs bg-slate-50 focus:bg-white rounded-xl border border-slate-200 focus:outline-emerald-500"
+                />
+                {proposalSearch && (
+                  <button
+                    onClick={() => setProposalSearch('')}
+                    title="Clear search"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            )}
 
             {displayProposals.length === 0 ? (
               <div className="text-center py-8 px-3 bg-slate-50 rounded-xl border border-dashed border-slate-200 space-y-2">
@@ -193,7 +238,18 @@ export const BudgetProposalWorkflow: React.FC<BudgetProposalWorkflowProps> = ({
               </div>
             ) : (
               <div className="space-y-2 max-h-[600px] overflow-y-auto pr-1">
-                {displayProposals.map((prop) => {
+                {listedProposals.length === 0 && (
+                  <div className="text-center py-6 px-3 bg-slate-50 rounded-xl border border-dashed border-slate-200 space-y-1.5">
+                    <p className="text-xs text-slate-500 font-medium">No proposals match "{proposalSearch.trim()}".</p>
+                    <button
+                      onClick={() => setProposalSearch('')}
+                      className="text-[11px] font-bold text-[#00873E] hover:text-[#007033] cursor-pointer"
+                    >
+                      Clear search
+                    </button>
+                  </div>
+                )}
+                {listedProposals.map((prop) => {
                   const isSelected = prop.id === activeProposal?.id;
                   const badge = getStageBadge(prop.budget_status);
                   const dept = DEPARTMENTS[prop.department];
@@ -379,6 +435,9 @@ export const BudgetProposalWorkflow: React.FC<BudgetProposalWorkflowProps> = ({
                   </table>
                 </div>
               </div>
+
+              {/* Trained model's cost estimate for this request */}
+              <BudgetPredictionPanel proposal={activeProposal} />
 
               {/* ACTION PANELS BASED ON CURRENT USER ROLE & PROPOSAL STATUS */}
               <div className="pt-2 border-t border-slate-100 space-y-4">
@@ -588,8 +647,14 @@ export const BudgetProposalWorkflow: React.FC<BudgetProposalWorkflowProps> = ({
                         onClick={() => onOpenLiquidationModal(activeProposal.id)}
                         className="p-2.5 bg-slate-800 hover:bg-slate-700 rounded-xl text-left border border-slate-700 transition cursor-pointer"
                       >
-                        <span className="font-bold text-xs text-white block">Audit Liquidation</span>
-                        <span className="text-[10px] text-slate-400">Account Fund Spent</span>
+                        <span className="font-bold text-xs text-white block">
+                          {canPrepareLiquidation(activeProposal, currentUser) && (!activeProposal.liquidation || activeProposal.liquidation.status === 'FOR_REVISION')
+                            ? 'Prepare Liquidation'
+                            : 'Liquidation Report'}
+                        </span>
+                        <span className="text-[10px] text-slate-400">
+                          {activeProposal.liquidation ? activeProposal.liquidation.status : 'Not yet submitted'}
+                        </span>
                       </button>
 
                       <button
@@ -618,9 +683,16 @@ export const BudgetProposalWorkflow: React.FC<BudgetProposalWorkflowProps> = ({
                 <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                   {activeProposal.notes.map((n) => (
                     <div key={n.id} className="p-3 bg-amber-50/60 rounded-xl border border-amber-200/60 text-xs space-y-1">
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-slate-900">{n.author_name}</span>
-                        <span className="text-[10px] text-slate-400">{n.created_at}</span>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="flex flex-wrap items-center gap-1.5">
+                          <span className="font-bold text-slate-900">{n.author_name || 'Unknown user'}</span>
+                          {n.author_role && (
+                            <span className="px-1.5 py-0.5 rounded-md bg-amber-100 border border-amber-300 text-amber-900 text-[10px] font-bold">
+                              {n.author_role}
+                            </span>
+                          )}
+                        </span>
+                        <span className="text-[10px] text-slate-400 shrink-0">{formatDateTime(n.created_at)}</span>
                       </div>
                       <p className="text-slate-700">{n.note_content}</p>
                     </div>

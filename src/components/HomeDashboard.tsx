@@ -43,7 +43,8 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
     userDepartment,
     isDepartmentRestricted,
     isViewOnlyReviewer,
-    setActiveTab
+    setActiveTab,
+    liveSyncStatus
   } = useApp();
 
   // Dean/Adviser's "budget" tab is the separate Reimbursement queue — their
@@ -59,17 +60,25 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
     ? scopedDepartmentInfo.spent 
     : scopedDepartmentList.reduce((sum, d) => sum + d.spent, 0);
 
-  const totalRemaining = isDepartmentRestricted 
-    ? scopedDepartmentInfo.remaining 
-    : totalAllocated - totalSpent;
+  // Completed income (SAF payments, penalties, budget returns...) adds to available funds.
+  const totalIncome = scopedDepartmentList.reduce((sum, d) => sum + (d.income ?? 0), 0);
+  const totalAvailable = totalAllocated + totalIncome;
 
-  const spentPercent = totalAllocated > 0 
-    ? Math.round((totalSpent / totalAllocated) * 100) 
+  // Remaining = allocated + income - spent (computed per department in AppContext).
+  const totalRemaining = scopedDepartmentList.reduce((sum, d) => sum + d.remaining, 0);
+
+  const spentPercent = totalAvailable > 0 
+    ? Math.round((totalSpent / totalAvailable) * 100) 
     : 0;
 
-  const forecastAmount = isDepartmentRestricted 
-    ? scopedDepartmentInfo.forecast 
-    : 646300;
+  const forecastAmount = scopedDepartmentList.reduce((sum, d) => sum + d.forecast, 0);
+
+  // Transactions awaiting review: shown, but not yet part of the balance.
+  const pendingIncome = scopedDepartmentList.reduce((sum, d) => sum + (d.pendingIncome ?? 0), 0);
+  const pendingSpent = scopedDepartmentList.reduce((sum, d) => sum + (d.pendingSpent ?? 0), 0);
+
+  // Exact peso amounts so the dashboard matches the transaction list to the centavo.
+  const peso = (n: number) => `₱${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   // SAF statistics for designated department
   const totalSafCollected = scopedSafRecords.filter(s => s.paid).reduce((sum, s) => sum + s.amount, 0);
@@ -144,17 +153,45 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <p className="text-xs font-semibold text-emerald-100 uppercase tracking-wider">
-                  {isDepartmentRestricted ? `${scopedDepartmentInfo.name} (${userDepartment}) Budget` : 'Annual Budget Allocation'}
+                  {isDepartmentRestricted ? `${scopedDepartmentInfo.name} (${userDepartment}) Available Funds` : 'Available Funds (All Departments)'}
                 </p>
                 <span className="px-2 py-0.5 bg-white/20 text-white text-[10px] font-black rounded-md uppercase">
                   {userDepartment}
                 </span>
               </div>
-              <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight mt-0.5">
-                ₱{(totalAllocated / 1000).toFixed(1)}k
+              {/* Current balance: goes UP with every income (SAF, penalties,
+                  returns) and DOWN with every expense, as soon as it's Completed. */}
+              <h2 className={`text-3xl sm:text-4xl font-extrabold tracking-tight mt-0.5 ${totalRemaining < 0 ? 'text-rose-200' : ''}`}>
+                {peso(totalRemaining)}
               </h2>
+              <p className="text-[11px] text-emerald-100 mt-1 font-mono">
+                {peso(totalAllocated)} allocated
+                <span className="text-lime-200"> + {peso(totalIncome)} collected</span>
+                <span className="text-rose-200"> − {peso(totalSpent)} spent</span>
+              </p>
+              {(pendingIncome > 0 || pendingSpent > 0) && (
+                <p className="text-[11px] text-amber-200 mt-0.5">
+                  Awaiting approval (not yet counted):
+                  {pendingIncome > 0 && ` +${peso(pendingIncome)} income`}
+                  {pendingIncome > 0 && pendingSpent > 0 && ','}
+                  {pendingSpent > 0 && ` −${peso(pendingSpent)} expenses`}
+                </p>
+              )}
             </div>
             <div className="flex items-center gap-2">
+              <span
+                title={liveSyncStatus === 'live'
+                  ? 'Live: updates instantly when any transaction is recorded'
+                  : liveSyncStatus === 'polling'
+                  ? 'Realtime unavailable: refreshing every 30 seconds'
+                  : 'Not syncing'}
+                className="px-3 py-1 bg-white/20 backdrop-blur-xs text-white text-xs font-bold rounded-full border border-white/20 flex items-center gap-1.5"
+              >
+                <span className={`w-2 h-2 rounded-full ${
+                  liveSyncStatus === 'live' ? 'bg-lime-300 animate-pulse' : liveSyncStatus === 'polling' ? 'bg-amber-300' : 'bg-slate-300'
+                }`}></span>
+                {liveSyncStatus === 'live' ? 'Live' : liveSyncStatus === 'polling' ? 'Syncing' : 'Offline'}
+              </span>
               <span className="px-3 py-1 bg-white/20 backdrop-blur-xs text-white text-xs font-bold rounded-full border border-white/20">
                 {activeSemester.school_year_label}
               </span>
@@ -164,7 +201,10 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
           {/* Progress Bar */}
           <div className="space-y-1.5">
             <div className="flex justify-between text-xs font-medium text-emerald-100">
-              <span>₱{(totalSpent / 1000).toFixed(1)}k spent of ₱{(totalAllocated / 1000).toFixed(1)}k</span>
+              <span>
+                {peso(totalSpent)} spent of {peso(totalAvailable)}
+                {totalIncome > 0 && <span className="text-emerald-200"> (incl. {peso(totalIncome)} income)</span>}
+              </span>
               <span className="font-bold text-white text-sm">{spentPercent}%</span>
             </div>
             <div className="w-full h-3 bg-black/20 rounded-full overflow-hidden p-0.5">
@@ -178,18 +218,19 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
           {/* Key Metrics Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
             <div className="bg-white/10 backdrop-blur-xs rounded-xl p-3 border border-white/15">
-              <p className="text-[11px] text-emerald-100 font-medium">Remaining Funds</p>
-              <p className="text-lg sm:text-xl font-bold text-white">₱{(totalRemaining / 1000).toFixed(1)}k</p>
+              <p className="text-[11px] text-emerald-100 font-medium">Total Funds (Allocated + Collected)</p>
+              <p className="text-lg sm:text-xl font-bold text-white">{peso(totalAvailable)}</p>
             </div>
 
             <div className="bg-white/10 backdrop-blur-xs rounded-xl p-3 border border-white/15">
-              <p className="text-[11px] text-emerald-100 font-medium">Random Forest Forecast</p>
-              <p className="text-lg sm:text-xl font-bold text-white">₱{(forecastAmount / 1000).toFixed(1)}k</p>
+              {/* Trained Random Forest's estimate of what this scope's budget requests should cost */}
+              <p className="text-[11px] text-emerald-100 font-medium">Random Forest Estimate (Budget Requests)</p>
+              <p className="text-lg sm:text-xl font-bold text-white">{peso(forecastAmount)}</p>
             </div>
 
             <div className="bg-white/10 backdrop-blur-xs rounded-xl p-3 border border-white/15">
               <p className="text-[11px] text-emerald-100 font-medium">Department SAF Collected</p>
-              <p className="text-lg sm:text-xl font-bold text-white">₱{totalSafCollected.toLocaleString('en-US')}</p>
+              <p className="text-lg sm:text-xl font-bold text-white">{peso(totalSafCollected)}</p>
             </div>
           </div>
         </div>
@@ -317,19 +358,19 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs pt-1">
                 <div className="bg-white p-2.5 rounded-lg border border-slate-100">
                   <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">ALLOCATED</span>
-                  <p className="font-black text-sm text-slate-900">₱{(dept.allocated / 1000).toFixed(1)}k</p>
+                  <p className="font-black text-sm text-slate-900">₱{dept.allocated.toLocaleString('en-US')}</p>
                 </div>
                 <div className="bg-white p-2.5 rounded-lg border border-slate-100">
                   <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">SPENT</span>
-                  <p className="font-black text-sm text-slate-900">₱{(dept.spent / 1000).toFixed(1)}k</p>
+                  <p className="font-black text-sm text-slate-900">₱{dept.spent.toLocaleString('en-US')}</p>
                 </div>
                 <div className="bg-white p-2.5 rounded-lg border border-slate-100">
                   <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">REMAINING</span>
-                  <p className="font-black text-sm text-emerald-700">₱{(dept.remaining / 1000).toFixed(1)}k</p>
+                  <p className="font-black text-sm text-emerald-700">₱{dept.remaining.toLocaleString('en-US')}</p>
                 </div>
                 <div className="bg-white p-2.5 rounded-lg border border-slate-100">
-                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">AI FORECAST</span>
-                  <p className="font-black text-sm text-purple-700">₱{(dept.forecast / 1000).toFixed(1)}k</p>
+                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">ML ESTIMATE</span>
+                  <p className="font-black text-sm text-purple-700">₱{dept.forecast.toLocaleString('en-US')}</p>
                 </div>
               </div>
             </div>

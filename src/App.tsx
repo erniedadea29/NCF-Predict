@@ -16,6 +16,8 @@ import { CreateProposalModal } from './components/CreateProposalModal';
 import { BudgetRequestExpensesModal } from './components/BudgetRequestExpensesModal';
 import { LiquidationReturnModal } from './components/LiquidationReturnModal';
 import { LiquidationReportDashboard } from './components/LiquidationReportDashboard';
+import { OfficerReimbursementView } from './components/OfficerReimbursementView';
+import { StudentExpensesView } from './components/StudentExpensesView';
 import { ManageUsersView } from './components/ManageUsersView';
 import { ReimbursementReviewPanel } from './components/ReimbursementReviewPanel';
 import { PastRecordsView } from './components/PastRecordsView';
@@ -32,10 +34,10 @@ function MainAppContent() {
   const [activeProposalIdForFinance, setActiveProposalIdForFinance] = useState<string | null>(null);
   const [activeProposalIdForLiquidation, setActiveProposalIdForLiquidation] = useState<string | null>(null);
 
-  // Students now additionally get read-only Budget and Expenses views
-  // alongside their portal and events/penalties — both components self-gate
-  // their own mutating UI internally for isReadOnlyStudent.
-  const studentAllowedTabs = ['student_portal', 'budget', 'expenses', 'events_attendance'];
+  // Students: their portal, a summarized view of approved budgets (the
+  // "expenses" tab) and events/penalties. No Budget tab, no transaction
+  // ledger, and nothing to download except their own receipts.
+  const studentAllowedTabs = ['student_portal', 'expenses', 'events_attendance'];
   useEffect(() => {
     if (isReadOnlyStudent && !studentAllowedTabs.includes(currentTab.toLowerCase())) {
       setCurrentTab('student_portal');
@@ -82,29 +84,31 @@ function MainAppContent() {
           <MLForecastView />
         )}
 
-        {(!isReadOnlyStudent && currentTab.toUpperCase() === 'TRANSACTIONS' ||
-          isReadOnlyStudent && currentTab.toUpperCase() === 'EXPENSES') && (
+        {!isReadOnlyStudent && currentTab.toUpperCase() === 'TRANSACTIONS' && (
           <TransactionsView onOpenAddModal={() => setIsAddTxOpen(true)} />
         )}
 
-        {(currentTab.toUpperCase() === 'BUDGET_PROPOSALS' ||
+        {isReadOnlyStudent && currentTab.toUpperCase() === 'EXPENSES' && (
+          <StudentExpensesView />
+        )}
+
+        {/* Budget proposals (everyone's "Budget & Proposals" tab, and Adviser/Dean's
+            "Budget Approvals" tab where their Approve/Revision/Reject panels live). */}
+        {!isReadOnlyStudent && (currentTab.toUpperCase() === 'BUDGET_PROPOSALS' ||
           currentTab.toUpperCase() === 'BUDGET_APPROVALS' ||
-          currentTab.toUpperCase() === 'BUDGET' ||
+          currentTab.toUpperCase() === 'BUDGET') && (
+          <BudgetProposalWorkflow
+            onOpenCreateProposal={() => setIsCreateProposalOpen(true)}
+            onOpenBudgetRequestModal={(id) => setActiveProposalIdForFinance(id)}
+            onOpenLiquidationModal={(id) => setActiveProposalIdForLiquidation(id)}
+          />
+        )}
+
+        {/* Reimbursement, separate from proposals: Adviser/Dean review the
+            requests; officers file and track their own. */}
+        {!isReadOnlyStudent && (currentTab.toUpperCase() === 'REIMBURSEMENT' ||
           currentTab.toUpperCase() === 'REIMBURSE') && (
-          // Dean/Adviser's own "Reimbursement" tab still goes to the
-          // reimbursement-claims queue; their new "Budget Approvals" tab
-          // (and everyone else's Budget tab) goes to the actual proposal
-          // workflow, where Adviser/Dean's Approve/Revision/Reject panels
-          // and Dean's stage tracker actually live (Section 1/3a).
-          (isViewOnlyReviewer && currentTab.toUpperCase() !== 'BUDGET_APPROVALS') ? (
-            <ReimbursementReviewPanel />
-          ) : (
-            <BudgetProposalWorkflow
-              onOpenCreateProposal={() => setIsCreateProposalOpen(true)}
-              onOpenBudgetRequestModal={(id) => setActiveProposalIdForFinance(id)}
-              onOpenLiquidationModal={(id) => setActiveProposalIdForLiquidation(id)}
-            />
-          )
+          isViewOnlyReviewer ? <ReimbursementReviewPanel /> : <OfficerReimbursementView />
         )}
 
         {!isReadOnlyStudent && (currentTab.toUpperCase() === 'LIQUIDATION_REPORTS' ||

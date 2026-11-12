@@ -8,6 +8,12 @@ export interface DepartmentInfo {
   textColor: string;
   allocated: number;
   spent: number;
+  /** Completed INCOME transactions (SAF payments, penalties, returns...). */
+  income?: number;
+  /** Pending/Processing transactions awaiting review (not yet in remaining). */
+  pendingIncome?: number;
+  pendingSpent?: number;
+  /** allocated + income - spent */
   remaining: number;
   forecast: number;
   usedPercentage: number;
@@ -334,6 +340,27 @@ export interface ReimbursementRecord {
   receipt_ref: string;
 }
 
+/** One expense entered by the Treasurer in a liquidation report. */
+export interface LiquidationItem {
+  description: string;
+  category: string;
+  amount: number;
+  /** Official receipt / invoice number, if any. */
+  receipt_no: string;
+}
+
+/**
+ * Per-category totals (what the submit_liquidation RPC and the dashboard's
+ * category breakdown read). `items` holds the Treasurer's itemized entries
+ * for that category; older reports don't have it.
+ */
+export interface LiquidationSummaryLine {
+  category: string;
+  spent: number;
+  line_item_count: number;
+  items?: LiquidationItem[];
+}
+
 export interface LiquidationRecord {
   id: string;
   budget_id: string;
@@ -342,7 +369,7 @@ export interface LiquidationRecord {
   total_spent: number;
   balance: number; // unspent fund to be returned
   status: 'Draft' | 'Submitted' | 'PENDING_ADVISER' | 'PENDING_DEAN' | 'FOR_REVISION' | 'Audited' | 'Rejected' | 'Closed';
-  accounting_summary: { category: string; spent: number; line_item_count: number }[];
+  accounting_summary: LiquidationSummaryLine[];
   submitted_by: string;
   submitted_date: string;
   auditor_remarks?: string;
@@ -446,42 +473,54 @@ export interface BudgetProposal {
   budget_return?: BudgetReturnRecord;
 }
 
-export interface ForecastTrajectoryPoint {
-  /** Predicted cumulative spend at the end of this month. */
-  predicted: number;
-  lower: number;
-  upper: number;
+// ---------------------------------------------------------------------------
+// Trained model (TRAIN_MODEL: scikit-learn Random Forest, best_model.h5)
+// served by the Python prediction API; results stored in Supabase.
+// ---------------------------------------------------------------------------
+
+/** One budget_request_items row as predicted by the model (table budget_predictions). */
+export interface BudgetItemPrediction {
+  request_id: string;
+  request_item_id: string | null;
+  category: string;
+  /** Category name the model actually used (after mapping). */
+  model_category: string;
+  item: string;
+  qty: number;
+  pred_unit_cost: number;
+  pred_subtotal: number;
+  requested_amount: number;
+  /** requested - predicted */
+  variance_amount: number;
+  /** (requested - predicted) / predicted * 100 */
+  variance_pct: number;
+  flag: 'OVER' | 'UNDER' | 'OK';
+  /** Category isn't in the training data, so the estimate is less reliable. */
+  low_confidence: boolean;
 }
 
-export interface ForecastDepartment {
-  code: DepartmentCode;
-  name: string;
-  allocated: number;
-  spent: number;
-  /** Predicted total spend at the end of the semester. */
-  forecast: number;
-  /** forecast - allocated (negative = projected surplus). */
-  diff: number;
-  confidence: number;
+/** Per-request totals (view budget_request_predictions). */
+export interface BudgetRequestPrediction {
+  request_id: string;
+  title: string;
+  department_code: DepartmentCode;
   status: string;
-  /** 95% prediction interval for the end-of-semester forecast. */
-  lower: number;
-  upper: number;
-  trajectory: ForecastTrajectoryPoint[];
+  requested_total: number;
+  predicted_total: number;
+  variance_amount: number;
+  variance_pct: number;
+  items_over: number;
+  has_low_confidence_items: boolean;
+  predicted_at: string;
+  model_id: number | null;
+  items: BudgetItemPrediction[];
 }
 
-export interface ForecastMetric {
-  rmse: number;
-  mae: number;
-  mape: number;
-  r2: number;
-  model_name: string;
-  training_years: number;
-  n_trees: number;
-  months_elapsed: number;
-  month_labels: string[];
-  /** Mean cumulative utilization (spent / allocated) at each month across history. */
-  historical_util_by_month: number[];
-  feature_importances: { feature: string; label: string; importance: number }[];
-  departments: ForecastDepartment[];
+/** The active trained model (table ml_models). Metrics are cross-validated on unseen events. */
+export interface TrainedModelInfo {
+  id: number;
+  algorithm: string;
+  params: Record<string, unknown> | null;
+  metrics: Record<string, number>;
+  created_at: string;
 }

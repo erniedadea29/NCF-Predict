@@ -12,11 +12,14 @@ import {
   DepartmentCode,
   DepartmentInfo,
   ActiveSemester,
-  ForecastMetric,
+  BudgetRequestPrediction,
+  BudgetItemPrediction,
+  TrainedModelInfo,
   CashoutRecord,
   ExpenseRecord,
   ReimbursementRecord,
   LiquidationRecord,
+  LiquidationSummaryLine,
   BudgetReturnRecord,
   ProposalNote,
   UserAccountSummary,
@@ -36,12 +39,12 @@ import {
   MOCK_TRANSACTIONS,
   MOCK_SCHOOL_EVENTS,
   MOCK_ATTENDANCES,
-  MOCK_PROPOSALS,
-  HISTORICAL_SEMESTER_SPENDING
+  MOCK_PROPOSALS
 } from '../data/mockData';
 import { isSupabaseLiveConfigured, getSupabase, getIsolatedSupabase } from '../lib/supabaseClient';
 import { jsPDF } from 'jspdf';
-import { buildRandomForestForecast } from '../lib/budgetForecast';
+import { getPredictionApiHealth, predictBudgetRequest, PREDICT_API_URL } from '../lib/predictionApi';
+import { roleLabel } from '../utils/roleLabels';
 
 // Shown before a real Supabase session is restored / while logged out.
 // currentUser stays non-null everywhere else in this file; AuthGate (App.tsx)
@@ -247,7 +250,7 @@ interface AppContextType {
   proposals: BudgetProposal[];
   createProposal: (proposal: Omit<BudgetProposal, 'id' | 'created_at' | 'updated_at' | 'votes' | 'notes' | 'cashouts' | 'expenses' | 'reimbursements'>) => Promise<string>;
   updateProposalDraft: (id: string, updates: Partial<BudgetProposal>) => void;
-  submitProposalForReview: (id: string) => void;
+  submitProposalForReview: (id: string) => Promise<boolean>;
   executiveReviewProposal: (id: string, decision: 'APPROVED_TO_COUNCIL' | 'NEEDS_REVISION' | 'REJECTED', remarks: string) => void;
   voteOnProposal: (proposalId: string, vote: 'IN_FAVOR' | 'AGAINST' | 'ABSTAIN', comment: string) => void;
   addProposalNote: (proposalId: string, noteContent: string, isOfficial?: boolean) => void;
@@ -256,14 +259,27 @@ interface AppContextType {
   
   // Budget Requests (Cashouts), Expenses, Reimbursement, Liquidation, Return
   requestCashout: (budgetId: string, amount: number, purpose: string, proofDocs: { name: string; type: string; url: string; date: string }[]) => void;
-  addExpense: (budgetId: string, desc: string, category: string, amount: number, proof: { name: string; type: string; url: string; invoice_number: string }) => void;
-  requestReimbursement: (expenseId: string, budgetId: string, amount: number, remarks: string) => void;
+  addExpense: (budgetId: string, desc: string, category: string, amount: number, proof: { name: string; type: string; url: string; invoice_number: string }) => Promise<ExpenseRecord | null>;
+  requestReimbursement: (expenseId: string, budgetId: string, amount: number, remarks: string, receiptNo?: string) => Promise<boolean>;
+  /** Records an out-of-pocket expense on an approved budget and files its reimbursement request in one step. */
+  submitReimbursementProposal: (budgetId: string, claim: {
+    description: string; amount: number; receiptNo: string; remarks: string;
+    proof: { name: string; type: string; url: string } | null;
+  }) => Promise<boolean>;
   approveReimbursement: (reimbursementId: string, decision?: 'Approved' | 'Rejected', remarks?: string) => void;
-  submitLiquidation: (budgetId: string, accountingSummary: { category: string; spent: number; line_item_count: number }[], notes: string) => void;
+  submitLiquidation: (budgetId: string, accountingSummary: LiquidationSummaryLine[], notes: string) => Promise<boolean>;
   recordBudgetReturn: (budgetId: string, amount: number, remarks: string) => void;
 
   // Forecast & AI
-  forecastMetric: ForecastMetric;
+  /** Trained-model predictions per budget request id (from Supabase). */
+  requestPredictions: Record<string, BudgetRequestPrediction>;
+  /** The active trained model (ml_models), or null if not loaded. */
+  trainedModel: TrainedModelInfo | null;
+  /** Whether the Python prediction API answered (null = not checked yet). */
+  predictionApiOnline: boolean | null;
+  runBudgetPrediction: (requestId: string) => Promise<{ success: boolean; message: string }>;
+  /** 'live' = Supabase Realtime connected; 'polling' = 30s fallback; 'offline' = not syncing. */
+  liveSyncStatus: 'live' | 'polling' | 'offline';
 
   // Supabase Sync
   syncToSupabase: () => Promise<{ success: boolean; message: string }>;
@@ -466,6 +482,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [students, setStudents] = useState<Student[]>(MOCK_STUDENTS);
   const [safRecords, setSafRecords] = useState<SAFRecord[]>(MOCK_SAF_RECORDS);
   const [transactions, setTransactions] = useState<DepartmentTransaction[]>(MOCK_TRANSACTIONS);
+  // True once the real transaction list has been fetched from Supabase; from
+  // then on department money figures are computed from it (see liveDepartments).
+  const [transactionsLoaded, setTransactionsLoaded] = useState(false);
 
   const mapStudentRow = (row: any): Student => ({
     id: row.id,
@@ -526,7 +545,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (cancelled) return;
       if (studentRows) setStudents(studentRows.map(mapStudentRow));
       if (safRows) setSafRecords(safRows.map(mapSafRow));
-      if (txRows) setTransactions(txRows.map(mapTransactionRow));
+      if (txRows) {
+        setTransactions(txRows.map(mapTransactionRow));
+        setTransactionsLoaded(true);
+      }
     })();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1109,7 +1131,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const adviserReviewLiquidation = async (liquidationId: string, decision: 'APPROVED' | 'REVISION' | 'REJECTED', remarks?: string) => {
     const client = getSupabase();
     const { error } = await client.rpc('adviser_review_liquidation', { p_liquidation_id: liquidationId, p_decision: decision, p_remarks: remarks });
-    if (error) { console.error('Failed to submit adviser liquidation review', error); return; }
+    if (error) { console.error('Failed to submit adviser liquidation review', error); alert(`Liquidation review was NOT saved.
+
+${error.message}`); return; }
     setProposals(prev => prev.map(p => p.liquidation?.id === liquidationId ? {
       ...p,
       liquidation: {
@@ -1123,7 +1147,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const deanReviewLiquidation = async (liquidationId: string, decision: 'APPROVED' | 'REVISION' | 'REJECTED', remarks?: string) => {
     const client = getSupabase();
     const { error } = await client.rpc('dean_review_liquidation', { p_liquidation_id: liquidationId, p_decision: decision, p_remarks: remarks });
-    if (error) { console.error('Failed to submit dean liquidation review', error); return; }
+    if (error) { console.error('Failed to submit dean liquidation review', error); alert(`Liquidation review was NOT saved.
+
+${error.message}`); return; }
     setProposals(prev => prev.map(p => p.liquidation?.id === liquidationId ? {
       ...p,
       liquidation: {
@@ -1166,7 +1192,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       estimated_amount: Number(li.amount), remarks: li.remarks || ''
     })),
     executive_review: row.executive_reviewed_by ? {
-      reviewed_by: '', decision: row.executive_decision, remarks: row.executive_remarks || '',
+      reviewed_by: row.executive?.full_name || '', decision: row.executive_decision, remarks: row.executive_remarks || '',
       date: row.executive_reviewed_at?.slice(0, 10) || ''
     } : undefined,
     council_resolution: row.council_resolution_number ? {
@@ -1179,16 +1205,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       id: v.id, council_member_id: v.council_member_id, council_member_name: '', position: '',
       vote: v.vote, comment: v.comment || '', voted_at: v.voted_at
     })),
+    // `author` is the author's profile, embedded by fetchProposals (null if unavailable).
     notes: (row.proposal_notes || []).map((n: any): ProposalNote => ({
-      id: n.id, author_id: n.author_id, author_name: '', author_role: '',
+      id: n.id, author_id: n.author_id,
+      author_name: n.author?.full_name || '',
+      author_role: roleLabel(n.author?.role, n.author?.officer_position),
       note_content: n.note_content, created_at: n.created_at, is_official: n.is_official
     })),
     adviser_approval: row.adviser_id ? {
-      adviser_name: '', decision: row.adviser_decision, remarks: row.adviser_remarks || '',
+      adviser_name: row.adviser?.full_name || '', decision: row.adviser_decision, remarks: row.adviser_remarks || '',
       date: row.adviser_decided_at?.slice(0, 10) || ''
     } : undefined,
     dean_approval: row.dean_id ? {
-      dean_name: '', decision: row.dean_decision, remarks: row.dean_remarks || '',
+      dean_name: row.dean?.full_name || '', decision: row.dean_decision, remarks: row.dean_remarks || '',
       date: row.dean_decided_at?.slice(0, 10) || '', release_authorized: row.release_authorized
     } : undefined,
     cashouts: (row.cashouts || []).map((c: any): CashoutRecord => ({
@@ -1218,7 +1247,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       balance: Number(row.liquidation_reports[0].balance),
       status: row.liquidation_reports[0].status,
       accounting_summary: row.liquidation_reports[0].accounting_summary || [],
-      submitted_by: '', submitted_date: row.liquidation_reports[0].created_at?.slice(0, 10) || '',
+      // Only the requesting Treasurer can submit a liquidation report, so their name is the submitter's.
+      submitted_by: row.requested_by_name || '', submitted_date: row.liquidation_reports[0].created_at?.slice(0, 10) || '',
       auditor_remarks: row.liquidation_reports[0].remarks || undefined,
       notes: row.liquidation_reports[0].remarks || undefined
     } : undefined,
@@ -1233,43 +1263,190 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } : undefined
   });
 
+  // Re-pulls every budget request with its related rows. Used on login and
+  // by the live-sync subscription whenever any user changes a request.
+  const fetchProposals = async () => {
+    const client = getSupabase();
+    // proposal_notes has a single FK to profiles (author_id), so the author's
+    // name/role can be embedded safely — that's what labels each note.
+    // Approver names: budget_requests has several FKs to profiles, so each
+    // embed is disambiguated by its column (profiles!adviser_id, ...).
+    const APPROVERS = `
+      executive:profiles!executive_reviewed_by(full_name),
+      adviser:profiles!adviser_id(full_name),
+      dean:profiles!dean_id(full_name),`;
+    const select = (extra: string, notes: string) => client.from('budget_requests').select(`
+      *,
+      ${extra}
+      budget_request_items(*),
+      council_votes(*),
+      ${notes},
+      cashouts(*),
+      reimbursements(*),
+      liquidation_reports(*),
+      budget_returns(*),
+      transactions(*)
+    `).order('created_at', { ascending: false });
+    const NOTES_WITH_AUTHOR = 'proposal_notes(*, author:profiles(full_name, role, officer_position))';
+    let { data, error } = await select(APPROVERS, NOTES_WITH_AUTHOR);
+    // Never let name lookups break the whole request list: drop them one at a time.
+    if (error) {
+      console.warn('Could not load approver names; retrying without them', error);
+      ({ data, error } = await select('', NOTES_WITH_AUTHOR));
+    }
+    if (error) {
+      console.warn('Could not load note authors; loading notes without names', error);
+      ({ data, error } = await select('', 'proposal_notes(*)'));
+    }
+    if (error) { console.error('Failed to fetch proposals', error); return; }
+    if (data) setProposals(data.map(mapProposalRow));
+  };
+
   useEffect(() => {
     if (!isAuthenticated) return;
-    let cancelled = false;
-    (async () => {
-      const client = getSupabase();
-      const { data, error } = await client.from('budget_requests').select(`
-        *,
-        budget_request_items(*),
-        council_votes(*),
-        proposal_notes(*),
-        cashouts(*),
-        reimbursements(*),
-        liquidation_reports(*),
-        budget_returns(*),
-        transactions(*)
-      `).order('created_at', { ascending: false });
-      if (cancelled) return;
-      if (error) { console.error('Failed to fetch proposals', error); return; }
-      if (data) setProposals(data.map(mapProposalRow));
-    })();
-    return () => { cancelled = true; };
+    fetchProposals();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated]);
 
-  // Random Forest forecast, retrained whenever department financials or the semester change.
-  const forecastMetric = useMemo<ForecastMetric>(
-    () => buildRandomForestForecast({ departments, history: HISTORICAL_SEMESTER_SPENDING, activeSemester }),
-    [departments, activeSemester]
-  );
-  // Departments with their `forecast` field filled in from the Random Forest model.
-  const forecastedDepartments = useMemo<Record<DepartmentCode, DepartmentInfo>>(() => {
+  // Live department money figures. Every money movement moves the dashboard:
+  //   income    = Completed INCOME transactions
+  //             + paid SAF records that have no matching income transaction
+  //               (SAF added as already-paid, or registered with the student,
+  //               never created one — they'd otherwise be missing entirely)
+  //   spent     = Completed EXPENSE transactions
+  //   remaining = allocated + income - spent
+  // Pending transactions are tracked separately (pendingIncome/pendingSpent)
+  // and only move the balance once approved. Rejected ones never do.
+  // `allocated` comes from the department_financials view (budgets table).
+  // Until live data has loaded, the seeded/mock figures are kept.
+  const liveDepartments = useMemo<Record<DepartmentCode, DepartmentInfo>>(() => {
+    if (!transactionsLoaded) return departments;
+    type Totals = { spent: number; income: number; pendingIncome: number; pendingSpent: number };
+    const totals: Partial<Record<DepartmentCode, Totals>> = {};
+    const bucket = (code: DepartmentCode) => (totals[code] ??= { spent: 0, income: 0, pendingIncome: 0, pendingSpent: 0 });
+
+    // SAF receipt numbers already represented by an income transaction.
+    const receiptsInTransactions = new Set<string>();
+    transactions.forEach(tx => {
+      const text = `${tx.description || ''} ${tx.reference_code || ''}`;
+      for (const m of text.matchAll(/SAF-\d{4}-\d+/g)) receiptsInTransactions.add(m[0]);
+
+      if (tx.status === 'Completed') {
+        if (tx.type === 'INCOME') bucket(tx.department).income += tx.amount;
+        else bucket(tx.department).spent += tx.amount;
+      } else if (tx.status === 'Pending' || tx.status === 'Processing') {
+        if (tx.type === 'INCOME') bucket(tx.department).pendingIncome += tx.amount;
+        else bucket(tx.department).pendingSpent += tx.amount;
+      }
+    });
+
+    safRecords.forEach(rec => {
+      if (!rec.paid || !rec.department) return;
+      if (rec.receipt_no && receiptsInTransactions.has(rec.receipt_no)) return;
+      bucket(rec.department).income += rec.amount;
+    });
+
     const next = { ...departments };
-    forecastMetric.departments.forEach(f => {
-      if (next[f.code]) next[f.code] = { ...next[f.code], forecast: f.forecast };
+    (Object.keys(next) as DepartmentCode[]).forEach(code => {
+      const { spent, income, pendingIncome, pendingSpent } = totals[code] ?? { spent: 0, income: 0, pendingIncome: 0, pendingSpent: 0 };
+      const allocated = next[code].allocated;
+      const available = allocated + income;
+      next[code] = {
+        ...next[code],
+        spent,
+        income,
+        pendingIncome,
+        pendingSpent,
+        remaining: available - spent,
+        usedPercentage: available > 0 ? Math.min(100, Math.round((spent / available) * 100)) : 0
+      };
     });
     return next;
-  }, [departments, forecastMetric]);
+  }, [departments, transactions, safRecords, transactionsLoaded]);
+
+  // ---------------------------------------------------------------------
+  // TRAINED MODEL (TRAIN_MODEL/best_model.h5, scikit-learn Random Forest).
+  // The Python prediction API predicts each budget request's line items and
+  // saves them to Supabase; the app reads those saved predictions here.
+  // ---------------------------------------------------------------------
+  const [requestPredictions, setRequestPredictions] = useState<Record<string, BudgetRequestPrediction>>({});
+  const [trainedModel, setTrainedModel] = useState<TrainedModelInfo | null>(null);
+  const [predictionApiOnline, setPredictionApiOnline] = useState<boolean | null>(null);
+
+  const fetchPredictions = async () => {
+    const client = getSupabase();
+    const [{ data: summaries, error: sumErr }, { data: items }, { data: models }] = await Promise.all([
+      client.from('budget_request_predictions').select('*'),
+      client.from('budget_predictions').select('*').not('request_id', 'is', null),
+      client.from('ml_models').select('id, algorithm, params, metrics, created_at').eq('is_active', true)
+        .order('created_at', { ascending: false }).limit(1)
+    ]);
+    if (models?.[0]) {
+      const m = models[0] as any;
+      setTrainedModel({ id: m.id, algorithm: m.algorithm, params: m.params, metrics: m.metrics || {}, created_at: m.created_at });
+    }
+    if (sumErr || !summaries) return;
+    const itemsByRequest: Record<string, BudgetItemPrediction[]> = {};
+    (items || []).forEach((r: any) => {
+      (itemsByRequest[r.request_id] ??= []).push({
+        request_id: r.request_id, request_item_id: r.request_item_id, category: r.category,
+        model_category: r.model_category || r.category, item: r.item, qty: Number(r.qty),
+        pred_unit_cost: Number(r.pred_unit_cost), pred_subtotal: Number(r.pred_subtotal),
+        requested_amount: Number(r.requested_amount), variance_amount: Number(r.variance_amount),
+        variance_pct: Number(r.variance_pct), flag: r.flag || 'OK', low_confidence: Boolean(r.low_confidence)
+      });
+    });
+    const next: Record<string, BudgetRequestPrediction> = {};
+    summaries.forEach((s: any) => {
+      next[s.request_id] = {
+        request_id: s.request_id, title: s.title, department_code: s.department_code, status: s.status,
+        requested_total: Number(s.requested_total), predicted_total: Number(s.predicted_total),
+        variance_amount: Number(s.variance_amount), variance_pct: Number(s.variance_pct),
+        items_over: Number(s.items_over), has_low_confidence_items: Boolean(s.has_low_confidence_items),
+        predicted_at: s.predicted_at, model_id: s.model_id, items: itemsByRequest[s.request_id] || []
+      };
+    });
+    setRequestPredictions(next);
+  };
+
+  useEffect(() => {
+    if (!isAuthenticated || !isSupabaseLiveConfigured()) return;
+    fetchPredictions();
+    getPredictionApiHealth().then(() => setPredictionApiOnline(true)).catch(() => setPredictionApiOnline(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated]);
+
+  // Asks the trained model to (re)predict a budget request's items, then reloads the saved results.
+  const runBudgetPrediction = async (requestId: string): Promise<{ success: boolean; message: string }> => {
+    try {
+      const res = await predictBudgetRequest(requestId);
+      setPredictionApiOnline(true);
+      if (!res.saved) return { success: false, message: `Predicted, but not saved: ${res.save_error || 'unknown error'}` };
+      await fetchPredictions();
+      return { success: true, message: `Predicted total: ₱${res.predicted_total.toLocaleString('en-US', { minimumFractionDigits: 2 })}` };
+    } catch (e) {
+      const offline = e instanceof TypeError || (e instanceof DOMException && e.name === 'AbortError');
+      if (offline) setPredictionApiOnline(false);
+      return {
+        success: false,
+        message: offline
+          ? `The prediction API isn't reachable at ${PREDICT_API_URL}. Start it with: python -m uvicorn api:app (in TRAIN_MODEL).`
+          : (e as Error).message
+      };
+    }
+  };
+
+  // Each department's `forecast` = the trained model's predicted cost of its
+  // budget requests (every request that wasn't rejected).
+  const forecastedDepartments = useMemo<Record<DepartmentCode, DepartmentInfo>>(() => {
+    const next = { ...liveDepartments };
+    (Object.keys(next) as DepartmentCode[]).forEach(code => { next[code] = { ...next[code], forecast: 0 }; });
+    Object.values(requestPredictions).forEach(p => {
+      if (p.status === 'REJECTED' || !next[p.department_code]) return;
+      next[p.department_code] = { ...next[p.department_code], forecast: next[p.department_code].forecast + p.predicted_total };
+    });
+    return next;
+  }, [liveDepartments, requestPredictions]);
   const [activeTab, setActiveTab] = useState<string>('home');
   const [mobileFrameMode, setMobileFrameMode] = useState<boolean>(false);
   const [selectedProposalIdForModal, setSelectedProposalIdForModal] = useState<string | null>(null);
@@ -2270,6 +2447,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     if (error || !data) {
       console.error('Failed to add transaction', error);
+      alert(`Transaction "${tx.title}" was NOT recorded, so the dashboard won't include it.
+
+${error?.message || 'The database did not save it.'}`);
       return;
     }
 
@@ -2310,6 +2490,103 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } : tx));
     await refreshDepartmentFinancials();
   };
+
+  // ---------------------------------------------------------------------
+  // LIVE SYNC: keeps the dashboard in step with changes made by ANY user.
+  // Supabase Realtime pushes row changes for the tables below; if Realtime
+  // isn't connected we fall back to polling every 30s, and we always
+  // re-pull when the browser tab regains focus.
+  // ---------------------------------------------------------------------
+  const [liveSyncStatus, setLiveSyncStatus] = useState<'live' | 'polling' | 'offline'>('offline');
+
+  const refetchTransactions = async () => {
+    const { data, error } = await getSupabase().from('transactions').select('*').order('created_at', { ascending: false });
+    if (error || !data) return;
+    setTransactions(data.map(mapTransactionRow));
+    setTransactionsLoaded(true);
+  };
+
+  const refetchSafRecords = async () => {
+    const { data } = await getSupabase()
+      .from('saf_records')
+      .select('*, students(student_number, first_name, last_name, course, section, year_level)');
+    if (data) setSafRecords(data.map(mapSafRow));
+  };
+
+  const refetchAllLive = async () => {
+    await Promise.all([refetchTransactions(), refreshDepartmentFinancials(), refetchSafRecords(), fetchProposals(), fetchPredictions()]);
+  };
+
+  // Always-current handlers so the long-lived subscription never uses stale closures.
+  const liveHandlersRef = useRef({ refetchTransactions, refetchSafRecords, refreshDepartmentFinancials, fetchProposals, fetchPredictions, refetchAllLive, mapTransactionRow });
+  liveHandlersRef.current = { refetchTransactions, refetchSafRecords, refreshDepartmentFinancials, fetchProposals, fetchPredictions, refetchAllLive, mapTransactionRow };
+
+  useEffect(() => {
+    if (!isAuthenticated || !isSupabaseLiveConfigured()) return;
+    const client = getSupabase();
+    const h = () => liveHandlersRef.current;
+
+    // Coalesce bursts of events (e.g. a proposal + its line items) into one refetch.
+    const timers: Record<string, ReturnType<typeof setTimeout>> = {};
+    const debounced = (key: string, fn: () => void, ms = 400) => {
+      clearTimeout(timers[key]);
+      timers[key] = setTimeout(fn, ms);
+    };
+
+    const channel = client
+      .channel('ncf-live-budget')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, (payload: any) => {
+        if (payload.eventType === 'DELETE') {
+          const id = payload.old?.id;
+          if (id) setTransactions(prev => prev.filter(tx => tx.id !== id));
+          else debounced('tx', () => h().refetchTransactions());
+        } else if (payload.new) {
+          const row = h().mapTransactionRow(payload.new);
+          setTransactions(prev => {
+            const exists = prev.some(tx => tx.id === row.id);
+            return exists ? prev.map(tx => (tx.id === row.id ? row : tx)) : [row, ...prev];
+          });
+        }
+        debounced('proposals', () => h().fetchProposals(), 800);
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'budgets' }, () => {
+        debounced('fin', () => h().refreshDepartmentFinancials());
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'saf_records' }, () => {
+        debounced('saf', () => h().refetchSafRecords());
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'budget_requests' }, () => {
+        debounced('proposals', () => h().fetchProposals(), 800);
+        debounced('predictions', () => h().fetchPredictions(), 3000);
+      })
+      .subscribe(status => {
+        if (status === 'SUBSCRIBED') {
+          setLiveSyncStatus('live');
+          // Catch anything that changed between the initial load and subscribing.
+          h().refetchAllLive();
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          setLiveSyncStatus('polling');
+        }
+      });
+
+    // Fallback polling while Realtime is unavailable.
+    const poll = setInterval(() => {
+      if (channel.state !== 'joined') h().refetchAllLive();
+    }, 30000);
+
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') h().refetchAllLive();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+
+    return () => {
+      clearInterval(poll);
+      document.removeEventListener('visibilitychange', onVisible);
+      Object.values(timers).forEach(clearTimeout);
+      client.removeChannel(channel);
+      setLiveSyncStatus('offline');
+    };
+  }, [isAuthenticated]);
 
   const addEvent = async (eventData: Omit<SchoolEvent, 'id' | 'created_at'>) => {
     const client = getSupabase();
@@ -2528,6 +2805,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const newProposal: BudgetProposal = {
       ...proposalData,
       id: row.id,
+      requested_by: row.requested_by || undefined,
       created_at: row.created_at,
       updated_at: row.updated_at,
       votes: [],
@@ -2535,7 +2813,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         id: `note_init_${row.id}`,
         author_id: currentUser.id,
         author_name: currentUser.name,
-        author_role: currentUser.role,
+        author_role: roleLabel(currentUser.role, currentUser.officer_position),
         note_content: initialNoteContent,
         created_at: new Date().toLocaleString(),
         is_official: true
@@ -2545,6 +2823,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       reimbursements: []
     };
     setProposals(prev => [newProposal, ...prev]);
+    // Let the trained model estimate the new request's items in the background.
+    if (proposalData.line_items.length > 0) runBudgetPrediction(row.id);
     return row.id;
   };
 
@@ -2567,8 +2847,51 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Skips the old Executive-Review/Council-Voting stages: Officer -> Adviser
   // -> Dean is the whole review sequence now. Those stages/RPCs are left in
   // the schema unused rather than removed, so no old data/enum breaks.
-  const submitProposalForReview = async (id: string) => {
-    await updateProposalDraft(id, { budget_status: 'CSC_ADVISER_APPROVAL' });
+  //
+  // Goes through the submit_budget_request RPC (SECURITY DEFINER, checks the
+  // caller is the Treasurer for this request) because a plain UPDATE can be
+  // silently filtered out by RLS: PostgREST then returns no error, the UI
+  // showed "submitted", but the row stayed DRAFT and reverted on refresh.
+  // Local state only changes once the database confirms the new status.
+  const submitProposalForReview = async (id: string): Promise<boolean> => {
+    const client = getSupabase();
+    const target = 'CSC_ADVISER_APPROVAL';
+    let saved: { status: string; updated_at?: string } | null = null;
+    let failure: string | null = null;
+
+    const rpc = await client.rpc('submit_budget_request', { p_proposal_id: id });
+    const rpcMissing = rpc.error && (rpc.error.code === 'PGRST202' || rpc.error.code === '42883');
+    if (!rpc.error) {
+      saved = Array.isArray(rpc.data) ? rpc.data[0] ?? null : rpc.data;
+    } else if (rpcMissing) {
+      // RPC not installed yet: fall back to a direct update, but ask for the
+      // updated row back so a policy-blocked update (0 rows) is detected.
+      const res = await client.from('budget_requests').update({ status: target }).eq('id', id).select('status, updated_at');
+      if (res.error) {
+        failure = res.error.code === '42501'
+          ? `${res.error.message}\n\nFix: run supabase/migrations/20261110_submit_budget_request.sql in the Supabase SQL Editor (installs the submit_budget_request function).`
+          : res.error.message;
+      }
+      else saved = res.data?.[0] ?? null;
+      if (!failure && !saved) failure = 'The database did not allow this update (row-level security). Install the submit_budget_request function in Supabase.';
+    } else {
+      failure = rpc.error.message;
+    }
+
+    if (failure || !saved || saved.status !== target) {
+      console.error('Failed to submit proposal', failure, saved);
+      alert(`Budget request was NOT submitted.\n\n${failure || 'The database did not save the new status.'}`);
+      return false;
+    }
+
+    setProposals(prev => prev.map(p => p.id === id ? {
+      ...p,
+      budget_status: target,
+      updated_at: saved!.updated_at || new Date().toISOString().slice(0, 10)
+    } : p));
+    // Refresh the trained model's estimate so the Adviser reviews an up-to-date prediction.
+    runBudgetPrediction(id);
+    return true;
   };
 
   const executiveReviewProposal = async (id: string, decision: 'APPROVED_TO_COUNCIL' | 'NEEDS_REVISION' | 'REJECTED', remarks: string) => {
@@ -2646,7 +2969,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       id: data.id,
       author_id: currentUser.id,
       author_name: currentUser.name,
-      author_role: currentUser.officer_position || currentUser.role,
+      author_role: roleLabel(currentUser.role, currentUser.officer_position),
       note_content: noteContent,
       created_at: new Date().toLocaleString(),
       is_official: isOfficial
@@ -2659,14 +2982,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const nextStatus = decision === 'APPROVED' ? 'DEAN_APPROVAL' : (decision === 'REVISION' ? 'FOR_REVISION' : 'REJECTED');
     const date = new Date().toISOString().slice(0, 10);
 
-    const { error } = await client.from('budget_requests').update({
-      status: nextStatus,
-      adviser_id: currentUser.id !== 'guest' ? currentUser.id : null,
-      adviser_decision: decision,
-      adviser_remarks: remarks,
-      adviser_decided_at: new Date().toISOString()
-    }).eq('id', proposalId);
-    if (error) { console.error('Failed to submit adviser decision', error); return; }
+    // Goes through the adviser_decide_budget_request RPC (SECURITY DEFINER):
+    // RLS blocks advisers from updating budget_requests directly, which made
+    // Approve / Request Revision / Reject silently do nothing.
+    const rpc = await client.rpc('adviser_decide_budget_request', {
+      p_proposal_id: proposalId, p_decision: decision, p_remarks: remarks
+    });
+    let failure: string | null = null;
+    if (rpc.error && (rpc.error.code === 'PGRST202' || rpc.error.code === '42883')) {
+      // RPC not installed yet: try a direct update and confirm a row actually changed.
+      const res = await client.from('budget_requests').update({
+        status: nextStatus,
+        adviser_id: currentUser.id !== 'guest' ? currentUser.id : null,
+        adviser_decision: decision,
+        adviser_remarks: remarks,
+        adviser_decided_at: new Date().toISOString()
+      }).eq('id', proposalId).select('id');
+      if (res.error || !res.data?.length) {
+        failure = `${res.error?.message || 'The database did not allow this update (row-level security).'}\n\nFix: run supabase/migrations/20261112_adviser_decide_budget_request.sql in the Supabase SQL Editor.`;
+      }
+    } else if (rpc.error) {
+      failure = rpc.error.message;
+    }
+    if (failure) {
+      console.error('Failed to submit adviser decision', failure);
+      alert(`Adviser decision was NOT saved.\n\n${failure}`);
+      return;
+    }
 
     setProposals(prev => prev.map(p => {
       if (p.id === proposalId) {
@@ -2686,7 +3028,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const { data: row, error } = await client.rpc('approve_dean_decision', {
       p_proposal_id: proposalId, p_decision: decision, p_remarks: remarks
     });
-    if (error || !row) { console.error('Failed to submit dean decision', error); return; }
+    if (error || !row) { console.error('Failed to submit dean decision', error); alert(`Dean decision was NOT saved.
+
+${error?.message || 'The database did not save the decision.'}`); return; }
 
     const isApproved = decision === 'APPROVED_FUND_RELEASE';
     let newCashout: CashoutRecord | null = null;
@@ -2740,9 +3084,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setProposals(prev => prev.map(p => p.id === budgetId ? { ...p, cashouts: [...p.cashouts, newCashout], updated_at: new Date().toISOString().slice(0, 10) } : p));
   };
 
-  const addExpense = async (budgetId: string, desc: string, category: string, amount: number, proof: { name: string; type: string; url: string; invoice_number: string }) => {
+  const addExpense = async (budgetId: string, desc: string, category: string, amount: number, proof: { name: string; type: string; url: string; invoice_number: string }): Promise<ExpenseRecord | null> => {
     const targetProp = proposals.find(p => p.id === budgetId);
-    if (!targetProp) return;
+    if (!targetProp) return null;
 
     const client = getSupabase();
     const referenceCode = `${targetProp.department}-EXP-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`;
@@ -2763,7 +3107,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       receipt_url: proof.url && proof.url !== '#' ? proof.url : null,
       created_by: currentUser.id !== 'guest' ? currentUser.id : null
     }).select().single();
-    if (error || !data) { console.error('Failed to add expense', error); return; }
+    if (error || !data) {
+      console.error('Failed to add expense', error);
+      alert(`Expense "${desc}" was NOT recorded.
+
+${error?.message || 'The database did not save it.'}`);
+      return null;
+    }
 
     const newExp: ExpenseRecord = {
       id: data.id, budget_id: budgetId, expense_desc: desc, category, amount_spent: amount,
@@ -2773,13 +3123,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setProposals(prev => prev.map(p => p.id === budgetId ? { ...p, expenses: [...p.expenses, newExp], updated_at: new Date().toISOString().slice(0, 10) } : p));
     setTransactions(prev => [mapTransactionRow(data), ...prev]);
     await refreshDepartmentFinancials();
+    return newExp;
   };
 
-  const requestReimbursement = async (expenseId: string, budgetId: string, amount: number, remarks: string) => {
+  const requestReimbursement = async (expenseId: string, budgetId: string, amount: number, remarks: string, receiptNo?: string): Promise<boolean> => {
     const targetProp = proposals.find(p => p.id === budgetId);
-    if (!targetProp) return;
+    if (!targetProp) return false;
     const client = getSupabase();
-    const receiptRef = `REC-${Date.now()}`;
+    // The claimant's official receipt number when given, else a generated reference.
+    const receiptRef = receiptNo?.trim() || `REC-${Date.now()}`;
 
     const { data, error } = await client.from('reimbursements').insert({
       request_code: receiptRef,
@@ -2798,7 +3150,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       status: 'Pending',
       remarks
     }).select().single();
-    if (error || !data) { console.error('Failed to request reimbursement', error); return; }
+    if (error || !data) {
+      console.error('Failed to request reimbursement', error);
+      alert(`Reimbursement request was NOT submitted.
+
+${error?.message || 'The database did not save it.'}`);
+      return false;
+    }
 
     const newReimb: ReimbursementRecord = {
       id: data.id, expense_id: expenseId, budget_id: budgetId, amount_spent: amount,
@@ -2810,6 +3168,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       reimbursements: [...p.reimbursements, newReimb],
       expenses: p.expenses.map(e => e.id === expenseId ? { ...e, reimbursement_status: 'Requested' } : e)
     } : p));
+    return true;
+  };
+
+  const submitReimbursementProposal = async (
+    budgetId: string,
+    claim: { description: string; amount: number; receiptNo: string; remarks: string; proof: { name: string; type: string; url: string } | null }
+  ): Promise<boolean> => {
+    const expense = await addExpense(budgetId, claim.description, 'Event', claim.amount, {
+      name: claim.proof?.name || 'No receipt attached',
+      type: claim.proof?.type || 'Invoice / Receipt',
+      url: claim.proof?.url || '#',
+      invoice_number: claim.receiptNo || 'N/A'
+    });
+    if (!expense) return false;
+    return requestReimbursement(expense.id, budgetId, claim.amount, claim.remarks || claim.description, claim.receiptNo);
   };
 
   const approveReimbursement = async (reimbursementId: string, decision: 'Approved' | 'Rejected' = 'Approved', remarks?: string) => {
@@ -2834,14 +3207,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }));
   };
 
-  const submitLiquidation = async (budgetId: string, accountingSummary: { category: string; spent: number; line_item_count: number }[], notes: string) => {
+  // The report's content (itemized expenses + certification) is authored by
+  // the Treasurer who filed the request — nothing here is auto-generated.
+  const submitLiquidation = async (budgetId: string, accountingSummary: LiquidationSummaryLine[], notes: string): Promise<boolean> => {
     const client = getSupabase();
     const { data: row, error } = await client.rpc('submit_liquidation', {
       p_proposal_id: budgetId,
       p_accounting_summary: accountingSummary,
-      p_notes: notes || 'Liquidation submitted with all supporting invoices and official receipts verified.'
+      p_notes: notes
     });
-    if (error || !row) { console.error('Failed to submit liquidation', error); return; }
+    if (error || !row) {
+      console.error('Failed to submit liquidation', error);
+      alert(`Liquidation report was NOT submitted.
+
+${error?.message || 'The database did not save the report.'}`);
+      return false;
+    }
 
     const targetProp = proposals.find(p => p.id === budgetId);
     const newLiquidation: LiquidationRecord = {
@@ -2852,6 +3233,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       notes: row.remarks || undefined
     };
     setProposals(prev => prev.map(p => p.id === budgetId ? { ...p, liquidation: newLiquidation, updated_at: new Date().toISOString().slice(0, 10) } : p));
+    return true;
   };
 
   const recordBudgetReturn = async (budgetId: string, amount: number, remarks: string) => {
@@ -3075,10 +3457,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         requestCashout,
         addExpense,
         requestReimbursement,
+        submitReimbursementProposal,
         approveReimbursement,
         submitLiquidation,
         recordBudgetReturn,
-        forecastMetric,
+        requestPredictions,
+        trainedModel,
+        predictionApiOnline,
+        runBudgetPrediction,
+        liveSyncStatus,
         syncToSupabase,
         activeTab,
         setActiveTab,

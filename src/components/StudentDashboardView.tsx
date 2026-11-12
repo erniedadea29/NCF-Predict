@@ -6,7 +6,6 @@ import {
   AlertTriangle,
   CheckCircle2,
   Clock,
-  Printer,
   GraduationCap,
   Eye,
   FileDown
@@ -19,13 +18,10 @@ export const StudentDashboardView: React.FC = () => {
     attendances,
     activeSemester,
     currentUser,
-    generateClearance,
     myReceipts,
     getSignedReceiptUrl
   } = useApp();
 
-  const [clearanceError, setClearanceError] = React.useState('');
-  const [generatingClearance, setGeneratingClearance] = React.useState(false);
 
   // Always resolve strictly to the logged-in student's own record — students
   // can only ever view their own data, never anyone else's.
@@ -43,60 +39,6 @@ export const StudentDashboardView: React.FC = () => {
 
   const isClearedForExam = studentSaf?.paid && totalUnpaidPenalty === 0;
 
-  const printClearanceSlip = async () => {
-    if (!activeStudent) return;
-    setClearanceError('');
-    setGeneratingClearance(true);
-    // Generates (or refreshes) a real, stored clearance record first — the
-    // printed slip below is no longer purely client-side; it reflects an
-    // actual row cashier/adviser/dean/admin can also see, with a real code.
-    const record = await generateClearance(activeStudent.id);
-    setGeneratingClearance(false);
-    if (!record) {
-      setClearanceError('Could not generate your clearance record right now. Please try again.');
-      return;
-    }
-
-    const slip = `
-============================================================
-             NAGA COLLEGE FOUNDATION (NCF)
-          OFFICIAL STUDENT CLEARANCE CERTIFICATE
-============================================================
-Clearance Code: ${record.clearance_code}
-Academic Year: ${activeSemester.school_year_label} • ${activeSemester.semester_name}
-Date Generated: ${new Date(record.generated_at).toLocaleString()}
-------------------------------------------------------------
-Student ID   : ${activeStudent?.student_number}
-Student Name : ${activeStudent?.first_name} ${activeStudent?.last_name}
-Department   : ${activeStudent?.department} - ${DEPARTMENTS[activeStudent?.department || 'CCS']?.name}
-Course & Yr  : ${activeStudent?.course} (${activeStudent?.year_level})
-Section      : ${activeStudent?.section}
-------------------------------------------------------------
-CLEARANCE STATUS BREAKDOWN:
-1. Student Activity Fund (SAF): ${record.saf_paid ? `CLEARED / PAID (₱${(studentSaf?.amount ?? 500).toFixed(2)})` : `UNPAID (₱${(studentSaf?.amount ?? 500).toFixed(2)})`}
-   Receipt Code: ${studentSaf?.receipt_no || 'N/A'}
-   Reference: ${studentSaf?.double_entry.reference_no || 'N/A'}
-
-2. Event Attendance & Fines  : ${record.unpaid_penalties_count === 0 ? 'CLEARED (₱0.00 Outstanding)' : `UNPAID FINES (₱${record.unpaid_penalties_amount.toFixed(2)}, ${record.unpaid_penalties_count} record(s))`}
-
-------------------------------------------------------------
-FINAL EXAMINATION CLEARANCE:
-${record.status === 'CLEARED' ? '>>> [ OFFICIALLY CLEARED & VALIDATED ] <<<' : '>>> [ HOLD - SETTLE UNPAID DUES AT TREASURY ] <<<'}
-============================================================
-Validated by Naga College Foundation Supreme Student Council
-Verify this clearance code with the Treasury/Adviser office if needed.
-`;
-
-    const blob = new Blob([slip], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `NCF_Clearance_${activeStudent?.student_number}_${record.clearance_code}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
 
   if (!activeStudent) {
     return (
@@ -170,18 +112,7 @@ Verify this clearance code with the Treasury/Adviser office if needed.
               </div>
             )}
 
-            <button
-              onClick={printClearanceSlip}
-              disabled={generatingClearance}
-              className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl border border-slate-200 transition cursor-pointer disabled:opacity-50"
-              title="Generate & Print Official Clearance Slip"
-            >
-              <Printer className={`w-4 h-4 ${generatingClearance ? 'animate-pulse' : ''}`} />
-            </button>
           </div>
-          {clearanceError && (
-            <p className="text-[11px] text-rose-600 font-semibold mt-2">{clearanceError}</p>
-          )}
         </div>
 
         {/* Academic Details (read-only) */}
@@ -209,56 +140,64 @@ Verify this clearance code with the Treasury/Adviser office if needed.
           </div>
         </div>
 
-        {/* Section 1: SAF Fee Status Card */}
-        <div className="p-5 bg-gradient-to-br from-emerald-50/70 to-teal-50/40 rounded-2xl border border-emerald-200/80 space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Receipt className="w-5 h-5 text-emerald-700" />
-              <h4 className="font-extrabold text-sm text-emerald-950">
-                Student Activity Fund (SAF) Record
-              </h4>
-            </div>
-            <span className="font-mono text-xs font-bold text-emerald-800">
-              Fee: ₱{studentSaf?.amount.toFixed(2) || '500.00'}
-            </span>
-          </div>
+        {/* Section 1: SAF Fee Status Card: green when paid, red when unpaid */}
+        {(() => {
+          const isPaid = Boolean(studentSaf?.paid);
+          const tone = isPaid
+            ? { card: 'bg-gradient-to-br from-emerald-50 to-teal-50/60 border-emerald-300', icon: 'text-emerald-700', title: 'text-emerald-950', fee: 'text-emerald-800', box: 'border-emerald-100', note: 'text-emerald-800/80' }
+            : { card: 'bg-gradient-to-br from-rose-50 to-red-50/60 border-rose-300', icon: 'text-rose-700', title: 'text-rose-950', fee: 'text-rose-800', box: 'border-rose-100', note: 'text-rose-800' };
+          return (
+            <div className={`p-5 rounded-2xl border space-y-3 ${tone.card}`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Receipt className={`w-5 h-5 ${tone.icon}`} />
+                  <h4 className={`font-extrabold text-sm ${tone.title}`}>
+                    Student Activity Fund (SAF) Record
+                  </h4>
+                </div>
+                <span className={`font-mono text-xs font-bold ${tone.fee}`}>
+                  Fee: ₱{studentSaf?.amount.toFixed(2) || '500.00'}
+                </span>
+              </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-            <div className="bg-white p-3 rounded-xl border border-emerald-100 space-y-0.5">
-              <span className="text-[10px] text-slate-400 uppercase font-bold">Payment Status</span>
-              <p className="font-extrabold text-slate-900 flex items-center gap-1.5">
-                {studentSaf?.paid ? (
-                  <>
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                    <span className="text-emerald-700">PAID & SETTLED</span>
-                  </>
-                ) : (
-                  <>
-                    <Clock className="w-3.5 h-3.5 text-amber-600" />
-                    <span className="text-amber-700">UNPAID (Pending)</span>
-                  </>
-                )}
-              </p>
-            </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                <div className={`bg-white p-3 rounded-xl border space-y-0.5 ${tone.box}`}>
+                  <span className="text-[10px] text-slate-400 uppercase font-bold">Payment Status</span>
+                  <p className="font-extrabold text-slate-900 flex items-center gap-1.5">
+                    {isPaid ? (
+                      <>
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                        <span className="text-emerald-700">PAID & SETTLED</span>
+                      </>
+                    ) : (
+                      <>
+                        <Clock className="w-3.5 h-3.5 text-rose-600" />
+                        <span className="text-rose-700">UNPAID (Pending)</span>
+                      </>
+                    )}
+                  </p>
+                </div>
 
-            <div className="bg-white p-3 rounded-xl border border-emerald-100 space-y-0.5">
-              <span className="text-[10px] text-slate-400 uppercase font-bold">Receipt / Voucher #</span>
-              <p className="font-mono font-bold text-slate-800">
-                {studentSaf?.receipt_no || 'N/A (Awaiting Payment)'}
-              </p>
-            </div>
+                <div className={`bg-white p-3 rounded-xl border space-y-0.5 ${tone.box}`}>
+                  <span className="text-[10px] text-slate-400 uppercase font-bold">Receipt / Voucher #</span>
+                  <p className="font-mono font-bold text-slate-800">
+                    {studentSaf?.receipt_no || 'N/A (Awaiting Payment)'}
+                  </p>
+                </div>
 
-            <div className="bg-white p-3 rounded-xl border border-emerald-100 space-y-0.5">
-              <span className="text-[10px] text-slate-400 uppercase font-bold">Double-Entry Vault Ref</span>
-              <p className="font-mono text-[11px] font-semibold text-slate-600">
-                {studentSaf?.double_entry.reference_no || 'DE-SAF-2024'}
-              </p>
+                <div className={`bg-white p-3 rounded-xl border space-y-0.5 ${tone.box}`}>
+                  <span className="text-[10px] text-slate-400 uppercase font-bold">Double-Entry Vault Ref</span>
+                  <p className="font-mono text-[11px] font-semibold text-slate-600">
+                    {studentSaf?.double_entry.reference_no || 'DE-SAF-2024'}
+                  </p>
+                </div>
+              </div>
+              {!isPaid && (
+                <p className={`text-[11px] font-semibold ${tone.note}`}>Please settle your SAF fee at the SSC Treasury Office to update this status.</p>
+              )}
             </div>
-          </div>
-          {!studentSaf?.paid && (
-            <p className="text-[11px] text-emerald-800/80">Please settle your SAF fee at the SSC Treasury Office to update this status.</p>
-          )}
-        </div>
+          );
+        })()}
 
         {/* Section 1b: My Receipts (auto-generated PDF on each SAF Cash-In) */}
         {myReceipts.length > 0 && (
