@@ -1,0 +1,23 @@
+# Render Blueprint for the NCF Predict website (static Vite/React build).
+# Render Dashboard > New > Blueprint > pick this repo. Fill in the three
+# values below when Render asks (they are NOT stored in git).
+services:
+  - type: web
+    name: ncf-predict
+    runtime: static
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    # Single-page app: every path serves index.html.
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      # Supabase > Project Settings > API (the anon/publishable key, never service_role)
+      - key: VITE_SUPABASE_URL
+        sync: false
+      - key: VITE_SUPABASE_ANON_KEY
+        sync: false
+      # The https URL of the deployed prediction API (TRAIN_MODEL), e.g. https://ncf-predict-api.onrender.com
+      - key: VITE_PREDICT_API_URL
+        sync: false
