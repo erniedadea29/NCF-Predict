@@ -34,7 +34,7 @@ import {
 import { PrintableProposalModal } from './PrintableProposalModal';
 import { BudgetPredictionPanel } from './BudgetPredictionPanel';
 import { canPrepareLiquidation } from '../utils/liquidation';
-import { canEditBudgetRequest } from '../utils/budgetRequest';
+import { canEditBudgetRequest, isAuditor } from '../utils/budgetRequest';
 import { formatDateTime } from '../utils/roleLabels';
 
 interface BudgetProposalWorkflowProps {
@@ -72,7 +72,8 @@ export const BudgetProposalWorkflow: React.FC<BudgetProposalWorkflowProps> = ({
   // (Section 1/3a) purely to review/act on a proposal at their stage — they
   // never draft proposals or touch the post-approval financial flow, so
   // those officer-only actions stay hidden for them same as for students.
-  const hideOfficerActions = isReadOnlyStudent || isViewOnlyReviewer;
+  // The Auditor can only audit and view proposals, never draft or spend.
+  const hideOfficerActions = isReadOnlyStudent || isViewOnlyReviewer || isAuditor(currentUser);
 
   // Students only ever see fully-approved-and-released budgets (Section 3)
   // — never drafts or ones still mid-review.

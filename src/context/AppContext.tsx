@@ -45,6 +45,7 @@ import { isSupabaseLiveConfigured, getSupabase, getIsolatedSupabase } from '../l
 import { jsPDF } from 'jspdf';
 import { getPredictionApiHealth, predictBudgetRequest, predictionApiConfigProblem, PREDICT_API_URL } from '../lib/predictionApi';
 import { roleLabel } from '../utils/roleLabels';
+import { isAuditor } from '../utils/budgetRequest';
 
 /**
  * TEMPORARY switch (requested): when true, the Super Admin can permanently
@@ -2832,6 +2833,10 @@ ${error?.message || 'The database did not save it.'}`);
 
   const createProposal = async (proposalData: Omit<BudgetProposal, 'id' | 'created_at' | 'updated_at' | 'votes' | 'notes' | 'cashouts' | 'expenses' | 'reimbursements'>): Promise<string> => {
     const client = getSupabase();
+    if (isAuditor(currentUser)) {
+      alert('The Auditor can only audit and view budget proposals, not create them.');
+      return '';
+    }
 
     const { data: row, error } = await client.from('budget_requests').insert({
       title: proposalData.budget_title,

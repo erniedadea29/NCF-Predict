@@ -1,5 +1,6 @@
 import React from 'react';
 import { useApp } from '../context/AppContext';
+import { isAuditor } from '../utils/budgetRequest';
 import { 
   TrendingUp, 
   Wallet, 
@@ -242,7 +243,7 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
           (Section 1: Advisers & Deans can only approve/reject, never
           initiate). */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {!isViewOnlyReviewer && (
+        {!isViewOnlyReviewer && !isAuditor(currentUser) && (
           <button
             onClick={onOpenCreateProposal}
             className="p-3.5 bg-white hover:bg-emerald-50/50 border border-slate-200 rounded-xl flex flex-col items-start text-left transition shadow-2xs group cursor-pointer"
@@ -399,7 +400,7 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
           <div className="text-center py-8 bg-slate-50 rounded-xl border border-dashed border-slate-200 space-y-2">
             <FileText className="w-8 h-8 text-slate-400 mx-auto" />
             <p className="text-xs text-slate-500">No active budget proposals drafted yet for {userDepartment}.</p>
-            {!isViewOnlyReviewer && (
+            {!isViewOnlyReviewer && !isAuditor(currentUser) && (
               <button
                 onClick={onOpenCreateProposal}
                 className="text-xs font-bold text-emerald-700 hover:underline cursor-pointer"

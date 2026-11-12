@@ -1,4 +1,13 @@
 import type { BudgetProposal, User } from '../types';
+import { OFFICER_POSITION_LABELS } from '../types';
+
+/**
+ * The Auditor only audits and views budget proposals: no drafting new
+ * requests and no post-approval fund actions.
+ */
+export function isAuditor(user: Pick<User, 'officer_position'>): boolean {
+  return (user.officer_position || '').trim().toLowerCase() === OFFICER_POSITION_LABELS.auditor.toLowerCase();
+}
 
 /** Statuses in which the request's creator may still change a budget request. */
 export const EDITABLE_REQUEST_STATUSES = ['DRAFT', 'FOR_REVISION', 'REJECTED'] as const;
