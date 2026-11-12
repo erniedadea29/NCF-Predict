@@ -2961,7 +2961,13 @@ ${error?.message || 'The database did not save it.'}`);
 
   const submitProposalForReview = async (id: string): Promise<boolean> => {
     const client = getSupabase();
-    const target = 'CSC_ADVISER_APPROVAL';
+    // Goes back to whoever sent it back: if the Adviser already approved and
+    // the Dean asked for revision / rejected it, it returns straight to the
+    // Dean. Mirrors submit_budget_request() in the database.
+    const prop = proposals.find(p => p.id === id);
+    const deanSentBack = prop?.adviser_approval?.decision === 'APPROVED'
+      && ['REVISION', 'REJECTED'].includes(String(prop?.dean_approval?.decision || ''));
+    const target = deanSentBack ? 'DEAN_APPROVAL' : 'CSC_ADVISER_APPROVAL';
     let saved: { status: string; updated_at?: string } | null = null;
     let failure: string | null = null;
 
@@ -2984,7 +2990,7 @@ ${error?.message || 'The database did not save it.'}`);
       failure = rpc.error.message;
     }
 
-    if (failure || !saved || saved.status !== target) {
+    if (failure || !saved || !['CSC_ADVISER_APPROVAL', 'DEAN_APPROVAL'].includes(saved.status)) {
       console.error('Failed to submit proposal', failure, saved);
       alert(`Budget request was NOT submitted.\n\n${failure || 'The database did not save the new status.'}`);
       return false;
@@ -2992,7 +2998,7 @@ ${error?.message || 'The database did not save it.'}`);
 
     setProposals(prev => prev.map(p => p.id === id ? {
       ...p,
-      budget_status: target,
+      budget_status: saved!.status as BudgetProposal['budget_status'],
       updated_at: saved!.updated_at || new Date().toISOString().slice(0, 10)
     } : p));
     // Refresh the trained model's estimate so the Adviser reviews an up-to-date prediction.

@@ -472,7 +472,11 @@ export const BudgetProposalWorkflow: React.FC<BudgetProposalWorkflowProps> = ({
                       </div>
                     )}
                     <p className="text-xs text-slate-700">
-                      Submitting sends the request straight to your CSC Adviser, who forwards it to the Dean for final approval.
+                      {(activeProposal.budget_status === 'FOR_REVISION' || activeProposal.budget_status === 'REJECTED')
+                        && activeProposal.adviser_approval?.decision === 'APPROVED'
+                        && (activeProposal.dean_approval?.decision === 'REVISION' || activeProposal.dean_approval?.decision === 'REJECTED')
+                        ? 'The Adviser already approved this request, so resubmitting sends it straight back to the Dean.'
+                        : 'Submitting sends the request straight to your CSC Adviser, who forwards it to the Dean for final approval.'}
                     </p>
                     <div className="flex flex-wrap items-center gap-2">
                       <button
