@@ -43,7 +43,7 @@ import {
 } from '../data/mockData';
 import { isSupabaseLiveConfigured, getSupabase, getIsolatedSupabase } from '../lib/supabaseClient';
 import { jsPDF } from 'jspdf';
-import { getPredictionApiHealth, predictBudgetRequest, PREDICT_API_URL } from '../lib/predictionApi';
+import { getPredictionApiHealth, predictBudgetRequest, predictionApiConfigProblem, PREDICT_API_URL } from '../lib/predictionApi';
 import { roleLabel } from '../utils/roleLabels';
 
 // Shown before a real Supabase session is restored / while logged out.
@@ -1425,12 +1425,17 @@ ${error.message}`); return; }
       await fetchPredictions();
       return { success: true, message: `Predicted total: ₱${res.predicted_total.toLocaleString('en-US', { minimumFractionDigits: 2 })}` };
     } catch (e) {
-      const offline = e instanceof TypeError || (e instanceof DOMException && e.name === 'AbortError');
+      const configProblem = predictionApiConfigProblem();
+      const offline = Boolean(configProblem) || e instanceof TypeError || (e instanceof DOMException && e.name === 'AbortError');
       if (offline) setPredictionApiOnline(false);
       return {
         success: false,
-        message: offline
-          ? `The prediction API isn't reachable at ${PREDICT_API_URL}. Start it with: python -m uvicorn api:app (in TRAIN_MODEL).`
+        message: configProblem
+          ? configProblem
+          : offline
+          ? (import.meta.env.DEV
+              ? `The prediction API isn't reachable at ${PREDICT_API_URL}. Start it with: python -m uvicorn api:app (in TRAIN_MODEL).`
+              : `The prediction API at ${PREDICT_API_URL} isn't responding. If it was idle it may still be waking up: try again in a minute. Otherwise check that the API service is running on the hosting service.`)
           : (e as Error).message
       };
     }
