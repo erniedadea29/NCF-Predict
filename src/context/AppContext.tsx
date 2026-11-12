@@ -871,20 +871,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // ============================================================
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
 
+  // Loaded on login and re-pulled by the live-sync subscription whenever a
+  // notification row changes (database triggers create them for every event).
+  const fetchNotifications = async () => {
+    const client = getSupabase();
+    const { data } = await client.from('notifications').select('*').order('created_at', { ascending: false }).limit(50);
+    if (data) {
+      setNotifications(data.map((n: any): NotificationItem => ({
+        id: n.id, title: n.title, body: n.body || undefined, link_tab: n.link_tab || undefined,
+        created_at: n.created_at, read_at: n.read_at || undefined
+      })));
+    }
+  };
+
   useEffect(() => {
     if (!isAuthenticated) return;
-    let cancelled = false;
-    (async () => {
-      const client = getSupabase();
-      const { data } = await client.from('notifications').select('*').order('created_at', { ascending: false }).limit(50);
-      if (!cancelled && data) {
-        setNotifications(data.map((n: any): NotificationItem => ({
-          id: n.id, title: n.title, body: n.body || undefined, link_tab: n.link_tab || undefined,
-          created_at: n.created_at, read_at: n.read_at || undefined
-        })));
-      }
-    })();
-    return () => { cancelled = true; };
+    fetchNotifications();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated]);
 
   const markNotificationRead = async (id: string) => {
@@ -2548,12 +2551,12 @@ ${error?.message || 'The database did not save it.'}`);
   };
 
   const refetchAllLive = async () => {
-    await Promise.all([refetchTransactions(), refreshDepartmentFinancials(), refetchSafRecords(), fetchProposals(), fetchPredictions()]);
+    await Promise.all([refetchTransactions(), refreshDepartmentFinancials(), refetchSafRecords(), fetchProposals(), fetchPredictions(), fetchNotifications()]);
   };
 
   // Always-current handlers so the long-lived subscription never uses stale closures.
-  const liveHandlersRef = useRef({ refetchTransactions, refetchSafRecords, refreshDepartmentFinancials, fetchProposals, fetchPredictions, refetchAllLive, mapTransactionRow });
-  liveHandlersRef.current = { refetchTransactions, refetchSafRecords, refreshDepartmentFinancials, fetchProposals, fetchPredictions, refetchAllLive, mapTransactionRow };
+  const liveHandlersRef = useRef({ refetchTransactions, refetchSafRecords, refreshDepartmentFinancials, fetchProposals, fetchPredictions, fetchNotifications, refetchAllLive, mapTransactionRow });
+  liveHandlersRef.current = { refetchTransactions, refetchSafRecords, refreshDepartmentFinancials, fetchProposals, fetchPredictions, fetchNotifications, refetchAllLive, mapTransactionRow };
 
   useEffect(() => {
     if (!isAuthenticated || !isSupabaseLiveConfigured()) return;
@@ -2582,6 +2585,10 @@ ${error?.message || 'The database did not save it.'}`);
           });
         }
         debounced('proposals', () => h().fetchProposals(), 800);
+      })
+      // New notifications (created by database triggers) light up the bell live.
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, () => {
+        debounced('notifications', () => h().fetchNotifications(), 300);
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'budgets' }, () => {
         debounced('fin', () => h().refreshDepartmentFinancials());
