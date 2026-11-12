@@ -9,6 +9,17 @@ export function isAuditor(user: Pick<User, 'officer_position'>): boolean {
   return (user.officer_position || '').trim().toLowerCase() === OFFICER_POSITION_LABELS.auditor.toLowerCase();
 }
 
+/**
+ * True when the Adviser already approved and the Dean sent the request back
+ * (revision / rejected): resubmitting it goes straight back to the Dean.
+ * Mirrors submit_budget_request() in the database.
+ */
+export function returnsToDean(proposal: BudgetProposal): boolean {
+  return (proposal.budget_status === 'FOR_REVISION' || proposal.budget_status === 'REJECTED')
+    && proposal.adviser_approval?.decision === 'APPROVED'
+    && (proposal.dean_approval?.decision === 'REVISION' || proposal.dean_approval?.decision === 'REJECTED');
+}
+
 /** Statuses in which the request's creator may still change a budget request. */
 export const EDITABLE_REQUEST_STATUSES = ['DRAFT', 'FOR_REVISION', 'REJECTED'] as const;
 

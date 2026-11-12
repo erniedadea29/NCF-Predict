@@ -34,7 +34,7 @@ import {
 import { PrintableProposalModal } from './PrintableProposalModal';
 import { BudgetPredictionPanel } from './BudgetPredictionPanel';
 import { canPrepareLiquidation } from '../utils/liquidation';
-import { canEditBudgetRequest, isAuditor } from '../utils/budgetRequest';
+import { canEditBudgetRequest, isAuditor, returnsToDean } from '../utils/budgetRequest';
 import { formatDateTime } from '../utils/roleLabels';
 
 interface BudgetProposalWorkflowProps {
@@ -445,6 +445,22 @@ export const BudgetProposalWorkflow: React.FC<BudgetProposalWorkflowProps> = ({
 
               {/* ACTION PANELS BASED ON CURRENT USER ROLE & PROPOSAL STATUS */}
               <div className="pt-2 border-t border-slate-100 space-y-4">
+                {/* Reviewers looking at a request they sent back: approval
+                    reopens once the creator edits and resubmits it. */}
+                {(currentUser.role === 'dean' || currentUser.role === 'csc_adviser')
+                  && (activeProposal.budget_status === 'FOR_REVISION' || activeProposal.budget_status === 'REJECTED') && (
+                  <div className="p-4 rounded-2xl border bg-amber-50 border-amber-200 text-xs text-amber-900 space-y-1">
+                    <p className="font-bold flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 text-amber-600" />
+                      {activeProposal.budget_status === 'REJECTED' ? 'Rejected' : 'Sent back for revision'}: waiting for {activeProposal.created_by_officer || 'the requester'} to edit and resubmit
+                    </p>
+                    <p>
+                      The Approve button appears again once it is resubmitted
+                      {returnsToDean(activeProposal) ? ' (it comes straight back to the Dean).' : ' (it goes to the Adviser first).'}
+                    </p>
+                  </div>
+                )}
+
                 {/* 1. Officer Actions: edit and (re)submit a Draft, a request sent
                     back For Revision, or a Rejected one (only the requesting Treasurer). */}
                 {canEditBudgetRequest(activeProposal, currentUser) && (
@@ -473,9 +489,7 @@ export const BudgetProposalWorkflow: React.FC<BudgetProposalWorkflowProps> = ({
                       </div>
                     )}
                     <p className="text-xs text-slate-700">
-                      {(activeProposal.budget_status === 'FOR_REVISION' || activeProposal.budget_status === 'REJECTED')
-                        && activeProposal.adviser_approval?.decision === 'APPROVED'
-                        && (activeProposal.dean_approval?.decision === 'REVISION' || activeProposal.dean_approval?.decision === 'REJECTED')
+                      {returnsToDean(activeProposal)
                         ? 'The Adviser already approved this request, so resubmitting sends it straight back to the Dean.'
                         : 'Submitting sends the request straight to your CSC Adviser, who forwards it to the Dean for final approval.'}
                     </p>

@@ -2838,45 +2838,86 @@ ${error?.message || 'The database did not save it.'}`);
       return '';
     }
 
-    const { data: row, error } = await client.from('budget_requests').insert({
-      title: proposalData.budget_title,
-      budget_description: proposalData.budget_description,
-      department_code: proposalData.department,
-      event_id: proposalData.event_id || null,
-      requested_by: currentUser.id !== 'guest' ? currentUser.id : null,
-      requested_by_name: proposalData.created_by_officer,
-      treasurer_notes: proposalData.treasurer_notes,
-      fiscal_year: proposalData.school_year,
-      semester_id: activeSemester.semester_id ? Number(activeSemester.semester_id) : null,
-      status: 'DRAFT',
-      total_amount: proposalData.total_budget_amount
-    }).select().single();
-
-    if (error || !row) { console.error('Failed to create proposal', error); return ''; }
-
-    if (proposalData.line_items.length > 0) {
-      await client.from('budget_request_items').insert(
-        proposalData.line_items.map(li => ({
-          request_id: row.id,
-          description: li.item_desc,
-          category: li.category,
-          quantity: li.quantity,
-          unit_cost: li.unit_cost,
-          amount: li.estimated_amount,
-          remarks: li.remarks
-        }))
-      );
-    }
-
     const initialNoteContent = proposalData.treasurer_notes || 'Draft budget proposal created.';
-    if (currentUser.id !== 'guest') {
-      await client.from('proposal_notes').insert({
-        proposal_id: row.id,
-        author_id: currentUser.id,
-        note_content: initialNoteContent,
-        is_official: true
-      });
+    const itemsPayload = proposalData.line_items.map(li => ({
+      description: li.item_desc,
+      category: li.category,
+      quantity: li.quantity,
+      unit_cost: li.unit_cost,
+      remarks: li.remarks
+    }));
+
+    // create_budget_request (SECURITY DEFINER) lets the Governor and Vice
+    // Governor create requests too: a plain INSERT is limited by RLS.
+    let row: any = null;
+    const rpc = await client.rpc('create_budget_request', {
+      p_title: proposalData.budget_title,
+      p_description: proposalData.budget_description,
+      p_department_code: proposalData.department,
+      p_requested_by_name: proposalData.created_by_officer,
+      p_treasurer_notes: proposalData.treasurer_notes || null,
+      p_fiscal_year: proposalData.school_year,
+      p_semester_id: activeSemester.semester_id ? Number(activeSemester.semester_id) : null,
+      p_items: itemsPayload
+    });
+    const rpcMissing = rpc.error && (rpc.error.code === 'PGRST202' || rpc.error.code === '42883');
+
+    if (!rpc.error) {
+      row = Array.isArray(rpc.data) ? rpc.data[0] ?? null : rpc.data;
+    } else if (rpcMissing) {
+      // Function not installed yet: old direct insert (works for the Treasurer).
+      const ins = await client.from('budget_requests').insert({
+        title: proposalData.budget_title,
+        budget_description: proposalData.budget_description,
+        department_code: proposalData.department,
+        event_id: proposalData.event_id || null,
+        requested_by: currentUser.id !== 'guest' ? currentUser.id : null,
+        requested_by_name: proposalData.created_by_officer,
+        treasurer_notes: proposalData.treasurer_notes,
+        fiscal_year: proposalData.school_year,
+        semester_id: activeSemester.semester_id ? Number(activeSemester.semester_id) : null,
+        status: 'DRAFT',
+        total_amount: proposalData.total_budget_amount
+      }).select().single();
+      if (ins.error || !ins.data) {
+        console.error('Failed to create proposal', ins.error);
+        alert(`Budget proposal was NOT saved.
+
+${ins.error?.message || 'The database did not allow it.'}
+
+Fix: run supabase/migrations/20261114_create_budget_request.sql in the Supabase SQL Editor.`);
+        return '';
+      }
+      row = ins.data;
+      if (itemsPayload.length > 0) {
+        await client.from('budget_request_items').insert(
+          proposalData.line_items.map(li => ({
+            request_id: row.id,
+            description: li.item_desc,
+            category: li.category,
+            quantity: li.quantity,
+            unit_cost: li.unit_cost,
+            amount: li.estimated_amount,
+            remarks: li.remarks
+          }))
+        );
+      }
+      if (currentUser.id !== 'guest') {
+        await client.from('proposal_notes').insert({
+          proposal_id: row.id,
+          author_id: currentUser.id,
+          note_content: initialNoteContent,
+          is_official: true
+        });
+      }
+    } else {
+      console.error('Failed to create proposal', rpc.error);
+      alert(`Budget proposal was NOT saved.
+
+${rpc.error.message}`);
+      return '';
     }
+    if (!row) { alert('Budget proposal was NOT saved.'); return ''; }
 
     const newProposal: BudgetProposal = {
       ...proposalData,

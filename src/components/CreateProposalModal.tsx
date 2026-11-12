@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { DepartmentCode, BudgetLineItem, BudgetProposal } from '../types';
 import { DEPARTMENTS } from '../data/mockData';
+import { returnsToDean } from '../utils/budgetRequest';
 import { X, Plus, Trash2, Check, FileText, Calculator, Layers, AlertCircle } from 'lucide-react';
 
 /**
@@ -59,6 +60,7 @@ export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({ isOpen
   const { 
     createProposal,
     updateBudgetRequest,
+    submitProposalForReview,
     activeSemester,
     currentUser,
     userDepartment,
@@ -78,6 +80,8 @@ export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({ isOpen
   const [saving, setSaving] = useState(false);
 
   const isEdit = Boolean(editProposal);
+  // A request sent back (For Revision / Rejected) can be saved and resubmitted in one step.
+  const isReturned = editProposal?.budget_status === 'FOR_REVISION' || editProposal?.budget_status === 'REJECTED';
 
   const resetForm = () => {
     setTitle('');
@@ -91,6 +95,9 @@ export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({ isOpen
   // Edit mode: load the request's current content. Coming back to "new"
   // after an edit starts from a blank form again.
   const wasEditing = useRef(false);
+  // Set by the "Save & Resubmit" button: save the edits, then send the
+  // request back to whoever returned it (Adviser, or the Dean).
+  const resubmitAfterSave = useRef(false);
   useEffect(() => {
     if (!isOpen) return;
     if (editProposal) {
@@ -178,8 +185,13 @@ export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({ isOpen
         treasurerNotes,
         lineItems
       });
+      let submitted = true;
+      if (ok && resubmitAfterSave.current) {
+        submitted = await submitProposalForReview(editProposal.id);
+      }
+      resubmitAfterSave.current = false;
       setSaving(false);
-      if (ok) {
+      if (ok && submitted) {
         resetForm();
         wasEditing.current = false;
         onClose();
@@ -197,7 +209,7 @@ export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({ isOpen
       budget_status: 'DRAFT',
       activesem_id: activeSemester.id,
       school_year: activeSemester.school_year_label,
-      created_by_officer: `${currentUser.name} (${currentUser.officer_position || 'Treasurer'})`,
+      created_by_officer: `${currentUser.name} (${currentUser.officer_position || (currentUser.role === 'officer_governor' ? 'Governor' : 'Treasurer')})`,
       treasurer_notes: treasurerNotes,
       line_items: lineItems
     });
@@ -220,10 +232,10 @@ export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({ isOpen
               <FileText className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="font-extrabold text-base">{isEdit ? 'Edit Budget Request' : 'New Budget Proposal (Treasurer Draft)'}</h3>
+              <h3 className="font-extrabold text-base">{isEdit ? 'Edit Budget Request' : 'New Budget Proposal (Officer Draft)'}</h3>
               <p className="text-xs text-emerald-100">
                 {isEdit
-                  ? `${editProposal!.budget_status === 'REJECTED' ? 'Rejected' : editProposal!.budget_status === 'FOR_REVISION' ? 'Returned for revision' : 'Draft'}: update it, then resubmit for Adviser review`
+                  ? `${editProposal!.budget_status === 'REJECTED' ? 'Rejected' : editProposal!.budget_status === 'FOR_REVISION' ? 'Returned for revision' : 'Draft'}: update it, then resubmit for ${returnsToDean(editProposal!) ? 'Dean' : 'Adviser'} review`
                   : 'Step 1: Define Requirements, Evaluate Pricing, Structure Proposal'}
               </p>
             </div>
@@ -445,13 +457,26 @@ export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({ isOpen
             >
               Cancel
             </button>
+            {isReturned && (
+              <button
+                type="submit"
+                disabled={saving}
+                onClick={() => { resubmitAfterSave.current = false; }}
+                className="px-4 py-2.5 rounded-xl border border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-50 transition cursor-pointer"
+              >
+                Save Only
+              </button>
+            )}
             <button
               type="submit"
               disabled={saving}
+              onClick={() => { resubmitAfterSave.current = isReturned; }}
               className="px-6 py-2.5 rounded-xl bg-[#00873E] hover:bg-[#007033] disabled:bg-slate-300 text-white text-xs font-bold shadow-md transition transform active:scale-98 cursor-pointer flex items-center gap-2"
             >
               <Check className="w-4 h-4" />
-              <span>{isEdit ? (saving ? 'Saving...' : 'Save Changes') : 'Save & Save as Draft'}</span>
+              <span>{isEdit
+                ? (saving ? 'Saving...' : isReturned ? `Save & Resubmit to ${returnsToDean(editProposal!) ? 'Dean' : 'Adviser'}` : 'Save Changes')
+                : 'Save & Save as Draft'}</span>
             </button>
           </div>
         </form>
