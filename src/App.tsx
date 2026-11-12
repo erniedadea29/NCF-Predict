@@ -26,11 +26,13 @@ import { Clock } from 'lucide-react';
 const STAFF_ROLES = ['csc_adviser', 'dean', 'admin', 'super_admin'];
 
 function MainAppContent() {
-  const { currentTab, setCurrentTab, isReadOnlyStudent, isAdminSystemOnly, isViewOnlyReviewer, isEmployeeAwaitingAssignment, currentUser } = useApp();
+  const { currentTab, setCurrentTab, isReadOnlyStudent, isAdminSystemOnly, isViewOnlyReviewer, isEmployeeAwaitingAssignment, currentUser, proposals } = useApp();
 
   // Modals state
   const [isAddTxOpen, setIsAddTxOpen] = useState(false);
   const [isCreateProposalOpen, setIsCreateProposalOpen] = useState(false);
+  // Budget request being edited in the proposal form (Draft / For Revision / Rejected).
+  const [editProposalId, setEditProposalId] = useState<string | null>(null);
   const [activeProposalIdForFinance, setActiveProposalIdForFinance] = useState<string | null>(null);
   const [activeProposalIdForLiquidation, setActiveProposalIdForLiquidation] = useState<string | null>(null);
 
@@ -101,6 +103,7 @@ function MainAppContent() {
             onOpenCreateProposal={() => setIsCreateProposalOpen(true)}
             onOpenBudgetRequestModal={(id) => setActiveProposalIdForFinance(id)}
             onOpenLiquidationModal={(id) => setActiveProposalIdForLiquidation(id)}
+            onOpenEditProposal={(id) => { setEditProposalId(id); setIsCreateProposalOpen(true); }}
           />
         )}
 
@@ -169,7 +172,8 @@ function MainAppContent() {
 
           <CreateProposalModal
             isOpen={isCreateProposalOpen}
-            onClose={() => setIsCreateProposalOpen(false)}
+            onClose={() => { setIsCreateProposalOpen(false); setEditProposalId(null); }}
+            editProposal={editProposalId ? proposals.find(p => p.id === editProposalId) || null : null}
           />
 
           <BudgetRequestExpensesModal

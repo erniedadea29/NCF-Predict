@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { DepartmentCode, BudgetLineItem } from '../types';
+import { DepartmentCode, BudgetLineItem, BudgetProposal } from '../types';
 import { DEPARTMENTS } from '../data/mockData';
 import { X, Plus, Trash2, Check, FileText, Calculator, Layers, AlertCircle } from 'lucide-react';
 
@@ -40,6 +40,8 @@ const ClearOnFocusNumberInput: React.FC<
 interface CreateProposalModalProps {
   isOpen: boolean;
   onClose: () => void;
+  /** When set, the form edits this request (Draft / For Revision / Rejected) instead of creating one. */
+  editProposal?: BudgetProposal | null;
 }
 
 // A new, empty line item: the Treasurer fills in every value (nothing pre-filled).
@@ -53,9 +55,10 @@ const blankLineItem = (): BudgetLineItem => ({
   remarks: ''
 });
 
-export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({ isOpen, onClose }) => {
+export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({ isOpen, onClose, editProposal }) => {
   const { 
     createProposal,
+    updateBudgetRequest,
     activeSemester,
     currentUser,
     userDepartment,
@@ -72,6 +75,37 @@ export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({ isOpen
   // Line items for requirements & price evaluation: starts with ONE blank
   // item; the Treasurer adds more with "+ Add Item".
   const [lineItems, setLineItems] = useState<BudgetLineItem[]>(() => [blankLineItem()]);
+  const [saving, setSaving] = useState(false);
+
+  const isEdit = Boolean(editProposal);
+
+  const resetForm = () => {
+    setTitle('');
+    setDescription('');
+    setLinkedSemester('');
+    setDepartment(userDepartment);
+    setTreasurerNotes('Verified unit costs against campus supplier price quotations.');
+    setLineItems([blankLineItem()]);
+  };
+
+  // Edit mode: load the request's current content. Coming back to "new"
+  // after an edit starts from a blank form again.
+  const wasEditing = useRef(false);
+  useEffect(() => {
+    if (!isOpen) return;
+    if (editProposal) {
+      setTitle(editProposal.budget_title);
+      setDescription(editProposal.budget_description === 'No additional description provided.' ? '' : editProposal.budget_description);
+      setDepartment(editProposal.department);
+      setTreasurerNotes(editProposal.treasurer_notes || '');
+      setLineItems(editProposal.line_items.length ? editProposal.line_items.map(li => ({ ...li })) : [blankLineItem()]);
+      wasEditing.current = true;
+    } else if (wasEditing.current) {
+      resetForm();
+      wasEditing.current = false;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, editProposal?.id]);
 
   if (!isOpen) return null;
 
@@ -136,6 +170,23 @@ export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({ isOpen
       return;
     }
 
+    if (editProposal) {
+      setSaving(true);
+      const ok = await updateBudgetRequest(editProposal.id, {
+        title: title.trim(),
+        description: description.trim() || 'No additional description provided.',
+        treasurerNotes,
+        lineItems
+      });
+      setSaving(false);
+      if (ok) {
+        resetForm();
+        wasEditing.current = false;
+        onClose();
+      }
+      return;
+    }
+
     await createProposal({
       budget_title: title.trim(),
       budget_description: description.trim() || 'No additional description provided.',
@@ -169,8 +220,12 @@ export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({ isOpen
               <FileText className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="font-extrabold text-base">New Budget Proposal (Treasurer Draft)</h3>
-              <p className="text-xs text-emerald-100">Step 1: Define Requirements, Evaluate Pricing, Structure Proposal</p>
+              <h3 className="font-extrabold text-base">{isEdit ? 'Edit Budget Request' : 'New Budget Proposal (Treasurer Draft)'}</h3>
+              <p className="text-xs text-emerald-100">
+                {isEdit
+                  ? `${editProposal!.budget_status === 'REJECTED' ? 'Rejected' : editProposal!.budget_status === 'FOR_REVISION' ? 'Returned for revision' : 'Draft'}: update it, then resubmit for Adviser review`
+                  : 'Step 1: Define Requirements, Evaluate Pricing, Structure Proposal'}
+              </p>
             </div>
           </div>
           <button
@@ -203,9 +258,9 @@ export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({ isOpen
               <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
                 Department / College
               </label>
-              {isDepartmentRestricted ? (
+              {isDepartmentRestricted || isEdit ? (
                 <div className="w-full px-3.5 py-2.5 bg-blue-50 border border-blue-200 text-blue-900 rounded-xl font-bold text-xs flex items-center justify-between">
-                  <span>{userDepartment} - {scopedDepartmentInfo.name}</span>
+                  <span>{isEdit ? `${department} - ${DEPARTMENTS[department]?.name || ''}` : `${userDepartment} - ${scopedDepartmentInfo.name}`}</span>
                   <span className="text-[10px] bg-blue-200 text-blue-950 px-1.5 py-0.5 rounded font-black">LOCKED</span>
                 </div>
               ) : (
@@ -223,7 +278,7 @@ export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({ isOpen
               )}
             </div>
 
-            <div className="space-y-1.5">
+            {!isEdit && <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
                 Link Semester (Optional)
               </label>
@@ -236,7 +291,7 @@ export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({ isOpen
                 <option value="1st Semester">1st Semester</option>
                 <option value="2nd Semester">2nd Semester</option>
               </select>
-            </div>
+            </div>}
 
             <div className="space-y-1.5 sm:col-span-2">
               <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
@@ -371,7 +426,7 @@ export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({ isOpen
           <div className="space-y-1.5 pt-2 border-t border-slate-100">
             <label className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
               <span className="px-2 py-0.5 bg-amber-100 text-amber-900 rounded text-[10px]">NOTES</span>
-              Initial Officer Notes
+              {isEdit ? 'Officer Notes' : 'Initial Officer Notes'}
             </label>
             <textarea
               rows={2}
@@ -392,10 +447,11 @@ export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({ isOpen
             </button>
             <button
               type="submit"
-              className="px-6 py-2.5 rounded-xl bg-[#00873E] hover:bg-[#007033] text-white text-xs font-bold shadow-md transition transform active:scale-98 cursor-pointer flex items-center gap-2"
+              disabled={saving}
+              className="px-6 py-2.5 rounded-xl bg-[#00873E] hover:bg-[#007033] disabled:bg-slate-300 text-white text-xs font-bold shadow-md transition transform active:scale-98 cursor-pointer flex items-center gap-2"
             >
               <Check className="w-4 h-4" />
-              <span>Save & Save as Draft</span>
+              <span>{isEdit ? (saving ? 'Saving...' : 'Save Changes') : 'Save & Save as Draft'}</span>
             </button>
           </div>
         </form>

@@ -34,18 +34,21 @@ import {
 import { PrintableProposalModal } from './PrintableProposalModal';
 import { BudgetPredictionPanel } from './BudgetPredictionPanel';
 import { canPrepareLiquidation } from '../utils/liquidation';
+import { canEditBudgetRequest } from '../utils/budgetRequest';
 import { formatDateTime } from '../utils/roleLabels';
 
 interface BudgetProposalWorkflowProps {
   onOpenCreateProposal: () => void;
   onOpenBudgetRequestModal: (proposalId: string) => void;
   onOpenLiquidationModal: (proposalId: string) => void;
+  onOpenEditProposal: (proposalId: string) => void;
 }
 
 export const BudgetProposalWorkflow: React.FC<BudgetProposalWorkflowProps> = ({ 
   onOpenCreateProposal,
   onOpenBudgetRequestModal,
-  onOpenLiquidationModal
+  onOpenLiquidationModal,
+  onOpenEditProposal
 }) => {
   const { 
     proposals, 
@@ -441,32 +444,50 @@ export const BudgetProposalWorkflow: React.FC<BudgetProposalWorkflowProps> = ({
 
               {/* ACTION PANELS BASED ON CURRENT USER ROLE & PROPOSAL STATUS */}
               <div className="pt-2 border-t border-slate-100 space-y-4">
-                {/* 1. Officer Actions (Submit Draft, or resubmit after revision) */}
-                {currentUser.role === 'officer_treasurer' && (activeProposal.budget_status === 'DRAFT' || activeProposal.budget_status === 'FOR_REVISION') && (
-                  <div className="p-4 bg-amber-50 rounded-2xl border border-amber-200 space-y-3">
-                    <div className="flex items-center gap-2 text-amber-900 font-bold text-xs">
-                      <AlertCircle className="w-4 h-4 text-amber-600" />
-                      <span>{activeProposal.budget_status === 'FOR_REVISION' ? 'Sent back for revision — edit and resubmit' : 'Draft ready — submit for Adviser review?'}</span>
+                {/* 1. Officer Actions: edit and (re)submit a Draft, a request sent
+                    back For Revision, or a Rejected one (only the requesting Treasurer). */}
+                {canEditBudgetRequest(activeProposal, currentUser) && (
+                  <div className={`p-4 rounded-2xl border space-y-3 ${
+                    activeProposal.budget_status === 'REJECTED' ? 'bg-rose-50 border-rose-200' : 'bg-amber-50 border-amber-200'
+                  }`}>
+                    <div className={`flex items-center gap-2 font-bold text-xs ${activeProposal.budget_status === 'REJECTED' ? 'text-rose-900' : 'text-amber-900'}`}>
+                      <AlertCircle className={`w-4 h-4 ${activeProposal.budget_status === 'REJECTED' ? 'text-rose-600' : 'text-amber-600'}`} />
+                      <span>
+                        {activeProposal.budget_status === 'REJECTED'
+                          ? 'Rejected: you can edit this request and resubmit it'
+                          : activeProposal.budget_status === 'FOR_REVISION'
+                          ? 'Sent back for revision: edit and resubmit'
+                          : 'Draft ready: edit if needed, then submit for Adviser review'}
+                      </span>
                     </div>
-                    {activeProposal.budget_status === 'FOR_REVISION' && (activeProposal.adviser_approval?.remarks || activeProposal.dean_approval?.remarks) && (
+                    {(activeProposal.budget_status === 'FOR_REVISION' || activeProposal.budget_status === 'REJECTED') &&
+                      (activeProposal.adviser_approval?.remarks || activeProposal.dean_approval?.remarks) && (
                       <div className="p-3 bg-white rounded-xl border border-amber-300 text-xs text-amber-900 space-y-1">
-                        {activeProposal.dean_approval?.decision === 'REVISION' && activeProposal.dean_approval.remarks && (
+                        {(activeProposal.dean_approval?.decision === 'REVISION' || activeProposal.dean_approval?.decision === 'REJECTED') && activeProposal.dean_approval.remarks && (
                           <p><strong>Dean:</strong> {activeProposal.dean_approval.remarks}</p>
                         )}
-                        {activeProposal.adviser_approval?.decision === 'REVISION' && activeProposal.adviser_approval.remarks && (
+                        {(activeProposal.adviser_approval?.decision === 'REVISION' || activeProposal.adviser_approval?.decision === 'REJECTED') && activeProposal.adviser_approval.remarks && (
                           <p><strong>Adviser:</strong> {activeProposal.adviser_approval.remarks}</p>
                         )}
                       </div>
                     )}
-                    <p className="text-xs text-amber-800">
-                      This sends the request straight to your CSC Adviser, who forwards it to the Dean for final approval.
+                    <p className="text-xs text-slate-700">
+                      Submitting sends the request straight to your CSC Adviser, who forwards it to the Dean for final approval.
                     </p>
-                    <button
-                      onClick={() => submitProposalForReview(activeProposal.id)}
-                      className="px-4 py-2 bg-[#00873E] hover:bg-[#007033] text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer"
-                    >
-                      {activeProposal.budget_status === 'FOR_REVISION' ? 'Resubmit Request →' : 'Submit Request →'}
-                    </button>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        onClick={() => onOpenEditProposal(activeProposal.id)}
+                        className="px-4 py-2 bg-white hover:bg-slate-50 text-slate-800 text-xs font-bold rounded-xl border border-slate-300 shadow-xs transition cursor-pointer"
+                      >
+                        ✎ Edit Request
+                      </button>
+                      <button
+                        onClick={() => submitProposalForReview(activeProposal.id)}
+                        className="px-4 py-2 bg-[#00873E] hover:bg-[#007033] text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer"
+                      >
+                        {activeProposal.budget_status === 'DRAFT' ? 'Submit Request →' : 'Resubmit Request →'}
+                      </button>
+                    </div>
                   </div>
                 )}
 

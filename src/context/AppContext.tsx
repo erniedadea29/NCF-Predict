@@ -251,6 +251,10 @@ interface AppContextType {
   createProposal: (proposal: Omit<BudgetProposal, 'id' | 'created_at' | 'updated_at' | 'votes' | 'notes' | 'cashouts' | 'expenses' | 'reimbursements'>) => Promise<string>;
   updateProposalDraft: (id: string, updates: Partial<BudgetProposal>) => void;
   submitProposalForReview: (id: string) => Promise<boolean>;
+  /** Treasurer edits a Draft / For Revision / Rejected request (title, description, notes, line items). */
+  updateBudgetRequest: (id: string, changes: {
+    title: string; description: string; treasurerNotes: string; lineItems: BudgetLineItem[];
+  }) => Promise<boolean>;
   executiveReviewProposal: (id: string, decision: 'APPROVED_TO_COUNCIL' | 'NEEDS_REVISION' | 'REJECTED', remarks: string) => void;
   voteOnProposal: (proposalId: string, vote: 'IN_FAVOR' | 'AGAINST' | 'ABSTAIN', comment: string) => void;
   addProposalNote: (proposalId: string, noteContent: string, isOfficial?: boolean) => void;
@@ -1299,7 +1303,32 @@ ${error.message}`); return; }
       ({ data, error } = await select('', 'proposal_notes(*)'));
     }
     if (error) { console.error('Failed to fetch proposals', error); return; }
-    if (data) setProposals(data.map(mapProposalRow));
+    if (!data) return;
+    let mapped = data.map(mapProposalRow);
+
+    // Note authors: RLS hides other users' profiles, so the embedded author is
+    // usually empty. get_note_authors (SECURITY DEFINER) returns just the
+    // display name/role for notes the caller may see. The caller's own notes
+    // are labelled from their session even before that function is installed.
+    const authors: Record<string, { name: string; role: string }> = {};
+    const proposalIds = mapped.map(p => p.id);
+    if (proposalIds.length > 0) {
+      const { data: rows, error: authorErr } = await client.rpc('get_note_authors', { p_proposal_ids: proposalIds });
+      if (authorErr) console.warn('Could not load note authors (run supabase/migrations/20261113_note_authors.sql)', authorErr);
+      (rows || []).forEach((r: any) => {
+        if (r.author_name) authors[r.note_id] = { name: r.author_name, role: roleLabel(r.author_role, r.author_position) };
+      });
+    }
+    const me = { name: currentUser.name, role: roleLabel(currentUser.role, currentUser.officer_position) };
+    mapped = mapped.map(p => ({
+      ...p,
+      notes: p.notes.map(n => {
+        if (n.author_name) return n;
+        const found = authors[n.id] || (n.author_id === currentUser.id ? me : null);
+        return found ? { ...n, author_name: found.name, author_role: n.author_role || found.role } : n;
+      })
+    }));
+    setProposals(mapped);
   };
 
   useEffect(() => {
@@ -2858,6 +2887,41 @@ ${error?.message || 'The database did not save it.'}`);
   // silently filtered out by RLS: PostgREST then returns no error, the UI
   // showed "submitted", but the row stayed DRAFT and reverted on refresh.
   // Local state only changes once the database confirms the new status.
+  // Edits go through the update_budget_request RPC (SECURITY DEFINER): RLS
+  // blocks Treasurers from changing requests directly once they've left Draft.
+  // Editing a Rejected request moves it to For Revision so it can be resubmitted.
+  const updateBudgetRequest = async (
+    id: string,
+    changes: { title: string; description: string; treasurerNotes: string; lineItems: BudgetLineItem[] }
+  ): Promise<boolean> => {
+    const client = getSupabase();
+    const { error } = await client.rpc('update_budget_request', {
+      p_proposal_id: id,
+      p_title: changes.title,
+      p_description: changes.description,
+      p_treasurer_notes: changes.treasurerNotes,
+      p_items: changes.lineItems.map(li => ({
+        description: li.item_desc,
+        category: li.category,
+        quantity: li.quantity,
+        unit_cost: li.unit_cost,
+        remarks: li.remarks
+      }))
+    });
+    if (error) {
+      console.error('Failed to update budget request', error);
+      const missing = error.code === 'PGRST202' || error.code === '42883';
+      alert(`Budget request was NOT saved.\n\n${missing
+        ? 'Fix: run supabase/migrations/20261113_edit_budget_request.sql in the Supabase SQL Editor.'
+        : error.message}`);
+      return false;
+    }
+    await fetchProposals();
+    // The items changed, so refresh the trained model's estimate.
+    runBudgetPrediction(id);
+    return true;
+  };
+
   const submitProposalForReview = async (id: string): Promise<boolean> => {
     const client = getSupabase();
     const target = 'CSC_ADVISER_APPROVAL';
@@ -3454,6 +3518,7 @@ ${error?.message || 'The database did not save the report.'}`);
         createProposal,
         updateProposalDraft,
         submitProposalForReview,
+        updateBudgetRequest,
         executiveReviewProposal,
         voteOnProposal,
         addProposalNote,
