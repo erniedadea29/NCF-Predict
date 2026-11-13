@@ -1207,6 +1207,20 @@ export const EventsAndPenalties: React.FC = () => {
                         >
                           Excused
                         </button>
+                        <button
+                          onClick={async () => {
+                            if (existingAtt?.status === 'Absent' && existingAtt.penalty_paid) {
+                              alert('This absence penalty is already paid, so the mark cannot be cleared.');
+                              return;
+                            }
+                            await clearAttendance(selectedEventForAttendance.id, [stud.id]);
+                          }}
+                          disabled={!existingAtt}
+                          title={existingAtt ? 'Clear this mark (back to not yet marked)' : 'Not marked yet'}
+                          className="px-2.5 py-1.5 rounded-xl font-bold transition cursor-pointer bg-slate-100 hover:bg-slate-200 text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          ✕ Clear
+                        </button>
                       </div>
                     </div>
                   );
