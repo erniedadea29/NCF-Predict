@@ -78,8 +78,21 @@ export const SafCollectionAndStudents: React.FC<SafCollectionAndStudentsProps> =
 
   const totalSafPaid = baseSaf.filter(s => s.paid).reduce((sum, s) => sum + s.amount, 0);
   const totalSafExpected = baseSaf.reduce((sum, s) => sum + s.amount, 0);
-  const collectionPercentage = totalSafExpected > 0 ? Math.round((totalSafPaid / totalSafExpected) * 100) : 0;
   const displayStudents = isDepartmentRestricted ? scopedStudents : students;
+
+  // Count STUDENTS (not SAF records): enrolled = the department's students,
+  // paid = those with a paid SAF record, pending = the rest.
+  const paidStudentNumbers = new Set(baseSaf.filter(r => r.paid).map(r => r.student_number));
+  const enrolledCount = displayStudents.length;
+  const paidSafCount = displayStudents.filter(st => paidStudentNumbers.has(st.student_number)).length;
+  const unpaidSafCount = enrolledCount - paidSafCount;
+  // Expected total if every enrolled student pays: billed SAF records, plus the
+  // usual SAF fee for enrolled students who have no SAF record yet.
+  const typicalSafFee = baseSaf.length > 0 ? Math.max(...baseSaf.map(r => r.amount)) : 0;
+  const studentsWithRecord = new Set(baseSaf.map(r => r.student_number));
+  const totalSafIfAllPaid = totalSafExpected
+    + displayStudents.filter(st => !studentsWithRecord.has(st.student_number)).length * typicalSafFee;
+  const collectionPercentage = totalSafIfAllPaid > 0 ? Math.round((totalSafPaid / totalSafIfAllPaid) * 100) : 0;
 
   const handleProcessPayment = (e: React.FormEvent) => {
     e.preventDefault();
@@ -203,8 +216,10 @@ export const SafCollectionAndStudents: React.FC<SafCollectionAndStudentsProps> =
         </button>
       </div>
 
-      {/* SAF Double Entry Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+      {/* SAF Double Entry Metric Cards — all figures use the same records
+          (the user's department when restricted). Collected and Uncollected
+          sit side by side. */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-2xs space-y-1">
           <span className="text-[11px] font-bold text-slate-400 uppercase">Total SAF Collected</span>
           <p className="text-xl sm:text-2xl font-black text-emerald-700">
@@ -214,29 +229,37 @@ export const SafCollectionAndStudents: React.FC<SafCollectionAndStudentsProps> =
         </div>
 
         <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-2xs space-y-1">
-          <span className="text-[11px] font-bold text-slate-400 uppercase">Collection Rate</span>
-          <p className="text-xl sm:text-2xl font-black text-slate-900">{collectionPercentage}%</p>
-          <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-            <div className="h-full bg-[#00873E]" style={{ width: `${collectionPercentage}%` }} />
-          </div>
+          <span className="text-[11px] font-bold text-slate-400 uppercase">Uncollected Receivables</span>
+          <p className="text-xl sm:text-2xl font-black text-amber-600">
+            ₱{(totalSafIfAllPaid - totalSafPaid).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+          </p>
+          <span className="text-[10px] text-amber-600 font-semibold">
+            {unpaidSafCount} Pending Student{unpaidSafCount === 1 ? '' : 's'}
+          </span>
+        </div>
+
+        <div className="col-span-2 lg:col-span-1 p-4 bg-emerald-50 rounded-2xl border border-emerald-200 shadow-2xs space-y-1">
+          <span className="text-[11px] font-bold text-emerald-800 uppercase">Total Expected (All Paid)</span>
+          <p className="text-xl sm:text-2xl font-black text-slate-900">
+            ₱{totalSafIfAllPaid.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+          </p>
+          <span className="text-[10px] text-emerald-800 block">If all {enrolledCount} enrolled students pay their SAF</span>
         </div>
 
         <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-2xs space-y-1">
           <span className="text-[11px] font-bold text-slate-400 uppercase">Paid Students</span>
           <p className="text-xl sm:text-2xl font-black text-emerald-600">
-            {safRecords.filter(s => s.paid).length} <span className="text-xs font-normal text-slate-500">/ {safRecords.length}</span>
+            {paidSafCount} <span className="text-xs font-normal text-slate-500">/ {enrolledCount} enrolled</span>
           </p>
           <span className="text-[10px] text-emerald-600 font-semibold">Cleared for exam</span>
         </div>
 
         <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-2xs space-y-1">
-          <span className="text-[11px] font-bold text-slate-400 uppercase">Uncollected Receivables</span>
-          <p className="text-xl sm:text-2xl font-black text-amber-600">
-            ₱{(totalSafExpected - totalSafPaid).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-          </p>
-          <span className="text-[10px] text-amber-600 font-semibold">
-            {safRecords.filter(s => !s.paid).length} Pending Students
-          </span>
+          <span className="text-[11px] font-bold text-slate-400 uppercase">Collection Rate</span>
+          <p className="text-xl sm:text-2xl font-black text-slate-900">{collectionPercentage}%</p>
+          <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+            <div className="h-full bg-[#00873E]" style={{ width: `${collectionPercentage}%` }} />
+          </div>
         </div>
       </div>
 
