@@ -29,7 +29,8 @@ interface TransactionsViewProps {
 // Dean/Adviser's Transactions screen ("CCS Transactions") is view-only per
 // spec Section 5 — no approve/reject there. Admin no longer has a
 // Transactions tab in its nav at all, but is left here for completeness.
-const REVIEWER_ROLES = ['admin'];
+// Dean / CSC Adviser approve their department's Pending transactions (Admin has no Transactions tab).
+const REVIEWER_ROLES = ['dean', 'csc_adviser', 'admin', 'super_admin'];
 
 export const TransactionsView: React.FC<TransactionsViewProps> = ({ onOpenAddModal }) => {
   const {

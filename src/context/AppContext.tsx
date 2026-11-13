@@ -2582,8 +2582,25 @@ ${error?.message || 'The database did not save it.'}`);
       reviewed_at: new Date().toISOString()
     };
     if (remarks) updates.notes = remarks;
-    const { error } = await client.from('transactions').update(updates).eq('id', id);
-    if (error) { console.error('Failed to review transaction', error); return; }
+    // review_transaction (SECURITY DEFINER) lets the Dean / CSC Adviser review
+    // their department's Pending transactions; RLS blocks a direct update.
+    const rpc = await client.rpc('review_transaction', { p_transaction_id: id, p_decision: decision, p_remarks: remarks || null });
+    if (rpc.error) {
+      if (rpc.error.code === 'PGRST202' || rpc.error.code === '42883') {
+        const { data, error } = await client.from('transactions').update(updates).eq('id', id).select('id');
+        if (error || !data || data.length === 0) {
+          console.error('Failed to review transaction', error);
+          alert('The transaction was NOT updated. Ask the Super Admin to run supabase/migrations/20261114_review_transaction.sql in Supabase.');
+          return;
+        }
+      } else {
+        console.error('Failed to review transaction', rpc.error);
+        alert(`The transaction was NOT updated.
+
+${rpc.error.message}`);
+        return;
+      }
+    }
 
     setTransactions(prev => prev.map(tx => tx.id === id ? {
       ...tx, status: decision, reviewed_by: currentUser.name, reviewed_at: new Date().toISOString(),
