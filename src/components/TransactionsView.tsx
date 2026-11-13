@@ -33,6 +33,7 @@ const REVIEWER_ROLES = ['admin'];
 
 export const TransactionsView: React.FC<TransactionsViewProps> = ({ onOpenAddModal }) => {
   const {
+    proposals,
     transactions,
     scopedTransactions,
     toggleArchiveTransaction,
@@ -284,6 +285,11 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ onOpenAddMod
                       <span className="text-[10px] text-slate-400 font-mono hidden md:inline">
                         • {tx.reference_code}
                       </span>
+                      {tx.proposal_id && (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 border border-emerald-200 text-emerald-800 truncate max-w-[180px]">
+                          Budget: {proposals.find(p => p.id === tx.proposal_id)?.budget_title || 'Approved budget'}
+                        </span>
+                      )}
                       {tx.status === 'Pending' && (
                         <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 flex items-center gap-1">
                           <Clock className="w-2.5 h-2.5" /> Pending Review

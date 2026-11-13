@@ -2480,6 +2480,7 @@ ${error.message}`); return; }
     status: row.status,
     reference_code: row.reference_code || row.id,
     description: row.notes || undefined,
+    proposal_id: row.proposal_id || undefined,
     created_by: row.created_by || undefined,
     reviewed_by: row.reviewed_by || undefined,
     reviewed_at: row.reviewed_at || undefined
@@ -2509,6 +2510,8 @@ ${error.message}`); return; }
       // status:'Completed' explicitly and bypass this.
       status: tx.status || (['admin', 'csc_adviser', 'dean'].includes(currentUser.role) ? 'Completed' : 'Pending'),
       notes: tx.description,
+      // The approved budget this expense is charged to (shows in its Audit Trail).
+      proposal_id: tx.proposal_id || null,
       created_by: currentUser.id !== 'guest' ? currentUser.id : undefined
     }).select().single();
 
@@ -2522,6 +2525,8 @@ ${error?.message || 'The database did not save it.'}`);
 
     setTransactions(prev => [mapTransactionRow(data), ...prev]);
     await refreshDepartmentFinancials();
+    // Charged to a budget: refresh it so the expense shows under that budget.
+    if (tx.proposal_id) await fetchProposals();
   };
 
   const toggleArchiveTransaction = async (id: string) => {

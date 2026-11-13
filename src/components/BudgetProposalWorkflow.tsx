@@ -33,6 +33,7 @@ import {
 } from 'lucide-react';
 import { PrintableProposalModal } from './PrintableProposalModal';
 import { BudgetPredictionPanel } from './BudgetPredictionPanel';
+import { BudgetAuditTrail } from './BudgetAuditTrail';
 import { canPrepareLiquidation } from '../utils/liquidation';
 import { canEditBudgetRequest, isAuditor, returnsToDean } from '../utils/budgetRequest';
 import { formatDateTime } from '../utils/roleLabels';
@@ -706,6 +707,12 @@ export const BudgetProposalWorkflow: React.FC<BudgetProposalWorkflowProps> = ({
                       </button>
                     </div>
                   </div>
+                )}
+
+                {/* Audit trail: every transaction, reimbursement, liquidation and
+                    return recorded under this approved budget (staff only). */}
+                {!isReadOnlyStudent && activeProposal.budget_status === 'APPROVED_RELEASED' && (
+                  <BudgetAuditTrail proposal={activeProposal} />
                 )}
               </div>
 

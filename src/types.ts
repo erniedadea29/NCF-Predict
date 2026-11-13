@@ -212,6 +212,8 @@ export interface DepartmentTransaction {
   status: 'Completed' | 'Pending' | 'Processing' | 'Rejected';
   reference_code: string;
   description?: string;
+  /** Approved budget (budget_requests.id) this expense is charged to, if any. */
+  proposal_id?: string;
   created_by?: string; // profiles.id of whoever created this row — powers PAST OFFICER/PAST ADVISER archives
   reviewed_by?: string;
   reviewed_at?: string;

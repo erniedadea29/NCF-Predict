@@ -12,6 +12,7 @@ interface AddTransactionModalProps {
 export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ isOpen, onClose }) => {
   const { 
     addTransaction, 
+    proposals,
     activeSemester, 
     userDepartment, 
     isDepartmentRestricted,
@@ -25,9 +26,24 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ isOpen
   const [type, setType] = useState<'EXPENSE' | 'INCOME'>('EXPENSE');
   const [description, setDescription] = useState<string>('');
   const [fiscalYear, setFiscalYear] = useState<string>(activeSemester.school_year_label);
+  // Approved budget an expense is charged to: a budget id, 'NONE' (general
+  // fund, not under any budget), or '' (not chosen yet).
+  const [chargedTo, setChargedTo] = useState<string>('');
 
   const deptCodes: DepartmentCode[] = ['CAF', 'CAS', 'CBM', 'CCJE', 'CCS', 'COE', 'CHS', 'CTED'];
   const categories: TransactionCategory[] = ['Revenue', 'Event', 'Capital'];
+
+  const effectiveDept = isDepartmentRestricted ? userDepartment : department;
+  // Approved & released budgets of the department, with what is left on each.
+  const approvedBudgets = proposals
+    .filter(p => p.budget_status === 'APPROVED_RELEASED' && p.department === effectiveDept)
+    .map(p => {
+      const released = p.cashouts.reduce((s, c) => s + c.amount_released, 0) || p.total_budget_amount;
+      const spent = p.expenses.reduce((s, x) => s + x.amount_spent, 0);
+      return { id: p.id, title: p.budget_title, remaining: released - spent };
+    });
+  const chargedBudget = approvedBudgets.find(b => b.id === chargedTo);
+  const peso = (n: number) => `₱${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   if (!isOpen) return null;
 
@@ -42,6 +58,14 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ isOpen
       alert('Please provide a transaction title/description.');
       return;
     }
+    if (type === 'EXPENSE' && !chargedTo) {
+      alert('Choose the approved budget this expense is charged to (or "Not under a budget").');
+      return;
+    }
+    if (type === 'EXPENSE' && chargedBudget && numAmount > chargedBudget.remaining
+      && !confirm(`This expense (${peso(numAmount)}) is more than what is left on "${chargedBudget.title}" (${peso(chargedBudget.remaining)}). Record it anyway?`)) {
+      return;
+    }
 
     const todayStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
@@ -54,13 +78,15 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ isOpen
       date: todayStr,
       amount: numAmount,
       type,
-      description: description.trim() || undefined
+      description: description.trim() || undefined,
+      proposal_id: type === 'EXPENSE' && chargedTo && chargedTo !== 'NONE' ? chargedTo : undefined
     });
 
     // Reset and close
     setTitle('');
     setAmount('');
     setDescription('');
+    setChargedTo('');
     onClose();
   };
 
@@ -112,7 +138,7 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ isOpen
                       <button
                         type="button"
                         key={code}
-                        onClick={() => setDepartment(code)}
+                        onClick={() => { setDepartment(code); setChargedTo(''); }}
                         className={`py-2 px-1 text-center rounded-xl text-xs font-bold border transition cursor-pointer ${
                           isSelected
                             ? 'bg-[#00873E] text-white border-[#00873E] shadow-xs'
@@ -180,6 +206,34 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ isOpen
               💰 Revenue / SAF Cash-In
             </button>
           </div>
+
+          {/* Approved budget this expense is charged to */}
+          {type === 'EXPENSE' && (
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Charged to Approved Budget *
+              </label>
+              <select
+                value={chargedTo}
+                onChange={(e) => setChargedTo(e.target.value)}
+                className={`w-full px-3.5 py-2.5 text-sm rounded-xl border font-semibold ${chargedTo ? 'bg-slate-50 border-slate-200' : 'bg-amber-50 border-amber-300'}`}
+              >
+                <option value="">Select the approved budget...</option>
+                {approvedBudgets.map(b => (
+                  <option key={b.id} value={b.id}>{b.title} ({peso(b.remaining)} left)</option>
+                ))}
+                <option value="NONE">Not under a budget (general fund / operations)</option>
+              </select>
+              {approvedBudgets.length === 0 && (
+                <p className="text-[11px] text-slate-500">No approved & released budget for {effectiveDept} yet.</p>
+              )}
+              {chargedBudget && (
+                <p className="text-[11px] text-slate-500">
+                  Shows in the Audit Trail of "{chargedBudget.title}". Remaining after this: <span className={`font-bold ${chargedBudget.remaining - (parseFloat(amount) || 0) < 0 ? 'text-rose-600' : 'text-slate-800'}`}>{peso(chargedBudget.remaining - (parseFloat(amount) || 0))}</span>
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Title / Description */}
           <div className="space-y-1.5">
