@@ -46,6 +46,7 @@ import { jsPDF } from 'jspdf';
 import { getPredictionApiHealth, predictBudgetRequest, predictionApiConfigProblem, PREDICT_API_URL } from '../lib/predictionApi';
 import { roleLabel } from '../utils/roleLabels';
 import { isAuditor } from '../utils/budgetRequest';
+import { expensePhotoFolder, uploadExpensePhotos } from '../utils/receiptPhotos';
 
 /**
  * TEMPORARY switch (requested): when true, the Super Admin can permanently
@@ -277,6 +278,8 @@ interface AppContextType {
   submitReimbursementProposal: (budgetId: string, claim: {
     description: string; amount: number; receiptNo: string; remarks: string;
     proof: { name: string; type: string; url: string } | null;
+    /** Receipt photos to upload into the new expense's folder. */
+    files?: File[];
   }) => Promise<boolean>;
   approveReimbursement: (reimbursementId: string, decision?: 'Approved' | 'Rejected', remarks?: string) => void;
   submitLiquidation: (budgetId: string, accountingSummary: LiquidationSummaryLine[], notes: string) => Promise<boolean>;
@@ -1260,7 +1263,8 @@ ${error.message}`); return; }
     })),
     expenses: (row.transactions || []).filter((t: any) => !t.is_income).map((t: any): ExpenseRecord => ({
       id: t.id, budget_id: row.id, expense_desc: t.title, category: t.category,
-      amount_spent: Number(t.amount), date_incurred: t.transaction_date, proof_attach: [],
+      amount_spent: Number(t.amount), date_incurred: t.transaction_date,
+      proof_attach: t.receipt_url ? [{ name: 'Receipt', type: '', url: t.receipt_url, invoice_number: '' }] : [],
       officer_id: t.created_by || '', officer_name: '',
       reimbursement_status: (row.reimbursements || []).some((r: any) => r.expense_transaction_id === t.id)
         ? ((row.reimbursements.find((r: any) => r.expense_transaction_id === t.id)?.status === 'Paid') ? 'Reimbursed'
@@ -3331,7 +3335,7 @@ ${error?.message || 'The database did not save it.'}`);
 
   const submitReimbursementProposal = async (
     budgetId: string,
-    claim: { description: string; amount: number; receiptNo: string; remarks: string; proof: { name: string; type: string; url: string } | null }
+    claim: { description: string; amount: number; receiptNo: string; remarks: string; proof: { name: string; type: string; url: string } | null; files?: File[] }
   ): Promise<boolean> => {
     const expense = await addExpense(budgetId, claim.description, 'Event', claim.amount, {
       name: claim.proof?.name || 'No receipt attached',
@@ -3340,6 +3344,16 @@ ${error?.message || 'The database did not save it.'}`);
       invoice_number: claim.receiptNo || 'N/A'
     });
     if (!expense) return false;
+    // Receipt photos go into this expense's own folder so they can be viewed and added to later.
+    if (claim.files && claim.files.length > 0) {
+      const dept = proposals.find(p => p.id === budgetId)?.department || 'GEN';
+      const uploadErrors = await uploadExpensePhotos(expensePhotoFolder(dept, budgetId, expense.id), claim.files);
+      if (uploadErrors.length > 0) alert(`Some receipt photos were NOT uploaded:
+
+${uploadErrors.join(', ')}
+
+You can add them again from the request's Photos button.`);
+    }
     return requestReimbursement(expense.id, budgetId, claim.amount, claim.remarks || claim.description, claim.receiptNo);
   };
 

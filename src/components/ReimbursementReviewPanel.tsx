@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { DEPARTMENTS } from '../data/mockData';
 import { downloadCsv } from '../utils/csvExport';
-import { Receipt, CheckCircle2, XCircle, Clock, ShieldCheck, Download } from 'lucide-react';
+import { Receipt, CheckCircle2, XCircle, Clock, ShieldCheck, Download, Image as ImageIcon } from 'lucide-react';
+import { ReceiptPhotosModal } from './ReceiptPhotosModal';
 
 // Dean/Adviser's course-scoped Budget tab is Reimbursement-only per spec —
 // no "Draft CCS Proposal" / general Budget & Proposals sections here, just
@@ -12,6 +13,9 @@ export const ReimbursementReviewPanel: React.FC = () => {
   const { scopedProposals, proposals, isDepartmentRestricted, userDepartment, approveReimbursement, currentUser } = useApp();
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectRemark, setRejectRemark] = useState('');
+  // The reviewer must open a request's receipt photos before approving it.
+  const [viewedPhotos, setViewedPhotos] = useState<Set<string>>(new Set());
+  const [photosFor, setPhotosFor] = useState<{ title: string; subtitle: string; department: string; proposalId: string; expenseId: string; legacyPath?: string } | null>(null);
 
   const displayProposals = isDepartmentRestricted ? scopedProposals : proposals;
 
@@ -22,7 +26,7 @@ export const ReimbursementReviewPanel: React.FC = () => {
   };
 
   const rows = displayProposals.flatMap(p =>
-    p.reimbursements.map(r => ({ ...r, budget_title: p.budget_title, department: p.department }))
+    p.reimbursements.map(r => ({ ...r, budget_title: p.budget_title, department: p.department, expense: p.expenses.find(e => e.id === r.expense_id) }))
   ).sort((a, b) => (a.reimbursement_status === 'Pending' ? -1 : 1));
 
   const pendingCount = rows.filter(r => r.reimbursement_status === 'Pending').length;
@@ -78,6 +82,26 @@ export const ReimbursementReviewPanel: React.FC = () => {
                   {r.remarks && <p className="text-[11px] text-slate-400 truncate">{r.remarks}</p>}
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
+                  {r.expense_id && (
+                    <button
+                      onClick={() => {
+                        setViewedPhotos(prev => new Set(prev).add(r.id));
+                        setPhotosFor({
+                          title: r.expense?.expense_desc || r.budget_title,
+                          subtitle: `${r.budget_title} • ${r.officer_name}${r.receipt_ref ? ` • ${r.receipt_ref}` : ''}`,
+                          department: r.department, proposalId: r.budget_id, expenseId: r.expense_id,
+                          legacyPath: r.expense?.proof_attach?.[0]?.url
+                        });
+                      }}
+                      className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition cursor-pointer ${
+                        r.reimbursement_status === 'Pending' && !viewedPhotos.has(r.id)
+                          ? 'bg-amber-100 hover:bg-amber-200 text-amber-900 ring-1 ring-amber-300'
+                          : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                      }`}
+                    >
+                      <ImageIcon className="w-3.5 h-3.5" /> Photos
+                    </button>
+                  )}
                   <span className={`px-2 py-0.5 rounded text-[10px] font-black border ${DEPARTMENTS[r.department]?.badgeBg}`}>
                     {r.department}
                   </span>
@@ -86,7 +110,9 @@ export const ReimbursementReviewPanel: React.FC = () => {
                     <>
                       <button
                         onClick={() => approveReimbursement(r.id)}
-                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#00873E] hover:bg-[#007033] text-white text-[11px] font-bold transition cursor-pointer"
+                        disabled={Boolean(r.expense_id) && !viewedPhotos.has(r.id)}
+                        title={r.expense_id && !viewedPhotos.has(r.id) ? 'Open Photos to check the receipt before approving.' : undefined}
+                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#00873E] hover:bg-[#007033] disabled:bg-slate-300 disabled:cursor-not-allowed text-white text-[11px] font-bold transition cursor-pointer"
                       >
                         <CheckCircle2 className="w-3.5 h-3.5" /> Approve
                       </button>
@@ -141,6 +167,9 @@ export const ReimbursementReviewPanel: React.FC = () => {
           )}
         </div>
       </div>
+      {photosFor && (
+        <ReceiptPhotosModal {...photosFor} canAdd={false} onClose={() => setPhotosFor(null)} />
+      )}
     </div>
   );
 };
