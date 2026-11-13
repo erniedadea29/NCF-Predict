@@ -3,6 +3,7 @@ import { AppProvider, useApp } from './context/AppContext';
 import { LoginPage } from './components/LoginPage';
 import { RegisterPage } from './components/RegisterPage';
 import { ResetPasswordPage } from './components/ResetPasswordPage';
+import { DeviceWaitingScreen, DeviceRequestPrompt } from './components/DeviceApproval';
 import { Header } from './components/Header';
 import { HomeDashboard } from './components/HomeDashboard';
 import { TransactionsView } from './components/TransactionsView';
@@ -194,7 +195,7 @@ function MainAppContent() {
 }
 
 function AuthGate() {
-  const { isAuthenticated, isAuthLoading, isPasswordRecovery } = useApp();
+  const { isAuthenticated, isAuthLoading, isPasswordRecovery, deviceGate } = useApp();
   const [authView, setAuthView] = useState<'login' | 'register'>('login');
 
   // Always land back on the Login page (not wherever they last were) after logging out.
@@ -229,7 +230,17 @@ function AuthGate() {
     );
   }
 
-  return <MainAppContent />;
+  // One device per account: a new device waits until it is approved.
+  if (deviceGate !== 'ok') {
+    return <DeviceWaitingScreen />;
+  }
+
+  return (
+    <>
+      <MainAppContent />
+      <DeviceRequestPrompt />
+    </>
+  );
 }
 
 export default function App() {

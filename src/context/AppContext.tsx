@@ -101,6 +101,12 @@ interface AppContextType {
   setCurrentUser: (user: User) => void;
   loginUser: (identifier: string, password: string) => Promise<{ success: boolean; message: string; user?: User }>;
   logoutUser: () => void;
+  /** One device per account: 'pending' while this device waits for approval. */
+  deviceGate: 'checking' | 'ok' | 'pending';
+  cancelDeviceLogin: () => void;
+  /** A sign-in attempt from another device, to approve or deny on this one. */
+  incomingDeviceRequest: { id: string; device: string; created_at: string } | null;
+  answerDeviceRequest: (allow: boolean) => Promise<void>;
   isAuthenticated: boolean;
   isAuthLoading: boolean;
   isReadOnlyStudent: boolean;
@@ -1750,9 +1756,10 @@ ${error.message}`); return; }
   }, []);
 
   // ---------------------------------------------------------------------
-  // ONE DEVICE AT A TIME: the newest sign-in becomes the account's active
-  // device (active_sessions table); any other device notices it is no
-  // longer the active one and signs out. Tabs of one browser share the key.
+  // ONE DEVICE AT A TIME, WITH APPROVAL: an account is used on one device.
+  // A new device has to be approved from the device already using the
+  // account ("Is this you?"); if that device is closed (no heartbeat for
+  // 90s) the new device is let in. Tabs of one browser share the key.
   // ---------------------------------------------------------------------
   const SESSION_KEY_STORAGE = 'ncf_active_session_key';
   const readSessionKey = () => { try { return localStorage.getItem(SESSION_KEY_STORAGE); } catch { return null; } };
@@ -1763,21 +1770,63 @@ ${error.message}`); return; }
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
-  // Make this device the active one and revoke the account's other logins.
-  const claimThisDevice = async () => {
-    const client = getSupabase();
-    const key = newSessionKey();
-    const { error } = await client.rpc('claim_active_session', {
-      p_session_key: key, p_device: navigator.userAgent.slice(0, 200)
-    });
-    if (error) {
-      // Feature not installed yet (SQL not run): don't block logging in.
-      if (error.code !== 'PGRST202' && error.code !== '42883') console.warn('Could not claim active device', error);
-      return;
-    }
+  // "Chrome on Windows", "Safari on iPhone"... shown in the "Is this you?" prompt.
+  const deviceLabel = () => {
+    const ua = navigator.userAgent;
+    const browser = /Edg\//.test(ua) ? 'Edge' : /OPR\//.test(ua) ? 'Opera' : /Chrome\//.test(ua) ? 'Chrome'
+      : /Firefox\//.test(ua) ? 'Firefox' : /Safari\//.test(ua) ? 'Safari' : 'a browser';
+    const os = /iPhone/.test(ua) ? 'iPhone' : /iPad/.test(ua) ? 'iPad' : /Android/.test(ua) ? 'Android'
+      : /Windows/.test(ua) ? 'Windows' : /Mac OS X/.test(ua) ? 'Mac' : /Linux/.test(ua) ? 'Linux' : 'a device';
+    return `${browser} on ${os}`;
+  };
+
+  // 'checking' until this device is confirmed; 'pending' while waiting for approval.
+  const [deviceGate, setDeviceGate] = useState<'checking' | 'ok' | 'pending'>('checking');
+  const [pendingDeviceRequest, setPendingDeviceRequest] = useState<{ id: string; key: string } | null>(null);
+  // A sign-in attempt from another device, shown on the device using the account.
+  const [incomingDeviceRequest, setIncomingDeviceRequest] = useState<{ id: string; device: string; created_at: string } | null>(null);
+
+  const finishDeviceApproval = (key: string) => {
     writeSessionKey(key);
+    setPendingDeviceRequest(null);
+    setDeviceGate('ok');
     // Other devices can no longer refresh their login.
-    client.auth.signOut({ scope: 'others' }).catch(() => { /* best effort */ });
+    getSupabase().auth.signOut({ scope: 'others' }).catch(() => { /* best effort */ });
+  };
+
+  const signOutThisDevice = async (message?: string) => {
+    writeSessionKey(null);
+    setPendingDeviceRequest(null);
+    setIncomingDeviceRequest(null);
+    setDeviceGate('checking');
+    await getSupabase().auth.signOut({ scope: 'local' });
+    setCurrentUser(GUEST_USER);
+    setIsAuthenticated(false);
+    setMfaChallenge(null);
+    setIsAuthModalOpen(true);
+    setAuthModalMode('login');
+    if (message) alert(message);
+  };
+
+  // The waiting device gives up.
+  const cancelDeviceLogin = () => { signOutThisDevice(); };
+
+  // The device using the account answers "Is this you?".
+  const answerDeviceRequest = async (allow: boolean) => {
+    const req = incomingDeviceRequest;
+    if (!req) return;
+    setIncomingDeviceRequest(null);
+    const { error } = await getSupabase().rpc('decide_device_login', {
+      p_request_id: req.id, p_my_session_key: readSessionKey() || '', p_allow: allow
+    });
+    if (error) { alert(`Could not answer the sign-in request: ${error.message}`); return; }
+    if (allow) {
+      await signOutThisDevice('You allowed the other device to use your account, so you have been logged out here.');
+    } else {
+      // Revoke every other login of this account, then suggest a new password.
+      getSupabase().auth.signOut({ scope: 'others' }).catch(() => { /* best effort */ });
+      alert('The other device was blocked and signed out. If it was not you, change your password now (Edit Profile).');
+    }
   };
 
   const loginUser = async (identifier: string, password: string): Promise<{ success: boolean; message: string; user?: User }> => {
@@ -1823,7 +1872,6 @@ ${error.message}`); return; }
       await client.auth.signOut();
       return { success: false, message: 'Your account has been deactivated. Please contact your adviser or admin.' };
     }
-    await claimThisDevice();
     setCurrentUser(user);
     setIsAuthenticated(true);
     setActiveTab(user.role === 'student' ? 'student_portal' : 'home');
@@ -1836,50 +1884,108 @@ ${error.message}`); return; }
     };
   };
 
-  // Watch whether this device is still the account's active device.
+  // Step 1: once signed in, make sure this device may use the account.
   useEffect(() => {
-    if (!isAuthenticated || !currentUser.id || currentUser.id === 'guest') return;
+    if (!isAuthenticated || !currentUser.id || currentUser.id === 'guest') {
+      setDeviceGate('checking');
+      return;
+    }
+    let cancelled = false;
+    const client = getSupabase();
+    (async () => {
+      const mine = readSessionKey();
+      const { data: row, error: rowError } = await client.from('active_sessions')
+        .select('session_key').eq('user_id', currentUser.id).maybeSingle();
+      if (cancelled) return;
+      if (rowError) { setDeviceGate('ok'); return; } // feature not installed: don't block anyone
+      if (row && mine && row.session_key === mine) { setDeviceGate('ok'); return; }
+
+      const key = mine || newSessionKey();
+      const { data, error } = await client.rpc('request_device_login', { p_session_key: key, p_device: deviceLabel() });
+      if (cancelled) return;
+      if (error) {
+        console.warn('Device check failed', error);
+        setDeviceGate('ok');
+        return;
+      }
+      const result = Array.isArray(data) ? data[0] : data;
+      if (result?.status === 'approved') {
+        finishDeviceApproval(key);
+      } else if (result?.status === 'pending' && result.request_id) {
+        setPendingDeviceRequest({ id: result.request_id, key });
+        setDeviceGate('pending');
+      } else {
+        setDeviceGate('ok');
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, currentUser.id]);
+
+  // Step 2a: the waiting device checks for the answer.
+  useEffect(() => {
+    if (deviceGate !== 'pending' || !pendingDeviceRequest) return;
+    const client = getSupabase();
+    let done = false;
+    const poll = async () => {
+      if (done) return;
+      const { data, error } = await client.rpc('check_device_login', { p_request_id: pendingDeviceRequest.id });
+      if (done || error) return;
+      if (data === 'approved') { done = true; finishDeviceApproval(pendingDeviceRequest.key); }
+      else if (data === 'denied' || data === 'expired') {
+        done = true;
+        signOutThisDevice('Your sign-in was not allowed by the device already using this account.');
+      }
+    };
+    poll();
+    const timer = window.setInterval(poll, 3000);
+    return () => { done = true; window.clearInterval(timer); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deviceGate, pendingDeviceRequest]);
+
+  // Step 2b: the device using the account keeps it (heartbeat), watches for
+  // sign-in attempts from other devices, and signs out if it was replaced.
+  useEffect(() => {
+    if (deviceGate !== 'ok' || !isAuthenticated || currentUser.id === 'guest') return;
     const client = getSupabase();
     const userId = currentUser.id;
     let stopped = false;
 
-    const kickOut = async () => {
+    const replaced = () => {
       if (stopped) return;
       stopped = true;
-      writeSessionKey(null);
-      await client.auth.signOut({ scope: 'local' });
-      setCurrentUser(GUEST_USER);
-      setIsAuthenticated(false);
-      setMfaChallenge(null);
-      setIsAuthModalOpen(true);
-      setAuthModalMode('login');
-      alert('You have been logged out because your account was signed in on another device. Only one device can use an account at a time.');
+      signOutThisDevice('You have been logged out because your account was signed in on another device. Only one device can use an account at a time.');
     };
 
-    const check = async () => {
+    const tick = async () => {
       if (stopped) return;
-      const { data, error } = await client.from('active_sessions').select('session_key').eq('user_id', userId).maybeSingle();
-      if (error) return; // table not installed yet or offline: do nothing
       const mine = readSessionKey();
-      if (!data || !mine) {
-        // No active device recorded yet (e.g. logged in before this feature): claim it.
-        await claimThisDevice();
-        return;
-      }
-      if (data.session_key !== mine) kickOut();
+      if (!mine) return;
+      const { data: alive, error } = await client.rpc('heartbeat_active_session', { p_session_key: mine });
+      if (error) return; // feature not installed or offline
+      if (alive === false) { replaced(); return; }
+      const since = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+      const { data: reqs } = await client.from('device_login_requests')
+        .select('id, device, created_at, session_key').eq('user_id', userId).eq('status', 'pending')
+        .gte('created_at', since).order('created_at', { ascending: false }).limit(1);
+      if (stopped) return;
+      const req = (reqs || []).find((r: any) => r.session_key !== mine);
+      setIncomingDeviceRequest(req ? { id: req.id, device: req.device || 'another device', created_at: req.created_at } : null);
     };
 
-    check();
-    const timer = window.setInterval(check, 20000);
-    const onFocus = () => { check(); };
+    tick();
+    const timer = window.setInterval(tick, 20000);
+    const onFocus = () => { tick(); };
     window.addEventListener('focus', onFocus);
     const channel = client
-      .channel(`active-session-${userId}`)
+      .channel(`device-${userId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'active_sessions', filter: `user_id=eq.${userId}` },
         (payload: any) => {
           const key = payload.new?.session_key;
-          if (key && key !== readSessionKey()) kickOut();
+          if (key && key !== readSessionKey()) replaced();
         })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'device_login_requests', filter: `user_id=eq.${userId}` },
+        () => { tick(); })
       .subscribe();
 
     return () => {
@@ -1889,7 +1995,7 @@ ${error.message}`); return; }
       client.removeChannel(channel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated, currentUser.id]);
+  }, [deviceGate, isAuthenticated, currentUser.id]);
 
   const logoutUser = () => {
     writeSessionKey(null);
@@ -1925,7 +2031,6 @@ ${error.message}`); return; }
       await client.auth.signOut();
       return { success: false, message: 'Your account has been deactivated. Please contact your adviser or admin.' };
     }
-    await claimThisDevice();
     setCurrentUser(user);
     setIsAuthenticated(true);
     setActiveTab(user.role === 'student' ? 'student_portal' : 'home');
@@ -3762,6 +3867,10 @@ ${error?.message || 'The database did not save the report.'}`);
         scopedPenalties,
         loginUser,
         logoutUser,
+        deviceGate,
+        cancelDeviceLogin,
+        incomingDeviceRequest,
+        answerDeviceRequest,
         isAuthModalOpen,
         setIsAuthModalOpen,
         authModalMode,
