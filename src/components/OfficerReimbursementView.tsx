@@ -4,9 +4,14 @@ import { DEPARTMENTS } from '../data/mockData';
 import { downloadCsv } from '../utils/csvExport';
 import { ReceiptPhotosModal } from './ReceiptPhotosModal';
 import { expensePhotoFolder, receiptFileProblem, uploadExpensePhotos } from '../utils/receiptPhotos';
-import { Receipt, Send, Clock, CheckCircle2, XCircle, Download, Search, Info, Camera, X, Image as ImageIcon } from 'lucide-react';
+import { Receipt, Send, Clock, CheckCircle2, XCircle, Download, Search, Info, Camera, X, Plus, Image as ImageIcon } from 'lucide-react';
 
 const peso = (n: number) => `₱${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+interface ReceiptLine { key: number; desc: string; amount: string; receiptNo: string; files: File[] }
+const emptyLine = (key: number): ReceiptLine => ({ key, desc: '', amount: '', receiptNo: '', files: [] });
+const lineAmount = (l: ReceiptLine) => Math.round((parseFloat(l.amount) || 0) * 100) / 100;
+const lineComplete = (l: ReceiptLine) => l.desc.trim() !== '' && lineAmount(l) > 0;
 
 const STATUS_STYLES: Record<string, string> = {
   Pending: 'bg-amber-50 text-amber-800 border-amber-200',
@@ -29,10 +34,28 @@ export const OfficerReimbursementView: React.FC = () => {
   // 'new' = describe the out-of-pocket expense here; 'recorded' = claim an expense already recorded on the budget.
   const [mode, setMode] = useState<'new' | 'recorded'>('new');
   const [expenseId, setExpenseId] = useState('');
-  const [newDesc, setNewDesc] = useState('');
-  const [newAmount, setNewAmount] = useState('');
-  const [newReceiptNo, setNewReceiptNo] = useState('');
-  // Receipt photos picked in the form; uploaded once the request is saved.
+  // 'new' mode: one line per receipt. Each line is saved as its own expense +
+  // reimbursement request so every receipt stays separate for audit.
+  const lineKey = useRef(1);
+  const [lines, setLines] = useState<ReceiptLine[]>([emptyLine(0)]);
+  const [lineError, setLineError] = useState<{ key: number; text: string } | null>(null);
+  const linePhotoInputRef = useRef<HTMLInputElement>(null);
+  const linePhotoTarget = useRef<number | null>(null);
+
+  const updateLine = (key: number, patch: Partial<ReceiptLine>) =>
+    setLines(prev => prev.map(l => l.key === key ? { ...l, ...patch } : l));
+  const addLine = () => setLines(prev => [...prev, emptyLine(lineKey.current++)]);
+  const removeLine = (key: number) => setLines(prev => prev.length > 1 ? prev.filter(l => l.key !== key) : prev);
+  const addLinePhotos = (files: File[]) => {
+    const key = linePhotoTarget.current;
+    if (linePhotoInputRef.current) linePhotoInputRef.current.value = '';
+    if (key === null) return;
+    const problems = files.map(receiptFileProblem).filter(Boolean) as string[];
+    setLineError(problems.length > 0 ? { key, text: problems.join(' ') } : null);
+    setLines(prev => prev.map(l => l.key === key ? { ...l, files: [...l.files, ...files.filter(f => !receiptFileProblem(f))] } : l));
+  };
+
+  // Receipt photos picked in the form ('recorded' mode); uploaded once the request is saved.
   const [photoFiles, setPhotoFiles] = useState<File[]>([]);
   const [photoError, setPhotoError] = useState('');
   const photoInputRef = useRef<HTMLInputElement>(null);
@@ -82,10 +105,10 @@ export const OfficerReimbursementView: React.FC = () => {
   const sum = (status: string[]) => rows.filter(r => status.includes(r.reimbursement_status)).reduce((s, r) => s + r.amount_spent, 0);
   const count = (status: string[]) => rows.filter(r => status.includes(r.reimbursement_status)).length;
 
-  const newAmountValue = parseFloat(newAmount);
+  const linesTotal = lines.reduce((s, l) => s + lineAmount(l), 0);
   const canSubmit = Boolean(selectedProposal) && (mode === 'recorded'
     ? Boolean(selectedExpense)
-    : newDesc.trim() !== '' && newAmountValue > 0);
+    : lines.length > 0 && lines.every(lineComplete));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -95,42 +118,54 @@ export const OfficerReimbursementView: React.FC = () => {
       return;
     }
 
-    let amount = 0;
     if (mode === 'recorded') {
       if (!selectedExpense) { setMessage({ ok: false, text: 'Choose the expense you paid for.' }); return; }
-      amount = selectedExpense.amount_spent;
-    } else {
-      if (!newDesc.trim() || !(newAmountValue > 0)) {
-        setMessage({ ok: false, text: 'Enter what you paid for and an amount greater than ₱0.' });
-        return;
-      }
-      amount = Math.round(newAmountValue * 100) / 100;
-    }
-
-    setSubmitting(true);
-    let ok: boolean;
-    if (mode === 'recorded') {
-      ok = await requestReimbursement(selectedExpense!.id, selectedProposal.id, amount, remarks.trim());
+      const amount = selectedExpense.amount_spent;
+      setSubmitting(true);
+      const ok = await requestReimbursement(selectedExpense.id, selectedProposal.id, amount, remarks.trim());
       if (ok && photoFiles.length > 0) {
-        const errs = await uploadExpensePhotos(expensePhotoFolder(selectedProposal.department, selectedProposal.id, selectedExpense!.id), photoFiles);
+        const errs = await uploadExpensePhotos(expensePhotoFolder(selectedProposal.department, selectedProposal.id, selectedExpense.id), photoFiles);
         if (errs.length > 0) alert(`Some receipt photos were NOT uploaded:\n\n${errs.join('\n')}\n\nYou can add them again from the request's Photos button.`);
       }
-    } else {
-      ok = await submitReimbursementProposal(selectedProposal.id, {
-        description: newDesc.trim(), amount, receiptNo: newReceiptNo.trim(), remarks: remarks.trim(), proof: null, files: photoFiles
+      setSubmitting(false);
+      if (ok) {
+        setMessage({ ok: true, text: `Reimbursement of ${peso(amount)} requested. It's now waiting for Adviser/Dean review.` });
+        setExpenseId('');
+        setPhotoFiles([]);
+        setPhotoError('');
+        setRemarks('');
+      }
+      return;
+    }
+
+    if (!lines.every(lineComplete)) {
+      setMessage({ ok: false, text: 'Each receipt needs what you paid for and an amount greater than ₱0.' });
+      return;
+    }
+
+    // One expense + reimbursement request per receipt, saved one after another.
+    setSubmitting(true);
+    const failed: ReceiptLine[] = [];
+    let savedCount = 0;
+    let savedTotal = 0;
+    for (const line of lines) {
+      const ok = await submitReimbursementProposal(selectedProposal.id, {
+        description: line.desc.trim(), amount: lineAmount(line), receiptNo: line.receiptNo.trim(),
+        remarks: remarks.trim(), proof: null, files: line.files
       });
+      if (ok) { savedCount++; savedTotal += lineAmount(line); } else failed.push(line);
     }
     setSubmitting(false);
 
-    if (ok) {
-      setMessage({ ok: true, text: `Reimbursement of ${peso(amount)} requested. It's now waiting for Adviser/Dean review.` });
-      setExpenseId('');
-      setNewDesc('');
-      setNewAmount('');
-      setNewReceiptNo('');
-      setPhotoFiles([]);
-      setPhotoError('');
+    if (failed.length === 0) {
+      setMessage({ ok: true, text: `${savedCount} reimbursement request(s) totaling ${peso(savedTotal)} sent. They're now waiting for Adviser/Dean review.` });
+      setLines([emptyLine(lineKey.current++)]);
+      setLineError(null);
       setRemarks('');
+    } else {
+      // Keep only the receipts that failed so they can be retried.
+      setLines(failed);
+      setMessage({ ok: false, text: `${savedCount} saved (${peso(savedTotal)}), but ${failed.length} receipt(s) failed. They're still in the form; try again.` });
     }
   };
 
@@ -228,41 +263,97 @@ export const OfficerReimbursementView: React.FC = () => {
 
               {selectedProposal && mode === 'new' && (
                 <>
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">What You Paid For *</label>
-                    <input
-                      type="text"
-                      value={newDesc}
-                      onChange={(e) => setNewDesc(e.target.value)}
-                      placeholder="e.g. Snacks for 50 participants"
-                      className="w-full px-3 py-2 text-xs bg-slate-50 rounded-xl border border-slate-200"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Amount (₱) *</label>
-                      <input
-                        type="number"
-                        min={0}
-                        step="0.01"
-                        value={newAmount}
-                        onChange={(e) => setNewAmount(e.target.value)}
-                        placeholder="0.00"
-                        className="w-full px-3 py-2 text-xs font-mono font-bold bg-slate-50 rounded-xl border border-slate-200"
-                      />
+                  <p className="text-[11px] text-slate-500">
+                    Amount = what you paid out of your own pocket (what should be returned to you). Each receipt is also recorded as an expense under the selected budget.
+                  </p>
+                  {lines.map((line, idx) => (
+                    <div key={line.key} className="space-y-2 p-3 rounded-xl border border-slate-200 bg-slate-50/60">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-black text-slate-500 uppercase tracking-wider">Receipt {idx + 1}</span>
+                        {lines.length > 1 && (
+                          <button type="button" onClick={() => removeLine(line.key)} className="flex items-center gap-0.5 text-[11px] font-bold text-rose-600 hover:text-rose-800 cursor-pointer">
+                            <X className="w-3.5 h-3.5" /> Remove
+                          </button>
+                        )}
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">What You Paid For *</label>
+                        <input
+                          type="text"
+                          value={line.desc}
+                          onChange={(e) => updateLine(line.key, { desc: e.target.value })}
+                          placeholder="e.g. Snacks for 50 participants"
+                          className="w-full px-3 py-2 text-xs bg-white rounded-xl border border-slate-200"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-1">
+                          <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Amount (₱) *</label>
+                          <input
+                            type="number"
+                            min={0}
+                            step="0.01"
+                            value={line.amount}
+                            onChange={(e) => updateLine(line.key, { amount: e.target.value })}
+                            placeholder="0.00"
+                            className="w-full px-3 py-2 text-xs font-mono font-bold bg-white rounded-xl border border-slate-200"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">OR / Receipt No.</label>
+                          <input
+                            type="text"
+                            value={line.receiptNo}
+                            onChange={(e) => updateLine(line.key, { receiptNo: e.target.value })}
+                            placeholder="OR-00123"
+                            className="w-full px-3 py-2 text-xs font-mono bg-white rounded-xl border border-slate-200"
+                          />
+                        </div>
+                      </div>
+                      {line.files.length > 0 && (
+                        <div className="space-y-1">
+                          {line.files.map((f, i) => (
+                            <div key={`${f.name}_${i}`} className="flex items-center justify-between gap-2 px-2.5 py-1.5 bg-emerald-50 border border-emerald-200 rounded-lg text-[11px]">
+                              <span className="flex items-center gap-1.5 min-w-0 font-semibold text-emerald-900">
+                                <ImageIcon className="w-3.5 h-3.5 shrink-0" /><span className="truncate">{f.name}</span>
+                              </span>
+                              <button type="button" onClick={() => updateLine(line.key, { files: line.files.filter((_, j) => j !== i) })} className="text-emerald-700 hover:text-emerald-900 cursor-pointer shrink-0">
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => { linePhotoTarget.current = line.key; linePhotoInputRef.current?.click(); }}
+                        className="w-full flex items-center justify-center gap-1.5 px-3 py-2 border-2 border-dashed border-slate-300 hover:border-[#00873E] rounded-xl text-[11px] font-bold text-slate-600 hover:text-[#00873E] transition cursor-pointer bg-white"
+                      >
+                        <Camera className="w-3.5 h-3.5" /> {line.files.length > 0 ? 'Add Another Photo / File' : 'Receipt Photo (optional)'}
+                      </button>
+                      {lineError?.key === line.key && <p className="text-[11px] text-rose-600 font-semibold">{lineError.text}</p>}
                     </div>
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">OR / Receipt No.</label>
-                      <input
-                        type="text"
-                        value={newReceiptNo}
-                        onChange={(e) => setNewReceiptNo(e.target.value)}
-                        placeholder="OR-00123"
-                        className="w-full px-3 py-2 text-xs font-mono bg-slate-50 rounded-xl border border-slate-200"
-                      />
-                    </div>
+                  ))}
+                  <input
+                    ref={linePhotoInputRef}
+                    type="file"
+                    multiple
+                    accept="image/*,application/pdf"
+                    className="hidden"
+                    onChange={(e) => addLinePhotos(Array.from(e.target.files || []))}
+                  />
+                  <button
+                    type="button"
+                    onClick={addLine}
+                    className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border border-[#00873E] text-[#00873E] hover:bg-emerald-50 text-xs font-bold transition cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Add Another Receipt
+                  </button>
+                  <div className="flex items-center justify-between text-xs bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2">
+                    <span className="font-bold text-emerald-900">Total to reimburse ({lines.length} receipt{lines.length > 1 ? 's' : ''})</span>
+                    <span className="font-black font-mono text-emerald-900">{peso(linesTotal)}</span>
                   </div>
-                  <p className="text-[11px] text-slate-500">This also records the expense under the selected budget.</p>
+                  <p className="text-[10px] text-slate-400">JPG, PNG, WEBP or PDF, max 8MB each. View or add more photos later from each request's Photos button.</p>
                 </>
               )}
 
@@ -295,7 +386,7 @@ export const OfficerReimbursementView: React.FC = () => {
                 </div>
               )}
 
-              {selectedProposal && (
+              {selectedProposal && mode === 'recorded' && (
                 <div className="space-y-1.5">
                   <label className="block text-xs font-bold text-slate-700">Receipt Photos / Scans (optional)</label>
                   {photoFiles.length > 0 && (
@@ -350,7 +441,7 @@ export const OfficerReimbursementView: React.FC = () => {
                 disabled={submitting || !canSubmit}
                 className="w-full py-2.5 bg-[#00873E] hover:bg-[#007033] disabled:bg-slate-300 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
               >
-                <Send className="w-3.5 h-3.5" /> {submitting ? 'Submitting...' : 'Request Reimbursement'}
+                <Send className="w-3.5 h-3.5" /> {submitting ? 'Submitting...' : mode === 'new' && lines.length > 1 ? `Request Reimbursement (${lines.length} receipts)` : 'Request Reimbursement'}
               </button>
             </>
           )}
