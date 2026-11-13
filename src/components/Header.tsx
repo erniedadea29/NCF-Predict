@@ -212,7 +212,7 @@ export const Header: React.FC = () => {
                     {notifications.map(n => {
                       // Clicking opens the page the notification is about (and marks it read).
                       // Sign-in notifications open the "Is this you?" review instead of a page.
-                      const isSignIn = /^(Sign-in attempt on|New sign-in on)/.test(n.title);
+                      const isSignIn = /^(Sign-in attempt on|New sign-in on|Blocked sign-in on)/.test(n.title);
                       const target = isSignIn ? null : resolveNotificationTab(n, currentUser.role, navList.map(item => item.id));
                       return (
                         <button

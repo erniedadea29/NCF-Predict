@@ -1940,6 +1940,9 @@ ${error.message}`); return; }
       const result = Array.isArray(data) ? data[0] : data;
       if (result?.status === 'approved') {
         finishDeviceApproval(key);
+      } else if (result?.status === 'blocked') {
+        // The account is already in use on another device: refuse this one.
+        signOutThisDevice('This account is already logged in on another device. Only one device can use an account at a time. Log out on the other device first, then try again.');
       } else if (result?.status === 'pending' && result.request_id) {
         setPendingDeviceRequest({ id: result.request_id, key });
         setDeviceGate('pending');
