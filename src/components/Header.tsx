@@ -31,7 +31,8 @@ export const Header: React.FC = () => {
     isAdminSystemOnly,
     isEmployeeAwaitingAssignment,
     notifications,
-    markNotificationRead
+    markNotificationRead,
+    reviewDeviceSignIns
   } = useApp();
 
   const [roleMenuOpen, setRoleMenuOpen] = useState(false);
@@ -210,13 +211,16 @@ export const Header: React.FC = () => {
                   <div className="py-1">
                     {notifications.map(n => {
                       // Clicking opens the page the notification is about (and marks it read).
-                      const target = resolveNotificationTab(n, currentUser.role, navList.map(item => item.id));
+                      // Sign-in notifications open the "Is this you?" review instead of a page.
+                      const isSignIn = /^(Sign-in attempt on|New sign-in on)/.test(n.title);
+                      const target = isSignIn ? null : resolveNotificationTab(n, currentUser.role, navList.map(item => item.id));
                       return (
                         <button
                           key={n.id}
                           onClick={() => {
                             if (!n.read_at) markNotificationRead(n.id);
-                            if (target) setActiveTab(target);
+                            if (isSignIn) reviewDeviceSignIns();
+                            else if (target) setActiveTab(target);
                             setNotifOpen(false);
                           }}
                           className={`w-full text-left px-3 py-2 text-xs transition cursor-pointer ${
@@ -227,7 +231,9 @@ export const Header: React.FC = () => {
                           {n.body && <p className="text-slate-500 mt-0.5">{n.body}</p>}
                           <p className="text-[10px] text-slate-400 mt-1 flex items-center justify-between gap-2">
                             <span>{new Date(n.created_at).toLocaleString()}</span>
-                            {target && <span className="font-bold text-[#00873E] shrink-0">Open {tabLabel(target, navList)} →</span>}
+                            {isSignIn
+                              ? <span className="font-bold text-rose-600 shrink-0">Review sign-in →</span>
+                              : target && <span className="font-bold text-[#00873E] shrink-0">Open {tabLabel(target, navList)} →</span>}
                           </p>
                         </button>
                       );

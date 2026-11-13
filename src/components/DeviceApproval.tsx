@@ -19,7 +19,7 @@ export const DeviceWaitingScreen: React.FC = () => {
               Open the system there and press <strong>Yes, it's me</strong>.
             </p>
             <p className="text-xs text-slate-400">
-              If the other device is closed or offline, you will be let in automatically within about 2 minutes.
+              If the other device is closed or offline, you will be let in automatically within about 3 minutes.
             </p>
             <div className="flex items-center justify-center gap-2 text-xs font-bold text-slate-500">
               <Loader2 className="w-4 h-4 animate-spin" /> Waiting...

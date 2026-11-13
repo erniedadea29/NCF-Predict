@@ -104,6 +104,8 @@ interface AppContextType {
   /** One device per account: 'pending' while this device waits for approval. */
   deviceGate: 'checking' | 'ok' | 'pending';
   cancelDeviceLogin: () => void;
+  /** Opened from a sign-in notification. */
+  reviewDeviceSignIns: () => Promise<void>;
   /** A sign-in attempt from another device, to approve or deny on this one. */
   incomingDeviceRequest: { id: string; device: string; created_at: string } | null;
   answerDeviceRequest: (allow: boolean) => Promise<void>;
@@ -1811,6 +1813,33 @@ ${error.message}`); return; }
   // The waiting device gives up.
   const cancelDeviceLogin = () => { signOutThisDevice(); };
 
+  // Clicking a sign-in notification: show "Is this you?" if a sign-in is
+  // still waiting; otherwise offer to log out every other device.
+  const reviewDeviceSignIns = async () => {
+    const client = getSupabase();
+    const mine = readSessionKey();
+    const since = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+    const { data: reqs } = await client.from('device_login_requests')
+      .select('id, device, created_at, session_key').eq('user_id', currentUser.id).eq('status', 'pending')
+      .gte('created_at', since).order('created_at', { ascending: false }).limit(1);
+    const req = (reqs || []).find((r: any) => r.session_key !== mine);
+    if (req) {
+      setIncomingDeviceRequest({ id: req.id, device: req.device || 'another device', created_at: req.created_at });
+      return;
+    }
+    if (mine) {
+      const { data: alive } = await client.rpc('heartbeat_active_session', { p_session_key: mine });
+      if (alive === false) {
+        await signOutThisDevice('Another device is now using your account, so you have been logged out here. If that was not you, log in again and change your password.');
+        return;
+      }
+    }
+    if (window.confirm('No sign-in is waiting for your approval right now. If you did not sign in on another device, press OK to log out every other device now. Then change your password in Edit Profile.')) {
+      const { error } = await client.auth.signOut({ scope: 'others' });
+      alert(error ? `Could not log out the other devices: ${error.message}` : 'All other devices were logged out. Change your password now in Edit Profile.');
+    }
+  };
+
   // The device using the account answers "Is this you?".
   const answerDeviceRequest = async (allow: boolean) => {
     const req = incomingDeviceRequest;
@@ -1962,7 +1991,7 @@ ${error.message}`); return; }
       const mine = readSessionKey();
       if (!mine) return;
       const { data: alive, error } = await client.rpc('heartbeat_active_session', { p_session_key: mine });
-      if (error) return; // feature not installed or offline
+      if (error) { console.warn('Device heartbeat failed', error); return; } // feature not installed or offline
       if (alive === false) { replaced(); return; }
       const since = new Date(Date.now() - 5 * 60 * 1000).toISOString();
       const { data: reqs } = await client.from('device_login_requests')
@@ -3882,6 +3911,7 @@ ${error?.message || 'The database did not save the report.'}`);
         logoutUser,
         deviceGate,
         cancelDeviceLogin,
+        reviewDeviceSignIns,
         incomingDeviceRequest,
         answerDeviceRequest,
         isAuthModalOpen,
