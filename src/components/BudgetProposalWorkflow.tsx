@@ -65,6 +65,7 @@ export const BudgetProposalWorkflow: React.FC<BudgetProposalWorkflowProps> = ({
     addProposalNote,
     adviserApproveProposal,
     deanApproveProposal,
+    departments,
     isReadOnlyStudent,
     isViewOnlyReviewer
   } = useApp();
@@ -621,6 +622,26 @@ export const BudgetProposalWorkflow: React.FC<BudgetProposalWorkflowProps> = ({
                   </div>
                 )}
 
+                {/* Not enough funds: the department's available funds (after
+                    every release and expense) can't cover this request. */}
+                {(() => {
+                  if (!['DRAFT', 'CSC_ADVISER_APPROVAL', 'DEAN_APPROVAL', 'FOR_REVISION'].includes(activeProposal.budget_status)) return null;
+                  const available = departments[activeProposal.department]?.remaining ?? 0;
+                  const short = activeProposal.total_budget_amount - available;
+                  if (short <= 0) return null;
+                  return (
+                    <div className="p-3 rounded-2xl border border-rose-300 bg-rose-50 text-xs text-rose-800 flex items-start gap-2">
+                      <span className="text-base leading-none">⚠️</span>
+                      <span>
+                        <strong>Not enough funds.</strong> {activeProposal.department} has only{' '}
+                        <strong>₱{available.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong> available, but this request needs{' '}
+                        <strong>₱{activeProposal.total_budget_amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
+                        {' '}(short by ₱{short.toLocaleString('en-US', { minimumFractionDigits: 2 })}). Releasing it will make the department's funds negative.
+                      </span>
+                    </div>
+                  );
+                })()}
+
                 {/* 5. Dean Approval & Fund Release — Approve releases funds;
                     Request Revision / Reject both route back to the Officer. */}
                 {currentUser.role === 'dean' && activeProposal.budget_status === 'DEAN_APPROVAL' && (
@@ -628,6 +649,10 @@ export const BudgetProposalWorkflow: React.FC<BudgetProposalWorkflowProps> = ({
                     <span className="font-bold text-xs text-rose-900 block">Dean Executive Approval & Fund Release Authorization</span>
                     <p className="text-xs text-rose-800">
                       Authorize full disbursement of ₱{activeProposal.total_budget_amount.toLocaleString('en-US')} from Student Activity Fund (SAF)?
+                    </p>
+                    <p className="text-[11px] text-rose-900">
+                      {activeProposal.department} available funds now: <strong>₱{(departments[activeProposal.department]?.remaining ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
+                      {' '}• after release: <strong>₱{((departments[activeProposal.department]?.remaining ?? 0) - activeProposal.total_budget_amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
                     </p>
                     <input
                       type="text"
@@ -638,7 +663,18 @@ export const BudgetProposalWorkflow: React.FC<BudgetProposalWorkflowProps> = ({
                     />
                     <div className="flex flex-wrap items-center gap-2">
                       <button
-                        onClick={() => deanApproveProposal(activeProposal.id, 'APPROVED_FUND_RELEASE', reviewRemarks || 'Executive Approval & Fund Release authorized.')}
+                        onClick={() => {
+                          const available = departments[activeProposal.department]?.remaining ?? 0;
+                          const short = activeProposal.total_budget_amount - available;
+                          if (short > 0 && !window.confirm(
+                            `Not enough funds: ${activeProposal.department} has only ₱${available.toLocaleString('en-US', { minimumFractionDigits: 2 })} available, ` +
+                            `but this request needs ₱${activeProposal.total_budget_amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}.
+
+` +
+                            `Releasing it will make the department's funds negative by ₱${short.toLocaleString('en-US', { minimumFractionDigits: 2 })}. Release anyway?`
+                          )) return;
+                          deanApproveProposal(activeProposal.id, 'APPROVED_FUND_RELEASE', reviewRemarks || 'Executive Approval & Fund Release authorized.');
+                        }}
                         className="px-5 py-2.5 bg-[#00873E] hover:bg-[#007033] text-white text-xs font-extrabold rounded-xl shadow-md cursor-pointer"
                       >
                         ✓ Approve & Authorize Fund Release

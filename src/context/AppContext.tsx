@@ -1198,6 +1198,8 @@ ${error.message}`); return; }
   };
 
   const [proposals, setProposals] = useState<BudgetProposal[]>(MOCK_PROPOSALS);
+  // True once real proposals were fetched (the mock list must not move the money figures).
+  const [proposalsLoaded, setProposalsLoaded] = useState(false);
 
   // Reconstructs the app's deeply-nested BudgetProposal shape from a
   // budget_requests row fetched with every related table embedded via
@@ -1365,6 +1367,7 @@ ${error.message}`); return; }
       })
     }));
     setProposals(mapped);
+    setProposalsLoaded(true);
   };
 
   useEffect(() => {
@@ -1378,7 +1381,13 @@ ${error.message}`); return; }
   //             + paid SAF records that have no matching income transaction
   //               (SAF added as already-paid, or registered with the student,
   //               never created one — they'd otherwise be missing entirely)
-  //   spent     = Completed EXPENSE transactions
+  //   spent     = Completed EXPENSE transactions not charged to a budget
+  //             + for each approved budget: the larger of the funds
+  //               released to it and the Completed expenses charged to it
+  //               (money leaves the treasury when it is released; expenses
+  //               paid from that released cash are not counted twice, and
+  //               spending above the release, e.g. reimbursements, still is)
+  //             An unspent budget returned comes back as an INCOME transaction.
   //   remaining = allocated + income - spent
   // Pending transactions are tracked separately (pendingIncome/pendingSpent)
   // and only move the balance once approved. Rejected ones never do.
@@ -1392,17 +1401,34 @@ ${error.message}`); return; }
 
     // SAF receipt numbers already represented by an income transaction.
     const receiptsInTransactions = new Set<string>();
+    // Funds released per budget (cash handed out for that budget).
+    const releasedByBudget = new Map<string, { dept: DepartmentCode; released: number }>();
+    if (proposalsLoaded) {
+      proposals.forEach(p => {
+        const released = p.cashouts
+          .filter(c => c.cashout_status !== 'Pending' && c.cashout_status !== 'Declined')
+          .reduce((s, c) => s + c.amount_released, 0);
+        if (released > 0) releasedByBudget.set(p.id, { dept: p.department, released });
+      });
+    }
+    const chargedToBudget = new Map<string, number>();
     transactions.forEach(tx => {
       const text = `${tx.description || ''} ${tx.reference_code || ''}`;
       for (const m of text.matchAll(/SAF-\d{4}-\d+/g)) receiptsInTransactions.add(m[0]);
 
       if (tx.status === 'Completed') {
         if (tx.type === 'INCOME') bucket(tx.department).income += tx.amount;
-        else bucket(tx.department).spent += tx.amount;
+        else if (tx.proposal_id && releasedByBudget.has(tx.proposal_id)) {
+          chargedToBudget.set(tx.proposal_id, (chargedToBudget.get(tx.proposal_id) || 0) + tx.amount);
+        } else bucket(tx.department).spent += tx.amount;
       } else if (tx.status === 'Pending' || tx.status === 'Processing') {
         if (tx.type === 'INCOME') bucket(tx.department).pendingIncome += tx.amount;
         else bucket(tx.department).pendingSpent += tx.amount;
       }
+    });
+
+    releasedByBudget.forEach(({ dept, released }, id) => {
+      bucket(dept).spent += Math.max(released, chargedToBudget.get(id) || 0);
     });
 
     safRecords.forEach(rec => {
@@ -1427,7 +1453,7 @@ ${error.message}`); return; }
       };
     });
     return next;
-  }, [departments, transactions, safRecords, transactionsLoaded]);
+  }, [departments, transactions, safRecords, transactionsLoaded, proposals, proposalsLoaded]);
 
   // ---------------------------------------------------------------------
   // TRAINED MODEL (TRAIN_MODEL/best_model.h5, scikit-learn Random Forest).

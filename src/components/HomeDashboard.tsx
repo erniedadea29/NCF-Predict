@@ -161,15 +161,21 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
                 </span>
               </div>
               {/* Current balance: goes UP with every income (SAF, penalties,
-                  returns) and DOWN with every expense, as soon as it's Completed. */}
+                  returns) and DOWN with every expense as soon as it's Completed,
+                  and with the funds released to an approved budget. */}
               <h2 className={`text-3xl sm:text-4xl font-extrabold tracking-tight mt-0.5 ${totalRemaining < 0 ? 'text-rose-200' : ''}`}>
                 {peso(totalRemaining)}
               </h2>
               <p className="text-[11px] text-emerald-100 mt-1 font-mono">
                 {peso(totalAllocated)} allocated
                 <span className="text-lime-200"> + {peso(totalIncome)} collected</span>
-                <span className="text-rose-200"> − {peso(totalSpent)} spent</span>
+                <span className="text-rose-200"> − {peso(totalSpent)} spent / released</span>
               </p>
+              {totalRemaining < 0 && (
+                <p className="mt-1.5 inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-rose-600 text-white text-[11px] font-bold">
+                  ⚠️ Not enough funds: released budgets and expenses exceed the available funds by {peso(-totalRemaining)}.
+                </p>
+              )}
               {(pendingIncome > 0 || pendingSpent > 0) && (
                 <p className="text-[11px] text-amber-200 mt-0.5">
                   Awaiting approval (not yet counted):
