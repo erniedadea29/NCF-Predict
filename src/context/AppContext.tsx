@@ -1853,7 +1853,7 @@ ${error.message}`); return; }
       setMfaChallenge(null);
       setIsAuthModalOpen(true);
       setAuthModalMode('login');
-      alert('Na-log out ka: may nag-login sa account mo sa ibang device. You were signed out because this account signed in on another device. Only one device can use an account at a time.');
+      alert('You have been logged out because your account was signed in on another device. Only one device can use an account at a time.');
     };
 
     const check = async () => {
