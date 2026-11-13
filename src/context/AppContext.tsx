@@ -2002,8 +2002,17 @@ ${error.message}`); return; }
   }, [deviceGate, isAuthenticated, currentUser.id]);
 
   const logoutUser = () => {
+    const key = readSessionKey();
     writeSessionKey(null);
-    getSupabase().auth.signOut();
+    const client = getSupabase();
+    // Free the account first (so signing in again isn't treated as a second
+    // device), then end the login.
+    (async () => {
+      if (key) {
+        try { await client.rpc('release_active_session', { p_session_key: key }); } catch { /* not installed / offline */ }
+      }
+      await client.auth.signOut();
+    })();
     // onAuthStateChange also handles this, but flip immediately for a snappy UI.
     setCurrentUser(GUEST_USER);
     setIsAuthenticated(false);
