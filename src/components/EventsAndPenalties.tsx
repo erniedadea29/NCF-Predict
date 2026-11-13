@@ -1124,7 +1124,7 @@ export const EventsAndPenalties: React.FC = () => {
                 const collapsed = collapsedYears.has(year);
                 return (
                   <div key={year} className="space-y-2">
-                    <div className="sticky top-0 z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-3 py-2 rounded-xl bg-slate-800 text-white text-xs">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-3 py-2 rounded-xl bg-slate-800 text-white text-xs">
                       <button
                         onClick={() => setCollapsedYears(prev => { const n = new Set(prev); if (n.has(year)) n.delete(year); else n.add(year); return n; })}
                         className="flex items-center gap-2 font-black text-left cursor-pointer"
