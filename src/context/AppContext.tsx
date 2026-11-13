@@ -267,7 +267,7 @@ interface AppContextType {
   }) => Promise<boolean>;
   executiveReviewProposal: (id: string, decision: 'APPROVED_TO_COUNCIL' | 'NEEDS_REVISION' | 'REJECTED', remarks: string) => void;
   voteOnProposal: (proposalId: string, vote: 'IN_FAVOR' | 'AGAINST' | 'ABSTAIN', comment: string) => void;
-  addProposalNote: (proposalId: string, noteContent: string, isOfficial?: boolean) => void;
+  addProposalNote: (proposalId: string, noteContent: string, isOfficial?: boolean, visibility?: 'all' | 'officers') => Promise<boolean>;
   adviserApproveProposal: (proposalId: string, decision: 'APPROVED' | 'REVISION' | 'REJECTED', remarks: string) => void;
   deanApproveProposal: (proposalId: string, decision: 'APPROVED_FUND_RELEASE' | 'REVISION' | 'REJECTED', remarks: string) => void;
   
@@ -1247,7 +1247,9 @@ ${error.message}`); return; }
       id: n.id, author_id: n.author_id,
       author_name: n.author?.full_name || '',
       author_role: roleLabel(n.author?.role, n.author?.officer_position),
-      note_content: n.note_content, created_at: n.created_at, is_official: n.is_official
+      author_role_key: n.author?.role || undefined,
+      note_content: n.note_content, created_at: n.created_at, is_official: n.is_official,
+      visibility: n.visibility === 'officers' ? 'officers' : 'all'
     })),
     adviser_approval: row.adviser_id ? {
       adviser_name: row.adviser?.full_name || '', decision: row.adviser_decision, remarks: row.adviser_remarks || '',
@@ -1344,22 +1346,22 @@ ${error.message}`); return; }
     // usually empty. get_note_authors (SECURITY DEFINER) returns just the
     // display name/role for notes the caller may see. The caller's own notes
     // are labelled from their session even before that function is installed.
-    const authors: Record<string, { name: string; role: string }> = {};
+    const authors: Record<string, { name: string; role: string; key?: string }> = {};
     const proposalIds = mapped.map(p => p.id);
     if (proposalIds.length > 0) {
       const { data: rows, error: authorErr } = await client.rpc('get_note_authors', { p_proposal_ids: proposalIds });
       if (authorErr) console.warn('Could not load note authors (run supabase/migrations/20261113_note_authors.sql)', authorErr);
       (rows || []).forEach((r: any) => {
-        if (r.author_name) authors[r.note_id] = { name: r.author_name, role: roleLabel(r.author_role, r.author_position) };
+        if (r.author_name) authors[r.note_id] = { name: r.author_name, role: roleLabel(r.author_role, r.author_position), key: r.author_role || undefined };
       });
     }
-    const me = { name: currentUser.name, role: roleLabel(currentUser.role, currentUser.officer_position) };
+    const me = { name: currentUser.name, role: roleLabel(currentUser.role, currentUser.officer_position), key: currentUser.role as string | undefined };
     mapped = mapped.map(p => ({
       ...p,
       notes: p.notes.map(n => {
         if (n.author_name) return n;
         const found = authors[n.id] || (n.author_id === currentUser.id ? me : null);
-        return found ? { ...n, author_name: found.name, author_role: n.author_role || found.role } : n;
+        return found ? { ...n, author_name: found.name, author_role: n.author_role || found.role, author_role_key: n.author_role_key || found.key } : n;
       })
     }));
     setProposals(mapped);
@@ -3154,27 +3156,39 @@ ${rpc.error.message}`);
     }));
   };
 
-  const addProposalNote = async (proposalId: string, noteContent: string, isOfficial: boolean = true) => {
+  const addProposalNote = async (proposalId: string, noteContent: string, isOfficial: boolean = true, visibility: 'all' | 'officers' = 'all'): Promise<boolean> => {
     const client = getSupabase();
-    if (currentUser.id === 'guest') return;
-    const { data, error } = await client.from('proposal_notes').insert({
+    if (currentUser.id === 'guest') return false;
+    const row: Record<string, unknown> = {
       proposal_id: proposalId,
       author_id: currentUser.id,
       note_content: noteContent,
       is_official: isOfficial
-    }).select().single();
-    if (error || !data) { console.error('Failed to add note', error); return; }
+    };
+    // Group notes keep the old insert shape, so they work even before the private-notes SQL is run.
+    if (visibility === 'officers') row.visibility = 'officers';
+    const { data, error } = await client.from('proposal_notes').insert(row).select().single();
+    if (error || !data) {
+      console.error('Failed to add note', error);
+      alert(visibility === 'officers' && /visibility/i.test(error?.message || '')
+        ? 'Officers-only notes are not set up yet. Run supabase/migrations/20261114_private_officer_notes.sql in Supabase.'
+        : `Could not add the note: ${error?.message || 'unknown error'}`);
+      return false;
+    }
 
     const newNote: ProposalNote = {
       id: data.id,
       author_id: currentUser.id,
       author_name: currentUser.name,
       author_role: roleLabel(currentUser.role, currentUser.officer_position),
+      author_role_key: currentUser.role,
       note_content: noteContent,
       created_at: new Date().toLocaleString(),
-      is_official: isOfficial
+      is_official: isOfficial,
+      visibility
     };
     setProposals(prev => prev.map(p => p.id === proposalId ? { ...p, notes: [...p.notes, newNote], updated_at: new Date().toISOString().slice(0, 10) } : p));
+    return true;
   };
 
   const adviserApproveProposal = async (proposalId: string, decision: 'APPROVED' | 'REVISION' | 'REJECTED', remarks: string) => {

@@ -84,6 +84,10 @@ export const BudgetProposalWorkflow: React.FC<BudgetProposalWorkflowProps> = ({
   const [selectedProposalId, setSelectedProposalId] = useState<string>(() => displayProposals[0]?.id || '');
   const [printableProposal, setPrintableProposal] = useState<BudgetProposal | null>(null);
   const [newComment, setNewComment] = useState<string>('');
+  // Notes thread shown: group chat (Adviser, Dean & officers) or officers-only.
+  const [notesThread, setNotesThread] = useState<'all' | 'officers'>('all');
+  const isCouncilOfficer = ['officer_treasurer', 'officer_governor', 'council_member'].includes(currentUser.role);
+  const activeThread: 'all' | 'officers' = isCouncilOfficer ? notesThread : 'all';
   const [reviewRemarks, setReviewRemarks] = useState<string>('');
   const [proposalSearch, setProposalSearch] = useState<string>('');
 
@@ -129,8 +133,9 @@ export const BudgetProposalWorkflow: React.FC<BudgetProposalWorkflowProps> = ({
   const handleAddNote = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newComment.trim() || !activeProposal) return;
-    addProposalNote(activeProposal.id, newComment.trim(), true);
+    const text = newComment.trim();
     setNewComment('');
+    addProposalNote(activeProposal.id, text, true, activeThread).then(ok => { if (!ok) setNewComment(text); });
   };
 
   const userVoted = activeProposal?.votes?.find(v => v.council_member_id === currentUser.id);
@@ -716,57 +721,104 @@ export const BudgetProposalWorkflow: React.FC<BudgetProposalWorkflowProps> = ({
                 )}
               </div>
 
-              {/* Collaborative Notes & Comments Section */}
-              <div className="space-y-3 pt-3 border-t border-slate-100">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-black uppercase text-slate-800 tracking-wider flex items-center gap-1.5">
-                    <MessageSquare className="w-4 h-4 text-amber-500" />
-                    Council Notes & Remarks
-                  </h4>
-                  <span className="text-[11px] text-slate-400">{activeProposal.notes.length} Notes</span>
-                </div>
-
-                {/* Notes List */}
-                <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                  {activeProposal.notes.map((n) => (
-                    <div key={n.id} className="p-3 bg-amber-50/60 rounded-xl border border-amber-200/60 text-xs space-y-1">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="flex flex-wrap items-center gap-1.5">
-                          <span className="font-bold text-slate-900">{n.author_name || 'Unknown user'}</span>
-                          {n.author_role && (
-                            <span className="px-1.5 py-0.5 rounded-md bg-amber-100 border border-amber-300 text-amber-900 text-[10px] font-bold">
-                              {n.author_role}
-                            </span>
-                          )}
-                        </span>
-                        <span className="text-[10px] text-slate-400 shrink-0">{formatDateTime(n.created_at)}</span>
+              {/* Notes as chat threads: a Group Chat for the Adviser, Dean and
+                  officers, and an Officers Only thread that only council
+                  officers can see (private; enforced by the database too).
+                  Students read the group chat only. */}
+              {(() => {
+                const groupNotes = activeProposal.notes.filter(n => n.visibility !== 'officers');
+                const privateNotes = isCouncilOfficer ? activeProposal.notes.filter(n => n.visibility === 'officers') : [];
+                const shown = activeThread === 'officers' ? privateNotes : groupNotes;
+                const isPrivate = activeThread === 'officers';
+                return (
+                  <div className="space-y-3 pt-3 border-t border-slate-100">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <h4 className="text-xs font-black uppercase text-slate-800 tracking-wider flex items-center gap-1.5">
+                        <MessageSquare className="w-4 h-4 text-amber-500" />
+                        Notes & Remarks
+                      </h4>
+                      <div className="flex rounded-xl border border-slate-200 bg-slate-50 p-1 text-[11px] font-bold">
+                        <button
+                          type="button"
+                          onClick={() => setNotesThread('all')}
+                          className={`px-3 py-1 rounded-lg transition cursor-pointer ${activeThread === 'all' ? 'bg-white text-[#00873E] shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
+                        >
+                          Group Chat ({groupNotes.length})
+                        </button>
+                        {isCouncilOfficer && (
+                          <button
+                            type="button"
+                            onClick={() => setNotesThread('officers')}
+                            className={`px-3 py-1 rounded-lg transition cursor-pointer flex items-center gap-1 ${isPrivate ? 'bg-white text-violet-700 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
+                          >
+                            <Lock className="w-3 h-3" /> Officers Only ({privateNotes.length})
+                          </button>
+                        )}
                       </div>
-                      <p className="text-slate-700">{n.note_content}</p>
                     </div>
-                  ))}
-                </div>
+                    <p className={`text-[11px] rounded-lg px-2.5 py-1.5 border ${isPrivate ? 'bg-violet-50 border-violet-200 text-violet-800' : 'bg-slate-50 border-slate-200 text-slate-500'}`}>
+                      {isPrivate
+                        ? 'Private: only council officers can see these notes. The Adviser and Dean cannot.'
+                        : 'Seen by the Adviser, the Dean and the council officers.'}
+                    </p>
 
-                {/* Add Note Form — students see the notes above read-only */}
-                {!isReadOnlyStudent && (
-                  <form onSubmit={handleAddNote} className="flex gap-2">
-                    <input
-                      type="text"
-                      required
-                      placeholder="Type a note or remark..."
-                      value={newComment}
-                      onChange={(e) => setNewComment(e.target.value)}
-                      className="flex-1 px-3.5 py-2 text-xs bg-slate-50 focus:bg-white rounded-xl border border-slate-200 focus:outline-emerald-500 font-medium"
-                    />
-                    <button
-                      type="submit"
-                      className="px-4 py-2 bg-[#00873E] hover:bg-[#007033] text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer flex items-center gap-1"
-                    >
-                      <Send className="w-3.5 h-3.5" />
-                      <span>Add Note</span>
-                    </button>
-                  </form>
-                )}
-              </div>
+                    <div className={`space-y-2 max-h-64 overflow-y-auto p-2 rounded-xl border ${isPrivate ? 'bg-violet-50/40 border-violet-100' : 'bg-slate-50/50 border-slate-100'}`}>
+                      {shown.length === 0 && (
+                        <p className="text-[11px] text-slate-400 text-center py-4">No messages yet.</p>
+                      )}
+                      {shown.map((n) => {
+                        const mine = n.author_id === currentUser.id;
+                        const reviewer = ['csc_adviser', 'dean', 'admin', 'super_admin'].includes(n.author_role_key || '');
+                        return (
+                          <div key={n.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
+                            <div className={`max-w-[85%] px-3 py-2 rounded-2xl border text-xs space-y-0.5 ${
+                              mine ? 'bg-emerald-50 border-emerald-200 rounded-br-md'
+                                : reviewer ? 'bg-sky-50 border-sky-200 rounded-bl-md'
+                                : 'bg-white border-slate-200 rounded-bl-md'
+                            }`}>
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <span className="font-bold text-slate-900">{mine ? 'You' : (n.author_name || 'Unknown user')}</span>
+                                {n.author_role && (
+                                  <span className={`px-1.5 py-0.5 rounded-md border text-[10px] font-bold ${
+                                    reviewer ? 'bg-sky-100 border-sky-300 text-sky-900' : 'bg-amber-100 border-amber-300 text-amber-900'
+                                  }`}>
+                                    {n.author_role}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-slate-700 whitespace-pre-wrap break-words">{n.note_content}</p>
+                              <p className="text-[10px] text-slate-400 text-right">{formatDateTime(n.created_at)}</p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Students read the group chat only. */}
+                    {!isReadOnlyStudent && (
+                      <form onSubmit={handleAddNote} className="flex gap-2">
+                        <input
+                          type="text"
+                          required
+                          placeholder={isPrivate ? 'Message the officers only...' : 'Message the Adviser, Dean and officers...'}
+                          value={newComment}
+                          onChange={(e) => setNewComment(e.target.value)}
+                          className="flex-1 min-w-0 px-3.5 py-2 text-xs bg-slate-50 focus:bg-white rounded-xl border border-slate-200 focus:outline-emerald-500 font-medium"
+                        />
+                        <button
+                          type="submit"
+                          className={`px-4 py-2 text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer flex items-center gap-1 shrink-0 ${
+                            isPrivate ? 'bg-violet-600 hover:bg-violet-700' : 'bg-[#00873E] hover:bg-[#007033]'
+                          }`}
+                        >
+                          {isPrivate ? <Lock className="w-3.5 h-3.5" /> : <Send className="w-3.5 h-3.5" />}
+                          <span>Send</span>
+                        </button>
+                      </form>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           </div>
         ) : (

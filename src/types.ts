@@ -299,9 +299,13 @@ export interface ProposalNote {
   author_id: string;
   author_name: string;
   author_role: string;
+  /** Raw profile role of the author (e.g. 'dean'), used to group notes. */
+  author_role_key?: string;
   note_content: string;
   created_at: string;
   is_official: boolean;
+  /** 'all' = group chat (Adviser, Dean & officers); 'officers' = officers only. */
+  visibility?: 'all' | 'officers';
 }
 
 export interface CashoutRecord {
