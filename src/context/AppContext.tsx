@@ -1974,9 +1974,12 @@ ${error.message}`); return; }
     };
 
     tick();
-    const timer = window.setInterval(tick, 20000);
+    const timer = window.setInterval(tick, 15000);
     const onFocus = () => { tick(); };
+    // Phones pause background tabs: check again as soon as the page is shown.
+    const onVisible = () => { if (document.visibilityState === 'visible') tick(); };
     window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisible);
     const channel = client
       .channel(`device-${userId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'active_sessions', filter: `user_id=eq.${userId}` },
@@ -1992,6 +1995,7 @@ ${error.message}`); return; }
       stopped = true;
       window.clearInterval(timer);
       window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisible);
       client.removeChannel(channel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
