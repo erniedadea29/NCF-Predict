@@ -152,6 +152,9 @@ export const EventsAndPenalties: React.FC = () => {
   const [payingPenalty, setPayingPenalty] = useState<{ attendanceId: string; studentName: string; amount: number } | null>(null);
   const [penaltyRemark, setPenaltyRemark] = useState('');
   const [attendanceSearch, setAttendanceSearch] = useState('');
+  // Attendance roster: filter by year level and collapse year-level groups.
+  const [attendanceYear, setAttendanceYear] = useState('ALL');
+  const [collapsedYears, setCollapsedYears] = useState<Set<string>>(new Set());
 
   const displayEvents = (isDepartmentRestricted ? scopedEvents : events).filter(isEventVisible);
   const pendingReviewEvents = canReviewEvents ? displayEvents.filter(ev => ev.status === 'PENDING_APPROVAL') : [];
@@ -159,6 +162,22 @@ export const EventsAndPenalties: React.FC = () => {
     ? attendances.filter(a => a.student_number === currentUser.student_number)
     : (isDepartmentRestricted ? scopedAttendances : attendances);
   const displayStudents = isDepartmentRestricted ? scopedStudents : students;
+
+  // Year levels present in the roster, in order (1st, 2nd, 3rd, 4th, then others).
+  const yearLabel = (s: { year_level?: string }) => (s.year_level || '').trim() || 'No Year Level';
+  const yearRank = (y: string) => { const m = y.match(/\d/); return m ? Number(m[0]) : 99; };
+  const rosterYears = Array.from(new Set(displayStudents.map(yearLabel)))
+    .sort((a, b) => yearRank(a) - yearRank(b) || a.localeCompare(b));
+
+  // Mark every student of one year level (or the whole roster) at once.
+  const markStudents = (list: typeof displayStudents, status: 'Present' | 'Absent' | 'Excused', label: string) => {
+    if (!selectedEventForAttendance || list.length === 0) return;
+    if (!window.confirm(`Mark all ${list.length} student(s) of ${label} as ${status}?`)) return;
+    list.forEach(stud => recordAttendance(
+      selectedEventForAttendance.id, stud.id, status,
+      status === 'Excused' ? `Excused (${label})` : undefined
+    ));
+  };
 
   // Key KPI metrics
   const totalEventsCount = displayEvents.length;
@@ -1048,15 +1067,25 @@ export const EventsAndPenalties: React.FC = () => {
                   Unexcused absences incur a <strong>₱{(selectedEventForAttendance.penalty ?? selectedEventForAttendance.penalty_fee_amount ?? 50).toFixed(2)}</strong> penalty.
                 </p>
                 <button
-                  onClick={() => {
-                    displayStudents.forEach(stud => {
-                      recordAttendance(selectedEventForAttendance.id, stud.id, 'Present');
-                    });
-                  }}
+                  onClick={() => markStudents(displayStudents, 'Present', 'the whole roster')}
                   className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-xl text-xs shadow-2xs whitespace-nowrap cursor-pointer"
                 >
                   ✓ Mark All Present
                 </button>
+              </div>
+
+              <div className="flex flex-wrap gap-1.5 text-[11px] font-bold">
+                {['ALL', ...rosterYears].map(y => (
+                  <button
+                    key={y}
+                    onClick={() => setAttendanceYear(y)}
+                    className={`px-2.5 py-1 rounded-full border transition cursor-pointer ${
+                      attendanceYear === y ? 'bg-slate-900 border-slate-900 text-white' : 'bg-white border-slate-200 text-slate-600 hover:border-slate-400'
+                    }`}
+                  >
+                    {y === 'ALL' ? `All Year Levels (${displayStudents.length})` : `${y} (${displayStudents.filter(s => yearLabel(s) === y).length})`}
+                  </button>
+                ))}
               </div>
 
               <div className="relative">
@@ -1071,9 +1100,10 @@ export const EventsAndPenalties: React.FC = () => {
               </div>
             </div>
 
-            <div className="p-5 space-y-2 overflow-y-auto flex-1">
-              {displayStudents
-                .filter(stud => {
+            <div className="p-5 space-y-4 overflow-y-auto flex-1">
+              {rosterYears.filter(y => attendanceYear === 'ALL' || attendanceYear === y).map(year => {
+                const yearStudents = displayStudents.filter(s => yearLabel(s) === year);
+                const shown = yearStudents.filter(stud => {
                   if (!attendanceSearch.trim()) return true;
                   const q = attendanceSearch.toLowerCase();
                   return (
@@ -1081,8 +1111,33 @@ export const EventsAndPenalties: React.FC = () => {
                     stud.last_name.toLowerCase().includes(q) ||
                     stud.student_number.toLowerCase().includes(q)
                   );
-                })
-                .map((stud) => {
+                });
+                if (attendanceSearch.trim() && shown.length === 0) return null;
+                const statusOf = (stud: typeof displayStudents[number]) => attendances.find(
+                  a => a.event_id === selectedEventForAttendance.id && (a.student_id === stud.id || a.student_number === stud.student_number)
+                )?.status;
+                const tally = (st: string) => yearStudents.filter(s => statusOf(s) === st).length;
+                const collapsed = collapsedYears.has(year);
+                return (
+                  <div key={year} className="space-y-2">
+                    <div className="sticky top-0 z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-3 py-2 rounded-xl bg-slate-800 text-white text-xs">
+                      <button
+                        onClick={() => setCollapsedYears(prev => { const n = new Set(prev); if (n.has(year)) n.delete(year); else n.add(year); return n; })}
+                        className="flex items-center gap-2 font-black text-left cursor-pointer"
+                      >
+                        <span>{collapsed ? '▸' : '▾'} {year}</span>
+                        <span className="font-medium text-slate-300 text-[11px]">
+                          {yearStudents.length} students • {tally('Present')} present • {tally('Absent')} absent • {tally('Excused')} excused
+                        </span>
+                      </button>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <span className="text-[10px] text-slate-400 uppercase font-bold">Mark all:</span>
+                        <button onClick={() => markStudents(yearStudents, 'Present', year)} className="px-2 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 font-bold text-[11px] cursor-pointer">Present</button>
+                        <button onClick={() => markStudents(yearStudents, 'Absent', year)} className="px-2 py-1 rounded-lg bg-rose-600 hover:bg-rose-700 font-bold text-[11px] cursor-pointer">Absent</button>
+                        <button onClick={() => markStudents(yearStudents, 'Excused', year)} className="px-2 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 font-bold text-[11px] cursor-pointer">Excused</button>
+                      </div>
+                    </div>
+                    {!collapsed && shown.map((stud) => {
                   const existingAtt = attendances.find(
                     a => a.event_id === selectedEventForAttendance.id && (a.student_id === stud.id || a.student_number === stud.student_number)
                   );
@@ -1139,6 +1194,9 @@ export const EventsAndPenalties: React.FC = () => {
                     </div>
                   );
                 })}
+                  </div>
+                );
+              })}
             </div>
 
             <div className="p-4 bg-slate-100 border-t border-slate-200 flex items-center justify-between shrink-0">
