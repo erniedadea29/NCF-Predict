@@ -90,6 +90,7 @@ export const EventsAndPenalties: React.FC = () => {
     proposeEvent,
     reviewEvent,
     recordAttendance,
+    clearAttendance,
     payPenalty,
     isReadOnlyStudent,
     isViewOnlyReviewer,
@@ -1102,7 +1103,10 @@ export const EventsAndPenalties: React.FC = () => {
 
             <div className="p-5 space-y-4 overflow-y-auto flex-1">
               {rosterYears.filter(y => attendanceYear === 'ALL' || attendanceYear === y).map(year => {
-                const yearStudents = displayStudents.filter(s => yearLabel(s) === year);
+                // Alphabetical by surname, then first name.
+                const yearStudents = displayStudents.filter(s => yearLabel(s) === year)
+                  .slice().sort((a, b) => a.last_name.localeCompare(b.last_name, undefined, { sensitivity: 'base' })
+                    || a.first_name.localeCompare(b.first_name, undefined, { sensitivity: 'base' }));
                 const shown = yearStudents.filter(stud => {
                   if (!attendanceSearch.trim()) return true;
                   const q = attendanceSearch.toLowerCase();
@@ -1135,6 +1139,19 @@ export const EventsAndPenalties: React.FC = () => {
                         <button onClick={() => markStudents(yearStudents, 'Present', year)} className="px-2 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 font-bold text-[11px] cursor-pointer">Present</button>
                         <button onClick={() => markStudents(yearStudents, 'Absent', year)} className="px-2 py-1 rounded-lg bg-rose-600 hover:bg-rose-700 font-bold text-[11px] cursor-pointer">Absent</button>
                         <button onClick={() => markStudents(yearStudents, 'Excused', year)} className="px-2 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 font-bold text-[11px] cursor-pointer">Excused</button>
+                        <button
+                          onClick={async () => {
+                            const marked = yearStudents.filter(s => statusOf(s));
+                            if (marked.length === 0) { alert(`No marks to clear in ${year}.`); return; }
+                            if (!window.confirm(`Clear the attendance marks of ${marked.length} student(s) in ${year}? They go back to not yet marked. Paid absence penalties are kept.`)) return;
+                            const n = await clearAttendance(selectedEventForAttendance.id, marked.map(s => s.id));
+                            if (n > 0 && n < marked.length) alert(`${n} cleared. ${marked.length - n} kept (paid penalty or not allowed).`);
+                          }}
+                          className="px-2 py-1 rounded-lg bg-slate-600 hover:bg-slate-500 font-bold text-[11px] cursor-pointer"
+                          title="Undo the marks of this year level"
+                        >
+                          Clear
+                        </button>
                       </div>
                     </div>
                     {!collapsed && shown.map((stud) => {

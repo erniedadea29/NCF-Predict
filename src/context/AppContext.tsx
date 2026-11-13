@@ -252,6 +252,7 @@ interface AppContextType {
   attendances: EventAttendance[];
   penalties: EventAttendance[];
   recordAttendance: (eventId: string, studentId: string, status: 'Present' | 'Absent' | 'Excused', remarks?: string) => void;
+  clearAttendance: (eventId: string, studentIds: string[]) => Promise<number>;
   updateAttendancePhoto: (attendanceId: string, photoPath: string) => Promise<void>;
   payPenalty: (attendanceId: string, receiptNo?: string, confirmationRemark?: string) => void;
 
@@ -2789,6 +2790,38 @@ ${error?.message || 'The database did not save it.'}`);
     });
   };
 
+  // Undo attendance marks (back to "not yet marked") for some students of an
+  // event. Paid absence penalties are kept so no payment record is lost.
+  // Returns how many marks were cleared.
+  const clearAttendance = async (eventId: string, studentIds: string[]): Promise<number> => {
+    const ids = new Set(studentIds);
+    const targets = attendances.filter(a => a.event_id === eventId && ids.has(a.student_id)
+      && !(a.status === 'Absent' && a.penalty_paid));
+    if (targets.length === 0) return 0;
+    const client = getSupabase();
+    const rowIds = targets.map(t => t.id);
+    let cleared: string[] = [];
+    const { data: rpcData, error: rpcError } = await client.rpc('clear_event_attendance', { p_event_id: eventId, p_attendance_ids: rowIds });
+    if (!rpcError) {
+      cleared = ((rpcData as string[] | null) || []);
+    } else if (rpcError.code === 'PGRST202' || rpcError.code === '42883') {
+      const { data, error } = await client.from('event_attendance').delete().in('id', rowIds).select('id');
+      if (error) { console.error('Failed to clear attendance', error); alert(`Could not clear attendance: ${error.message}`); return 0; }
+      cleared = (data || []).map((r: { id: string }) => r.id);
+    } else {
+      console.error('Failed to clear attendance', rpcError);
+      alert(`Could not clear attendance: ${rpcError.message}`);
+      return 0;
+    }
+    if (cleared.length === 0) {
+      alert('Attendance was not cleared: your account is not allowed to remove attendance records. Ask the Super Admin to run the clear_event_attendance SQL.');
+      return 0;
+    }
+    const done = new Set(cleared);
+    setAttendances(prev => prev.filter(a => !done.has(a.id)));
+    return cleared.length;
+  };
+
   // Student self-check-in photo (Section 10) — the row must already exist
   // (created when the officer takes attendance); RLS/the Phase 0 guard
   // trigger restrict a student's own update to photo_url/notes only, never
@@ -3620,6 +3653,7 @@ ${error?.message || 'The database did not save the report.'}`);
         attendances: usableAttendances,
         penalties: usableAttendances,
         recordAttendance,
+        clearAttendance,
         updateAttendancePhoto,
         payPenalty,
         proposals,
