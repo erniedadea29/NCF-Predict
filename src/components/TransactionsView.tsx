@@ -158,11 +158,21 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ onOpenAddMod
         </div>
 
         {/* Toggle Archive & Refresh */}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Add Transaction sits up here so it is easy to find. */}
+          {!hideWriteActions && (
+            <button
+              onClick={onOpenAddModal}
+              className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs font-extrabold bg-[#00873E] hover:bg-[#007033] text-white shadow-md ring-2 ring-emerald-200 transition cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add Transaction</span>
+            </button>
+          )}
           <button
             onClick={exportFilteredCsv}
             disabled={filteredTransactions.length === 0}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-[#00873E] hover:bg-[#007033] disabled:bg-slate-300 text-white shadow-2xs transition cursor-pointer disabled:cursor-not-allowed"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-white hover:bg-slate-50 border border-slate-300 disabled:text-slate-300 text-slate-700 shadow-2xs transition cursor-pointer disabled:cursor-not-allowed"
           >
             <Download className="w-3.5 h-3.5" />
             <span>Export Report (CSV)</span>
@@ -373,18 +383,6 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ onOpenAddMod
         </div>
       )}
 
-      {/* Floating / Bottom Sticky Action Button matching PDF screenshots */}
-      {!hideWriteActions && (
-        <div className="fixed bottom-6 right-6 z-30">
-          <button
-            onClick={onOpenAddModal}
-            className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-[#00873E] hover:bg-[#007033] text-white font-bold text-sm shadow-xl transition transform hover:scale-105 active:scale-95 cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            <span>+ Add Transaction</span>
-          </button>
-        </div>
-      )}
     </div>
   );
 };
