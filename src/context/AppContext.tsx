@@ -1094,12 +1094,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const pdfBlob = buildAdviserHandoverPdf();
       const storagePath = `handover/${userDepartment}/${currentUser.id}/${Date.now()}.pdf`;
       const { error: uploadErr } = await client.storage.from('handover-files').upload(storagePath, pdfBlob, {
-        contentType: 'application/pdf', upsert: true
+        // Each file gets a new timestamped path, so no overwrite is needed;
+        // upsert would also require an UPDATE storage policy.
+        contentType: 'application/pdf', upsert: false
       });
-      if (uploadErr) return { success: false, message: uploadErr.message };
+      if (uploadErr) return { success: false, message: `Upload failed: ${uploadErr.message}` };
 
       const { error: rpcErr } = await client.rpc('send_adviser_handover_file', { p_file_path: storagePath });
-      if (rpcErr) return { success: false, message: rpcErr.message };
+      if (rpcErr) return { success: false, message: `Saving the file record failed: ${rpcErr.message}` };
 
       await refreshHandoverData();
       return { success: true, message: 'Activity log & records file sent to your Admin and Dean.' };
