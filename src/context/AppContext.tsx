@@ -984,102 +984,315 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const doc = new jsPDF({ unit: 'pt', format: 'a4' });
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
-    const centerX = pageWidth / 2;
-    let y = 60;
+    const margin = 40;
+    const contentWidth = pageWidth - margin * 2;
+    const green: [number, number, number] = [0, 135, 62];
+    let y = 50;
 
-    const ensureRoom = (needed: number) => {
-      if (y + needed > pageHeight - 50) { doc.addPage(); y = 60; }
-    };
-    const sectionHeader = (title: string) => {
-      ensureRoom(50);
-      y += 10;
-      doc.setDrawColor(0, 135, 62);
-      doc.setLineWidth(1);
-      doc.line(60, y, pageWidth - 60, y);
-      y += 20;
+    // The built-in PDF font only has Latin-1 characters; anything else
+    // (the peso sign, bullets, long dashes) breaks the spacing of the line.
+    const clean = (v: unknown) => String(v ?? '')
+      .replace(/₱/g, 'PHP ')
+      .replace(/[—–]/g, '-')
+      .replace(/[•·]/g, '|')
+      .replace(/[‘’]/g, "'")
+      .replace(/[“”]/g, '"')
+      .replace(/[^\x20-\x7E\xA0-\xFF]/g, '');
+    const money = (n: number) => `PHP ${Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const label = (s?: string) => clean((s || '').replace(/_/g, ' '));
+
+    const newPage = () => { doc.addPage(); y = 50; };
+    const ensureRoom = (needed: number) => { if (y + needed > pageHeight - 45) newPage(); };
+
+    const sectionHeader = (title: string, subtitle?: string) => {
+      ensureRoom(60);
+      y += 14;
+      doc.setFillColor(...green);
+      doc.rect(margin, y, contentWidth, 22, 'F');
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(12);
-      doc.setTextColor(0, 135, 62);
-      doc.text(title, 60, y);
+      doc.setFontSize(11);
+      doc.setTextColor(255, 255, 255);
+      doc.text(clean(title), margin + 8, y + 15);
+      doc.setTextColor(0, 0, 0);
+      y += 30;
+      if (subtitle) {
+        doc.setFont('helvetica', 'italic');
+        doc.setFontSize(8.5);
+        doc.setTextColor(90, 90, 90);
+        doc.splitTextToSize(clean(subtitle), contentWidth).forEach((l: string) => { doc.text(l, margin, y + 8); y += 11; });
+        doc.setTextColor(0, 0, 0);
+        y += 4;
+      }
+    };
+
+    const note = (text: string) => {
+      ensureRoom(18);
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(9);
+      doc.setTextColor(110, 110, 110);
+      doc.text(clean(text), margin, y + 10);
       doc.setTextColor(0, 0, 0);
       y += 18;
     };
-    const line = (text: string, opts?: { bold?: boolean; size?: number }) => {
-      ensureRoom(16);
-      doc.setFont('helvetica', opts?.bold ? 'bold' : 'normal');
-      doc.setFontSize(opts?.size || 9.5);
-      doc.text(text, 60, y);
-      y += 15;
+
+    type Col = { header: string; width: number; align?: 'left' | 'right' | 'center' };
+    type Rgb = [number, number, number];
+    const table = (cols: Col[], rows: string[][], opts?: { boldFirstCol?: boolean; cellColor?: (row: number, col: number) => Rgb | null }) => {
+      const fontSize = 8;
+      const lineH = 10;
+      const padX = 4;
+      const padY = 4;
+      const widths = cols.map(c => c.width * contentWidth);
+
+      const drawHeader = () => {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(fontSize);
+        const headerLines = cols.map((c, i) => doc.splitTextToSize(clean(c.header), widths[i] - padX * 2) as string[]);
+        const h = Math.max(...headerLines.map(l => l.length)) * lineH + padY * 2;
+        doc.setFillColor(230, 243, 235);
+        doc.rect(margin, y, contentWidth, h, 'F');
+        doc.setTextColor(0, 90, 40);
+        let x = margin;
+        cols.forEach((c, i) => {
+          headerLines[i].forEach((l, li) => {
+            const tx = c.align === 'right' ? x + widths[i] - padX : c.align === 'center' ? x + widths[i] / 2 : x + padX;
+            doc.text(l, tx, y + padY + lineH * (li + 1) - 2, { align: c.align || 'left' });
+          });
+          x += widths[i];
+        });
+        doc.setTextColor(0, 0, 0);
+        y += h;
+      };
+
+      ensureRoom(40);
+      drawHeader();
+      rows.forEach((row, ri) => {
+        const cellLines = row.map((cell, i) => {
+          doc.setFont('helvetica', opts?.boldFirstCol && i === 0 ? 'bold' : 'normal');
+          doc.setFontSize(fontSize);
+          return doc.splitTextToSize(clean(cell), widths[i] - padX * 2) as string[];
+        });
+        const h = Math.max(1, ...cellLines.map(l => l.length)) * lineH + padY * 2;
+        if (y + h > pageHeight - 45) { newPage(); drawHeader(); }
+        if (ri % 2 === 1) {
+          doc.setFillColor(247, 249, 248);
+          doc.rect(margin, y, contentWidth, h, 'F');
+        }
+        doc.setDrawColor(225, 225, 225);
+        doc.setLineWidth(0.5);
+        doc.line(margin, y + h, margin + contentWidth, y + h);
+        let x = margin;
+        cols.forEach((c, i) => {
+          const color = opts?.cellColor?.(ri, i);
+          doc.setFont('helvetica', (opts?.boldFirstCol && i === 0) || color ? 'bold' : 'normal');
+          doc.setFontSize(fontSize);
+          doc.setTextColor(...(color || [0, 0, 0] as Rgb));
+          cellLines[i].forEach((l, li) => {
+            const tx = c.align === 'right' ? x + widths[i] - padX : c.align === 'center' ? x + widths[i] / 2 : x + padX;
+            doc.text(l, tx, y + padY + lineH * (li + 1) - 2, { align: c.align || 'left' });
+          });
+          x += widths[i];
+        });
+        doc.setTextColor(0, 0, 0);
+        y += h;
+      });
+      y += 6;
     };
 
+    // ---------- Title ----------
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(14);
-    doc.text('NAGA COLLEGE FOUNDATION (NCF)', centerX, y, { align: 'center' });
+    doc.setFontSize(15);
+    doc.setTextColor(...green);
+    doc.text('NAGA COLLEGE FOUNDATION (NCF)', pageWidth / 2, y, { align: 'center' });
     y += 18;
-    doc.setFontSize(11);
-    doc.text('Supreme Student Council — Adviser Handover File', centerX, y, { align: 'center' });
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(11.5);
+    doc.text('Supreme Student Council - Adviser Handover File', pageWidth / 2, y, { align: 'center' });
     y += 14;
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
-    doc.text('Complete Activity Log & Previous Records (Read-Only)', centerX, y, { align: 'center' });
-    y += 20;
-    doc.setDrawColor(0, 135, 62);
+    doc.setTextColor(90, 90, 90);
+    doc.text('Complete Activity Log & Previous Records (Read-Only)', pageWidth / 2, y, { align: 'center' });
+    doc.setTextColor(0, 0, 0);
+    y += 14;
+    doc.setDrawColor(...green);
     doc.setLineWidth(1.5);
-    doc.line(60, y, pageWidth - 60, y);
-    y += 26;
+    doc.line(margin, y, pageWidth - margin, y);
+    y += 10;
 
-    line(`Adviser: ${currentUser.name}`, { bold: true });
-    line(`Department: ${userDepartment} — ${scopedDepartmentInfo.name}`);
-    line(`Generated: ${new Date().toLocaleString()}`);
-    line(`School Year: ${activeSemester.school_year_label} • ${activeSemester.semester_name}`);
+    table(
+      [{ header: 'Detail', width: 0.25 }, { header: 'Information', width: 0.75 }],
+      [
+        ['Adviser', currentUser.name],
+        ['Department', `${userDepartment} - ${scopedDepartmentInfo.name}`],
+        ['School Year / Semester', `${activeSemester.school_year_label} - ${activeSemester.semester_name}`],
+        ['Date generated', new Date().toLocaleString('en-US', { dateStyle: 'long', timeStyle: 'short' })]
+      ],
+      { boldFirstCol: true }
+    );
 
-    sectionHeader(`Transactions (${scopedTransactions.length})`);
-    if (scopedTransactions.length === 0) {
-      line('No transactions on record.');
-    } else {
-      scopedTransactions.forEach(tx => {
-        line(`${tx.date} • ${tx.reference_code} • ${tx.category} • ${tx.title} — ${tx.type === 'INCOME' ? '+' : '-'}₱${tx.amount.toFixed(2)} (${tx.status})`);
-      });
-    }
+    // ---------- Summary ----------
+    const done = scopedTransactions.filter(t => t.status === 'Completed');
+    const incomeTotal = done.filter(t => t.type === 'INCOME').reduce((s, t) => s + t.amount, 0);
+    const expenseTotal = done.filter(t => t.type !== 'INCOME').reduce((s, t) => s + t.amount, 0);
+    const pendingTx = scopedTransactions.filter(t => t.status === 'Pending').length;
+    const statusCount = (pred: (s: string) => boolean) => scopedProposals.filter(p => pred(p.budget_status)).length;
+    const requestedTotal = scopedProposals.reduce((s, p) => s + p.total_budget_amount, 0);
+    const penalties = scopedAttendances.filter(a => a.penalty_amount > 0);
+    const penaltiesPaid = penalties.filter(a => a.penalty_paid).reduce((s, a) => s + a.penalty_amount, 0);
+    const penaltiesUnpaid = penalties.filter(a => !a.penalty_paid).reduce((s, a) => s + a.penalty_amount, 0);
 
-    sectionHeader(`Budget Proposals (${scopedProposals.length})`);
-    if (scopedProposals.length === 0) {
-      line('No budget proposals on record.');
-    } else {
-      scopedProposals.forEach(p => {
-        line(`${p.budget_title} — ₱${p.total_budget_amount.toFixed(2)} — ${p.budget_status.replace(/_/g, ' ')}`, { bold: true });
-        if (p.liquidation) {
-          line(`  Liquidation: ${p.liquidation.status} — spent ₱${p.liquidation.total_spent.toFixed(2)} of ₱${p.liquidation.total_released.toFixed(2)}`);
-        }
-        p.reimbursements.forEach(r => {
-          line(`  Reimbursement: ${r.officer_name} — ₱${r.amount_spent.toFixed(2)} — ${r.reimbursement_status}`);
-        });
-      });
-    }
+    sectionHeader('Summary', 'Totals for the records in this file. Only COMPLETED transactions are counted in income and expenses.');
+    table(
+      [{ header: 'Item', width: 0.6 }, { header: 'Value', width: 0.4, align: 'right' }],
+      [
+        ['Total income (completed)', money(incomeTotal)],
+        ['Total expenses (completed)', money(expenseTotal)],
+        ['Net (income - expenses)', money(incomeTotal - expenseTotal)],
+        ['Transactions still pending review', String(pendingTx)],
+        ['Budget proposals (total requested)', `${scopedProposals.length} (${money(requestedTotal)})`],
+        ['  - Released / Approved', String(statusCount(s => /RELEASED|APPROVED|LIQUIDAT|COMPLETED/.test(s)))],
+        ['  - Still in review / Draft', String(statusCount(s => /PENDING|DRAFT|REVISION|SUBMITTED|APPROVAL|REVIEW/.test(s)))],
+        ['  - Rejected', String(statusCount(s => /REJECTED/.test(s)))],
+        ['Events', String(scopedEvents.length)],
+        ['Penalties collected (paid)', `${penalties.filter(a => a.penalty_paid).length} (${money(penaltiesPaid)})`],
+        ['Penalties not yet paid', `${penalties.filter(a => !a.penalty_paid).length} (${money(penaltiesUnpaid)})`]
+      ],
+      { boldFirstCol: true }
+    );
 
-    sectionHeader(`Events (${scopedEvents.length})`);
-    if (scopedEvents.length === 0) {
-      line('No events on record.');
-    } else {
-      scopedEvents.forEach(ev => {
-        line(`${ev.event_date} • ${ev.event_title} — ${ev.venue} — ${ev.status || 'PUBLISHED'}`);
-      });
-    }
+    // ---------- Transactions ----------
+    const sortedTx = [...scopedTransactions].sort((a, b) => String(b.date).localeCompare(String(a.date)));
+    sectionHeader(`1. Transactions (${scopedTransactions.length})`, 'Every income and expense recorded for the department, newest first.');
+    if (scopedTransactions.length === 0) note('No transactions on record.');
+    else table(
+      [
+        { header: 'Date', width: 0.1 },
+        { header: 'Reference', width: 0.17 },
+        { header: 'Category', width: 0.1 },
+        { header: 'Description', width: 0.25 },
+        { header: 'Type', width: 0.09, align: 'center' },
+        { header: 'Amount', width: 0.17, align: 'right' },
+        { header: 'Status', width: 0.12, align: 'center' }
+      ],
+      sortedTx.map(tx => [
+          String(tx.date).slice(0, 10), tx.reference_code, label(tx.category), tx.title,
+          tx.type === 'INCOME' ? 'Income' : 'Expense',
+          `${tx.type === 'INCOME' ? '+' : '-'}${money(tx.amount)}`, label(tx.status)
+        ]),
+      // Amount in green for income, red for expenses.
+      { cellColor: (r, c) => (c === 5 ? (sortedTx[r].type === 'INCOME' ? [0, 120, 55] : [200, 30, 45]) : null) }
+    );
 
-    sectionHeader(`Attendance & Penalty Enforcement (${scopedAttendances.length})`);
-    if (scopedAttendances.length === 0) {
-      line('No attendance/penalty records on record.');
-    } else {
-      scopedAttendances.forEach(att => {
-        const penaltyNote = att.penalty_amount > 0 ? ` — Penalty ₱${att.penalty_amount.toFixed(2)} (${att.penalty_paid ? 'Paid' : 'Unpaid'})` : '';
-        line(`${att.student_name} • ${att.event_title} — ${att.status}${penaltyNote}`);
-      });
-    }
+    // ---------- Budget proposals ----------
+    sectionHeader(`2. Budget Proposals (${scopedProposals.length})`, 'Each budget request with its current status, liquidation and reimbursements.');
+    if (scopedProposals.length === 0) note('No budget proposals on record.');
+    else table(
+      [
+        { header: 'Budget title', width: 0.27 },
+        { header: 'Amount', width: 0.14, align: 'right' },
+        { header: 'Status', width: 0.17 },
+        { header: 'Liquidation', width: 0.2 },
+        { header: 'Reimbursements', width: 0.22 }
+      ],
+      scopedProposals.map(p => [
+        p.budget_title,
+        money(p.total_budget_amount),
+        label(p.budget_status),
+        p.liquidation
+          ? `${label(p.liquidation.status)}: spent ${money(p.liquidation.total_spent)} of ${money(p.liquidation.total_released)}`
+          : 'None',
+        p.reimbursements.length
+          ? p.reimbursements.map(r => `${r.officer_name}: ${money(r.amount_spent)} (${label(r.reimbursement_status)})`).join('\n')
+          : 'None'
+      ])
+    );
 
+    // ---------- Events ----------
+    const attendanceByEvent = new Map<string, { present: number; absent: number; excused: number; penalty: number; unpaid: number }>();
+    scopedAttendances.forEach(a => {
+      const k = a.event_title;
+      const e = attendanceByEvent.get(k) || { present: 0, absent: 0, excused: 0, penalty: 0, unpaid: 0 };
+      const st = String(a.status).toUpperCase();
+      if (st.startsWith('PRESENT')) e.present += 1;
+      else if (st.startsWith('ABSENT')) e.absent += 1;
+      else if (st.startsWith('EXCUSED')) e.excused += 1;
+      e.penalty += a.penalty_amount || 0;
+      if (a.penalty_amount > 0 && !a.penalty_paid) e.unpaid += a.penalty_amount;
+      attendanceByEvent.set(k, e);
+    });
+
+    sectionHeader(`3. Events & Attendance (${scopedEvents.length})`, 'Each event with its attendance count and penalties.');
+    if (scopedEvents.length === 0) note('No events on record.');
+    else table(
+      [
+        { header: 'Date', width: 0.11 },
+        { header: 'Event', width: 0.25 },
+        { header: 'Venue', width: 0.14 },
+        { header: 'Status', width: 0.11, align: 'center' },
+        { header: 'Present', width: 0.08, align: 'center' },
+        { header: 'Absent', width: 0.07, align: 'center' },
+        { header: 'Excused', width: 0.08, align: 'center' },
+        { header: 'Unpaid penalties', width: 0.16, align: 'right' }
+      ],
+      [...scopedEvents]
+        .sort((a, b) => String(b.event_date).localeCompare(String(a.event_date)))
+        .map(ev => {
+          const s = attendanceByEvent.get(ev.event_title);
+          return [
+            String(ev.event_date).slice(0, 10), ev.event_title, ev.venue || '-', label(ev.status || 'PUBLISHED'),
+            String(s?.present ?? 0), String(s?.absent ?? 0), String(s?.excused ?? 0), money(s?.unpaid ?? 0)
+          ];
+        })
+    );
+
+    // ---------- Penalties ----------
+    sectionHeader(`4. Penalty Records (${penalties.length})`, 'Students with a penalty, sorted by name. Students without a penalty are not listed.');
+    if (penalties.length === 0) note('No penalties on record.');
+    else table(
+      [
+        { header: 'Student', width: 0.28 },
+        { header: 'Event', width: 0.3 },
+        { header: 'Attendance', width: 0.14, align: 'center' },
+        { header: 'Penalty', width: 0.15, align: 'right' },
+        { header: 'Payment', width: 0.13, align: 'center' }
+      ],
+      [...penalties]
+        .sort((a, b) => a.student_name.localeCompare(b.student_name) || a.event_title.localeCompare(b.event_title))
+        .map(a => [a.student_name, a.event_title, label(a.status), money(a.penalty_amount), a.penalty_paid ? 'Paid' : 'Unpaid'])
+    );
+
+    // ---------- Certification ----------
     sectionHeader('Certification');
-    line('This file is a read-only record generated for continuity and handover reference. It cannot be', { size: 9 });
-    line('edited by a newly elected Adviser — it exists solely so incoming leadership can review what', { size: 9 });
-    line('took place during the previous term.', { size: 9 });
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.splitTextToSize(
+      'This file is a read-only record generated by NCF Predict for continuity and handover reference. '
+      + 'It cannot be edited by a newly elected Adviser. It exists so incoming leadership can review what took place during the previous term.',
+      contentWidth
+    ).forEach((l: string) => { ensureRoom(14); doc.text(l, margin, y + 10); y += 13; });
+    y += 30;
+    ensureRoom(50);
+    doc.setDrawColor(0, 0, 0);
+    doc.setLineWidth(0.5);
+    doc.line(margin, y, margin + 200, y);
+    doc.text(clean(currentUser.name), margin, y + 12);
+    doc.setFontSize(8);
+    doc.setTextColor(90, 90, 90);
+    doc.text('CSC Adviser', margin, y + 23);
+    doc.setTextColor(0, 0, 0);
+
+    // ---------- Page footer ----------
+    const pages = doc.getNumberOfPages();
+    for (let i = 1; i <= pages; i++) {
+      doc.setPage(i);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7.5);
+      doc.setTextColor(130, 130, 130);
+      doc.text(clean(`Adviser Handover File - ${userDepartment} - ${activeSemester.school_year_label}`), margin, pageHeight - 22);
+      doc.text(`Page ${i} of ${pages}`, pageWidth - margin, pageHeight - 22, { align: 'right' });
+    }
+    doc.setTextColor(0, 0, 0);
 
     return doc.output('blob');
   };
