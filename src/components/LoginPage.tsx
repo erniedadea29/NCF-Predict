@@ -101,12 +101,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
   };
 
   return (
-    <div className="min-h-screen w-full bg-gradient-to-br from-[#00873E] via-[#03693a] to-slate-900 flex items-center justify-center p-3 sm:p-6">
+    <div className="min-h-screen w-full bg-slate-100 flex items-center justify-center p-3 sm:p-6">
       <div className="w-full max-w-4xl bg-white rounded-3xl shadow-2xl overflow-hidden grid grid-cols-1 lg:grid-cols-5">
         {/* Left Branding Panel */}
-        <div className="hidden lg:flex lg:col-span-2 flex-col justify-between bg-[#00873E] text-white p-8 relative overflow-hidden">
+        <div className="hidden lg:flex lg:col-span-2 flex-col justify-between bg-[#0B3D2E] text-white p-8 relative overflow-hidden">
           <div className="absolute -right-10 -top-10 w-52 h-52 rounded-full bg-white/10"></div>
-          <div className="absolute -left-16 bottom-0 w-64 h-64 rounded-full bg-black/10"></div>
+          <div className="absolute -left-16 bottom-0 w-64 h-64 rounded-full bg-white/5"></div>
           <div className="relative z-10">
             <div className="w-14 h-14 rounded-2xl bg-white/15 flex items-center justify-center text-white font-black text-2xl backdrop-blur-xs shadow-inner mb-6">
               Σ
@@ -125,7 +125,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
             </div>
             <div className="flex items-center gap-2">
               <Building2 className="w-4 h-4" />
-              <span>Naga College Foundation • Supreme Student Council</span>
+              <span>Naga College Foundation • College Student Council</span>
             </div>
           </div>
         </div>
@@ -133,8 +133,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
         {/* Login Panel */}
         <div className="lg:col-span-3 p-6 sm:p-10 max-h-[92vh] overflow-y-auto">
           <div className="mb-6">
-            <div className="w-11 h-11 rounded-2xl bg-[#00873E]/10 flex items-center justify-center mb-4">
-              <LogIn className="w-5 h-5 text-[#00873E]" />
+            <div className="w-11 h-11 rounded-2xl bg-[#0B3D2E]/10 flex items-center justify-center mb-4">
+              <LogIn className="w-5 h-5 text-[#0B3D2E]" />
             </div>
             <h2 className="text-2xl font-black text-slate-900">Log in to your account</h2>
             <p className="text-xs text-slate-500 mt-1">You must log in before you can access the system.</p>
@@ -150,7 +150,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
           {mfaChallengePending ? (
             <div className="space-y-4">
               <div className="flex items-center gap-2 text-slate-800">
-                <ShieldCheck className="w-5 h-5 text-[#00873E]" />
+                <ShieldCheck className="w-5 h-5 text-[#0B3D2E]" />
                 <p className="text-sm font-bold">Two-Factor Verification</p>
               </div>
               <p className="text-xs text-slate-500">
@@ -171,14 +171,14 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
                   value={mfaCode}
                   onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, ''))}
                   placeholder="000000"
-                  className="w-full px-3.5 py-3 text-center text-2xl tracking-[0.5em] font-mono border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#00873E] focus:border-[#00873E]"
+                  className="w-full px-3.5 py-3 text-center text-2xl tracking-[0.5em] font-mono border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#0B3D2E] focus:border-[#0B3D2E]"
                   autoFocus
                   required
                 />
                 <button
                   type="submit"
                   disabled={mfaVerifying || mfaCode.length < 6}
-                  className="w-full py-2.5 px-4 bg-[#00873E] hover:bg-[#007033] text-white font-bold text-sm rounded-xl shadow-xs transition cursor-pointer disabled:opacity-50"
+                  className="w-full py-2.5 px-4 bg-[#0B3D2E] hover:bg-[#072A20] text-white font-bold text-sm rounded-xl shadow-xs transition cursor-pointer disabled:opacity-50"
                 >
                   {mfaVerifying ? 'Verifying...' : 'Verify & Continue'}
                 </button>
@@ -186,7 +186,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
               <button
                 type="button"
                 onClick={() => cancelMfaChallenge()}
-                className="w-full flex items-center justify-center gap-1.5 text-center text-xs font-bold text-slate-500 hover:text-slate-700 cursor-pointer"
+                className="w-full flex items-center justify-center gap-1.5 text-center text-xs font-bold text-slate-500 hover:text-[#072A20] cursor-pointer"
               >
                 <ArrowLeft className="w-3.5 h-3.5" /> Back to login
               </button>
@@ -213,13 +213,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
                       value={resetOtpCode}
                       onChange={(e) => setResetOtpCode(e.target.value.replace(/\D/g, ''))}
                       placeholder="000000"
-                      className="w-full px-3.5 py-3 text-center text-2xl tracking-[0.5em] font-mono border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#00873E] focus:border-[#00873E]"
+                      className="w-full px-3.5 py-3 text-center text-2xl tracking-[0.5em] font-mono border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#0B3D2E] focus:border-[#0B3D2E]"
                       autoFocus
                       required
                     />
                     <button
                       type="submit" disabled={resetOtpVerifying || resetOtpCode.length < 6}
-                      className="w-full py-2.5 px-4 bg-[#00873E] hover:bg-[#007033] text-white font-bold text-sm rounded-xl shadow-xs transition cursor-pointer disabled:opacity-50"
+                      className="w-full py-2.5 px-4 bg-[#0B3D2E] hover:bg-[#072A20] text-white font-bold text-sm rounded-xl shadow-xs transition cursor-pointer disabled:opacity-50"
                     >
                       {resetOtpVerifying ? 'Verifying...' : 'Verify Code'}
                     </button>
@@ -227,7 +227,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
                   <button
                     type="button"
                     onClick={() => { setResetOtpStep(false); setResetOtpCode(''); setResetOtpError(''); setResetMessage(''); }}
-                    className="w-full flex items-center justify-center gap-1.5 text-center text-xs font-bold text-slate-500 hover:text-slate-700 cursor-pointer"
+                    className="w-full flex items-center justify-center gap-1.5 text-center text-xs font-bold text-slate-500 hover:text-[#072A20] cursor-pointer"
                   >
                     <ArrowLeft className="w-3.5 h-3.5" /> Use a different email
                   </button>
@@ -247,13 +247,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
                       <input
                         type="email" value={resetEmail} onChange={(e) => setResetEmail(e.target.value)}
                         placeholder="your.email@ncf.edu.ph"
-                        className="w-full pl-9 pr-3 py-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#00873E]"
+                        className="w-full pl-9 pr-3 py-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#0B3D2E]"
                         required
                       />
                     </div>
                     <button
                       type="submit" disabled={resetSending}
-                      className="w-full py-2.5 px-4 bg-[#00873E] hover:bg-[#007033] text-white font-bold text-sm rounded-xl shadow-xs transition cursor-pointer disabled:opacity-50"
+                      className="w-full py-2.5 px-4 bg-[#0B3D2E] hover:bg-[#072A20] text-white font-bold text-sm rounded-xl shadow-xs transition cursor-pointer disabled:opacity-50"
                     >
                       {resetSending ? 'Sending...' : 'Send Code'}
                     </button>
@@ -261,7 +261,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
                   <button
                     type="button"
                     onClick={() => { setShowForgotPassword(false); setResetMessage(''); }}
-                    className="w-full text-center text-xs font-bold text-slate-500 hover:text-slate-700 cursor-pointer"
+                    className="w-full text-center text-xs font-bold text-slate-500 hover:text-[#072A20] cursor-pointer"
                   >
                     &larr; Back to login
                   </button>
@@ -282,7 +282,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
                   placeholder="e.g. mbautista@gbox.ncf.edu.ph"
-                  className="w-full pl-9 pr-3 py-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#00873E] focus:border-[#00873E] transition outline-hidden"
+                  className="w-full pl-9 pr-3 py-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#0B3D2E] focus:border-[#0B3D2E] transition outline-hidden"
                   autoFocus
                   required
                 />
@@ -297,7 +297,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
                 <button
                   type="button"
                   onClick={() => { setShowForgotPassword(true); setResetEmail(identifier.includes('@') ? identifier : ''); }}
-                  className="text-[11px] font-bold text-[#00873E] hover:text-[#007033] cursor-pointer"
+                  className="text-[11px] font-bold text-[#0B3D2E] hover:text-[#072A20] cursor-pointer"
                 >
                   Forgot password?
                 </button>
@@ -309,12 +309,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Enter your password"
-                  className="w-full pl-9 pr-10 py-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#00873E] focus:border-[#00873E] transition outline-hidden"
+                  className="w-full pl-9 pr-10 py-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#0B3D2E] focus:border-[#0B3D2E] transition outline-hidden"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-0 top-0 bottom-0 pr-3 flex items-center text-slate-400 hover:text-slate-600"
+                  className="absolute right-0 top-0 bottom-0 pr-3 flex items-center text-slate-400 hover:text-[#0B3D2E]"
                   tabIndex={-1}
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -325,7 +325,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full py-2.5 px-4 bg-[#00873E] hover:bg-[#007033] text-white font-bold text-sm rounded-xl shadow-xs transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              className="w-full py-2.5 px-4 bg-[#0B3D2E] hover:bg-[#072A20] text-white font-bold text-sm rounded-xl shadow-xs transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
             >
               <LogIn className="w-4 h-4" />
               <span>{isLoading ? 'Signing in...' : 'Log In'}</span>
@@ -336,7 +336,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
             Don't have an account?{' '}
             <button
               onClick={onGoToRegister}
-              className="font-bold text-[#00873E] hover:text-[#007033] cursor-pointer underline underline-offset-2"
+              className="font-bold text-[#0B3D2E] hover:text-[#072A20] cursor-pointer underline underline-offset-2"
             >
               Register here
             </button>

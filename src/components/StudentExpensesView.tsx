@@ -122,7 +122,7 @@ export const StudentExpensesView: React.FC = () => {
                     <span className="font-bold">{usedPct}%</span>
                   </div>
                   <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-[#00873E] rounded-full" style={{ width: `${usedPct}%` }} />
+                    <div className="h-full bg-[#0B3D2E] rounded-full" style={{ width: `${usedPct}%` }} />
                   </div>
                 </div>
 

@@ -144,7 +144,7 @@ export const Header: React.FC = () => {
         <div className="flex items-center gap-2 sm:gap-3">
           {/* Brand Logo */}
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-[#00873E] flex items-center justify-center text-white font-bold text-lg shadow-xs tracking-tight">
+            <div className="w-8 h-8 rounded-lg bg-[#0B3D2E] flex items-center justify-center text-white font-bold text-lg shadow-xs tracking-tight">
               Σ
             </div>
             <div>
@@ -164,8 +164,8 @@ export const Header: React.FC = () => {
               school year); everyone else, including students, is read-only. */}
           <button
             onClick={() => isAdminSystemOnly && setIsSyModalOpen(true)}
-            className={`flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#00873E] text-white font-medium text-xs shadow-xs transition ${
-              isAdminSystemOnly ? 'hover:bg-[#007033] cursor-pointer' : 'cursor-default opacity-90'
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#0B3D2E] text-white font-medium text-xs shadow-xs transition ${
+              isAdminSystemOnly ? 'hover:bg-[#072A20] cursor-pointer' : 'cursor-default opacity-90'
             }`}
             title={isAdminSystemOnly ? 'Click to edit Semester & School Year' : 'Current academic period — only Admin/Super Admin can change this'}
           >
@@ -177,7 +177,7 @@ export const Header: React.FC = () => {
           {/* Mobile Shell Simulation Toggle */}
           <button
             onClick={() => setMobileFrameMode(!mobileFrameMode)}
-            className="hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition text-xs font-medium cursor-pointer"
+            className="hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-full bg-white border border-[#0B3D2E]/20 hover:bg-[#EEF4F0] text-[#0B3D2E] border border-[#0B3D2E]/20 transition text-xs font-medium cursor-pointer"
             title="Toggle Mobile Simulator View"
           >
             {mobileFrameMode ? <Monitor className="w-3.5 h-3.5 text-slate-600" /> : <Smartphone className="w-3.5 h-3.5 text-slate-600" />}
@@ -188,7 +188,7 @@ export const Header: React.FC = () => {
           <div className="relative">
             <button
               onClick={() => { setNotifOpen(!notifOpen); setRoleMenuOpen(false); }}
-              className="relative p-1.5 sm:p-2 rounded-full bg-slate-100 hover:bg-slate-200 border border-slate-200 transition cursor-pointer"
+              className="relative p-1.5 sm:p-2 rounded-full bg-white border border-[#0B3D2E]/20 hover:bg-[#EEF4F0] border border-[#0B3D2E]/20 transition cursor-pointer"
               title="Notifications"
             >
               <Bell className="w-4 h-4 text-slate-600" />
@@ -224,7 +224,7 @@ export const Header: React.FC = () => {
                             setNotifOpen(false);
                           }}
                           className={`w-full text-left px-3 py-2 text-xs transition cursor-pointer ${
-                            n.read_at ? 'hover:bg-slate-50' : 'bg-emerald-50/60 hover:bg-emerald-50'
+                            n.read_at ? 'hover:bg-[#EEF4F0]' : 'bg-emerald-50/60 hover:bg-emerald-50'
                           }`}
                         >
                           <p className={`font-bold ${n.read_at ? 'text-slate-700' : 'text-emerald-900'}`}>{n.title}</p>
@@ -233,7 +233,7 @@ export const Header: React.FC = () => {
                             <span>{new Date(n.created_at).toLocaleString()}</span>
                             {isSignIn
                               ? <span className="font-bold text-rose-600 shrink-0">Review sign-in →</span>
-                              : target && <span className="font-bold text-[#00873E] shrink-0">Open {tabLabel(target, navList)} →</span>}
+                              : target && <span className="font-bold text-[#0B3D2E] shrink-0">Open {tabLabel(target, navList)} →</span>}
                           </p>
                         </button>
                       );
@@ -248,9 +248,9 @@ export const Header: React.FC = () => {
           <div className="relative">
             <button
               onClick={() => { setRoleMenuOpen(!roleMenuOpen); setNotifOpen(false); }}
-              className="flex items-center gap-1.5 p-1 sm:px-2.5 sm:py-1 rounded-full bg-slate-100 hover:bg-slate-200 border border-slate-200 transition cursor-pointer"
+              className="flex items-center gap-1.5 p-1 sm:px-2.5 sm:py-1 rounded-full bg-white border border-[#0B3D2E]/20 hover:bg-[#EEF4F0] border border-[#0B3D2E]/20 transition cursor-pointer"
             >
-              <div className="w-6 h-6 rounded-full bg-[#00873E] text-white font-bold flex items-center justify-center text-xs">
+              <div className="w-6 h-6 rounded-full bg-[#0B3D2E] text-white font-bold flex items-center justify-center text-xs">
                 {currentUser.name.charAt(0)}
               </div>
               <span className="hidden lg:inline text-xs font-semibold text-slate-800 truncate max-w-[110px]">
@@ -275,14 +275,14 @@ export const Header: React.FC = () => {
                 <div className="p-1">
                   <button
                     onClick={() => { setIsEditProfileOpen(true); setRoleMenuOpen(false); }}
-                    className="w-full text-left px-3 py-1.5 text-xs rounded-lg hover:bg-slate-50 text-slate-700 font-semibold flex items-center gap-2 transition cursor-pointer"
+                    className="w-full text-left px-3 py-1.5 text-xs rounded-lg hover:bg-[#EEF4F0] text-[#0B3D2E] font-semibold flex items-center gap-2 transition cursor-pointer"
                   >
                     <UserCog className="w-3.5 h-3.5 text-slate-500" />
                     <span>Edit Profile</span>
                   </button>
                   <button
                     onClick={() => { setRoleMenuOpen(false); setConfirmingLogout(true); }}
-                    className="w-full text-left px-3 py-1.5 text-xs rounded-lg hover:bg-rose-50 text-rose-700 font-semibold flex items-center gap-2 transition cursor-pointer"
+                    className="w-full text-left px-3 py-1.5 text-xs rounded-lg hover:bg-red-100 text-red-700 font-semibold flex items-center gap-2 transition cursor-pointer"
                   >
                     <LogOut className="w-3.5 h-3.5 text-rose-600" />
                     <span>Log Out</span>
@@ -295,8 +295,8 @@ export const Header: React.FC = () => {
       </div>
 
       {confirmingLogout && (
-        <div className="fixed inset-0 z-[60] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-xs p-5 space-y-4">
+        <div className="fixed inset-0 z-[60] bg-[#0B3D2E]/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl border-t-4 border-t-[#F2B705] border border-slate-200 w-full max-w-xs p-5 space-y-4">
             <div>
               <h3 className="font-extrabold text-slate-900 text-base">Log out?</h3>
               <p className="text-xs text-slate-500 mt-1">You'll need to log in again to access your account.</p>
@@ -304,13 +304,13 @@ export const Header: React.FC = () => {
             <div className="flex gap-2">
               <button
                 onClick={() => setConfirmingLogout(false)}
-                className="flex-1 py-2 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer"
+                className="flex-1 py-2 rounded-xl text-xs font-bold bg-white border border-[#0B3D2E]/20 hover:bg-[#EEF4F0] text-[#0B3D2E] transition cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 onClick={() => { logoutUser(); setConfirmingLogout(false); }}
-                className="flex-1 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white transition cursor-pointer"
+                className="flex-1 py-2 rounded-xl text-xs font-bold bg-red-600 hover:bg-red-700 text-white transition cursor-pointer"
               >
                 Log Out
               </button>
@@ -328,8 +328,8 @@ export const Header: React.FC = () => {
               onClick={() => setActiveTab(item.id)}
               className={`pb-2 px-3 border-b-2 transition whitespace-nowrap cursor-pointer ${
                 activeTab === item.id
-                  ? 'border-[#00873E] text-[#00873E]'
-                  : 'border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300'
+                  ? 'border-[#0B3D2E] text-[#0B3D2E]'
+                  : 'border-transparent text-[#0B3D2E] hover:text-[#072A20] hover:border-[#0B3D2E]/40'
               }`}
             >
               {item.label}

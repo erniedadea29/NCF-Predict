@@ -223,10 +223,10 @@ export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({ isOpen
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-      <div className="bg-white w-full max-w-3xl rounded-3xl shadow-2xl border border-slate-200 overflow-hidden my-6">
+    <div className="fixed inset-0 z-50 bg-[#0B3D2E]/40 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+      <div className="bg-white w-full max-w-3xl rounded-3xl shadow-2xl border-t-4 border-t-[#F2B705] border border-slate-200 overflow-hidden my-6">
         {/* Header */}
-        <div className="px-6 py-4 bg-[#00873E] text-white flex items-center justify-between">
+        <div className="px-6 py-4 bg-[#0B3D2E] text-white flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-xl bg-white/20 text-white font-bold flex items-center justify-center text-sm">
               <FileText className="w-4 h-4" />
@@ -358,7 +358,7 @@ export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({ isOpen
                     <button
                       type="button"
                       onClick={() => removeLineItem(item.id)}
-                      className="text-slate-400 hover:text-rose-600 transition p-1 cursor-pointer"
+                      className="text-slate-400 hover:text-red-800 transition p-1 cursor-pointer"
                       title="Remove item"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -428,7 +428,7 @@ export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({ isOpen
                 <p className="text-xs font-bold text-emerald-800 uppercase tracking-wider">Total Evaluated Budget</p>
                 <p className="text-[11px] text-emerald-600">Calculated from {lineItems.length} line items</p>
               </div>
-              <div className="text-xl sm:text-2xl font-black text-[#00873E]">
+              <div className="text-xl sm:text-2xl font-black text-[#0B3D2E]">
                 ₱{totalCalculatedBudget.toLocaleString('en-US', { minimumFractionDigits: 2 })}
               </div>
             </div>
@@ -453,7 +453,7 @@ export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({ isOpen
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2.5 rounded-xl border border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-100 transition cursor-pointer"
+              className="px-4 py-2.5 rounded-xl border border-[#0B3D2E]/20 text-xs font-bold text-[#0B3D2E] hover:bg-[#EEF4F0] transition cursor-pointer"
             >
               Cancel
             </button>
@@ -462,7 +462,7 @@ export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({ isOpen
                 type="submit"
                 disabled={saving}
                 onClick={() => { resubmitAfterSave.current = false; }}
-                className="px-4 py-2.5 rounded-xl border border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-50 transition cursor-pointer"
+                className="px-4 py-2.5 rounded-xl border border-[#0B3D2E]/20 text-xs font-bold text-[#0B3D2E] hover:bg-[#EEF4F0] disabled:opacity-50 transition cursor-pointer"
               >
                 Save Only
               </button>
@@ -471,7 +471,7 @@ export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({ isOpen
               type="submit"
               disabled={saving}
               onClick={() => { resubmitAfterSave.current = isReturned; }}
-              className="px-6 py-2.5 rounded-xl bg-[#00873E] hover:bg-[#007033] disabled:bg-slate-300 text-white text-xs font-bold shadow-md transition transform active:scale-98 cursor-pointer flex items-center gap-2"
+              className="px-6 py-2.5 rounded-xl bg-[#0B3D2E] hover:bg-[#072A20] disabled:bg-[#0B3D2E]/35 text-white text-xs font-bold shadow-md transition transform active:scale-98 cursor-pointer flex items-center gap-2"
             >
               <Check className="w-4 h-4" />
               <span>{isEdit

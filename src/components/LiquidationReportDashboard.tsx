@@ -242,7 +242,7 @@ export const LiquidationReportDashboard: React.FC<LiquidationReportDashboardProp
           <button
             onClick={exportCsv}
             disabled={filteredRows.length === 0}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 disabled:bg-slate-50 disabled:text-slate-300 text-slate-700 transition cursor-pointer disabled:cursor-not-allowed"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-white border border-[#0B3D2E]/20 hover:bg-[#EEF4F0] disabled:bg-slate-50 disabled:text-slate-300 text-[#0B3D2E] transition cursor-pointer disabled:cursor-not-allowed"
           >
             <Download className="w-3.5 h-3.5" />
             <span>Export Report (CSV)</span>
@@ -250,7 +250,7 @@ export const LiquidationReportDashboard: React.FC<LiquidationReportDashboardProp
           {isOfficer && (
             <button
               onClick={() => setPickerOpen(o => !o)}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-[#00873E] hover:bg-[#007033] text-white shadow-xs transition cursor-pointer"
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-[#0B3D2E] hover:bg-[#072A20] text-white shadow-xs transition cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>New Liquidation Report{creatableCount > 0 ? ` (${creatableCount})` : ''}</span>
@@ -267,7 +267,7 @@ export const LiquidationReportDashboard: React.FC<LiquidationReportDashboardProp
               <h3 className="text-sm font-black text-slate-900">New Liquidation Report</h3>
               <p className="text-[11px] text-slate-500">Choose the approved budget to liquidate. Only the Treasurer who filed a budget request prepares its report.</p>
             </div>
-            <button onClick={() => setPickerOpen(false)} className="text-slate-400 hover:text-slate-700 cursor-pointer" title="Close">
+            <button onClick={() => setPickerOpen(false)} className="text-slate-400 hover:text-[#072A20] cursor-pointer" title="Close">
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -291,14 +291,14 @@ export const LiquidationReportDashboard: React.FC<LiquidationReportDashboardProp
                   {r.canCreate ? (
                     <button
                       onClick={() => { setPickerOpen(false); onOpenLiquidationModal(r.proposal.id); }}
-                      className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#00873E] hover:bg-[#007033] text-white text-[11px] font-bold cursor-pointer"
+                      className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#0B3D2E] hover:bg-[#072A20] text-white text-[11px] font-bold cursor-pointer"
                     >
                       <FileText className="w-3.5 h-3.5" /> {r.action} Report
                     </button>
                   ) : (
                     <button
                       onClick={() => { setPickerOpen(false); onOpenLiquidationModal(r.proposal.id); }}
-                      className="shrink-0 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold cursor-pointer"
+                      className="shrink-0 px-3 py-1.5 rounded-lg bg-white border border-[#0B3D2E]/20 hover:bg-[#EEF4F0] text-[#0B3D2E] text-[11px] font-bold cursor-pointer"
                     >
                       View
                     </button>
@@ -375,7 +375,7 @@ export const LiquidationReportDashboard: React.FC<LiquidationReportDashboardProp
                 </div>
                 <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-[#00873E] rounded-full transition-all duration-500"
+                    className="h-full bg-[#0B3D2E] rounded-full transition-all duration-500"
                     style={{ width: `${Math.max(4, Math.round((c.spent / maxCategorySpend) * 100))}%` }}
                   />
                 </div>
@@ -393,8 +393,8 @@ export const LiquidationReportDashboard: React.FC<LiquidationReportDashboardProp
             onClick={() => setStatusFilter(pill.id)}
             className={`px-4 py-2 rounded-xl text-xs font-bold transition shadow-2xs whitespace-nowrap cursor-pointer ${
               statusFilter === pill.id
-                ? 'bg-[#00873E] text-white shadow-xs'
-                : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'
+                ? 'bg-[#0B3D2E] text-white shadow-xs'
+                : 'bg-white hover:bg-[#EEF4F0] text-[#0B3D2E] border border-[#0B3D2E]/20'
             }`}
           >
             {pill.label}
@@ -466,7 +466,7 @@ export const LiquidationReportDashboard: React.FC<LiquidationReportDashboardProp
               >
                 <div
                   className="absolute left-0 top-0 bottom-0 w-1.5"
-                  style={{ backgroundColor: deptInfo?.color || '#00873E' }}
+                  style={{ backgroundColor: deptInfo?.color || '#0B3D2E' }}
                 />
 
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pl-2">
@@ -522,7 +522,7 @@ export const LiquidationReportDashboard: React.FC<LiquidationReportDashboardProp
                   {r.statusFilter !== 'RETURNED' && (
                     <button
                       onClick={() => onOpenLiquidationModal(r.proposal.id)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-bold transition cursor-pointer"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#0B3D2E] hover:bg-[#072A20] text-white text-[11px] font-bold transition cursor-pointer"
                     >
                       <FileText className="w-3.5 h-3.5" />
                       {r.statusFilter === 'AWAITING_LIQUIDATION' && canPrepareLiquidation(r.proposal, currentUser)

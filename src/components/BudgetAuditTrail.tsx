@@ -73,12 +73,12 @@ export const BudgetAuditTrail: React.FC<{ proposal: BudgetProposal }> = ({ propo
   return (
     <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50/60 space-y-3">
       <div className="flex items-center justify-between gap-2">
-        <button onClick={() => setOpen(o => !o)} className="flex items-center gap-1.5 font-black text-xs uppercase tracking-wider text-slate-800 cursor-pointer">
+        <button onClick={() => setOpen(o => !o)} className="flex items-center gap-1.5 font-black text-xs uppercase tracking-wider text-[#0B3D2E] cursor-pointer">
           <ClipboardList className="w-4 h-4 text-emerald-600" />
           Audit Trail: everything under this budget
           {open ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
         </button>
-        <button onClick={exportCsv} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white hover:bg-slate-100 border border-slate-200 text-[11px] font-bold text-slate-700 cursor-pointer">
+        <button onClick={exportCsv} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white hover:bg-[#EEF4F0] border border-[#0B3D2E]/20 text-[11px] font-bold text-[#0B3D2E] cursor-pointer">
           <Download className="w-3.5 h-3.5" /> Export (CSV)
         </button>
       </div>
@@ -122,7 +122,7 @@ export const BudgetAuditTrail: React.FC<{ proposal: BudgetProposal }> = ({ propo
                         department: proposal.department, proposalId: proposal.id, expenseId: e.id,
                         legacyPath: e.proof_attach?.[0]?.url
                       })}
-                      className="p-1 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-600 cursor-pointer" title="Receipt photos"
+                      className="p-1 rounded-md bg-white border border-[#0B3D2E]/20 hover:bg-[#EEF4F0] text-[#0B3D2E] cursor-pointer" title="Receipt photos"
                     >
                       <ImageIcon className="w-3.5 h-3.5" />
                     </button>

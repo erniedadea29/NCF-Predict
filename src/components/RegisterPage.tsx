@@ -226,11 +226,11 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onGoToLogin }) => {
 
   if (otpStep) {
     return (
-      <div className="min-h-screen w-full bg-gradient-to-br from-[#00873E] via-[#03693a] to-slate-900 flex items-center justify-center p-3 sm:p-6">
+      <div className="min-h-screen w-full bg-slate-100 flex items-center justify-center p-3 sm:p-6">
         <div className="w-full max-w-sm bg-white rounded-3xl shadow-2xl overflow-hidden">
           <div className="p-6 sm:p-8">
-            <div className="w-11 h-11 rounded-2xl bg-[#00873E]/10 flex items-center justify-center mb-4">
-              <MailCheck className="w-5 h-5 text-[#00873E]" />
+            <div className="w-11 h-11 rounded-2xl bg-[#0B3D2E]/10 flex items-center justify-center mb-4">
+              <MailCheck className="w-5 h-5 text-[#0B3D2E]" />
             </div>
             <h2 className="text-xl font-black text-slate-900">Verify your email</h2>
             <p className="text-xs text-slate-500 mt-1">
@@ -260,14 +260,14 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onGoToLogin }) => {
                   value={otpCode}
                   onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
                   placeholder="000000"
-                  className="w-full px-3.5 py-3 text-center text-2xl tracking-[0.5em] font-mono border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#00873E] focus:border-[#00873E]"
+                  className="w-full px-3.5 py-3 text-center text-2xl tracking-[0.5em] font-mono border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#0B3D2E] focus:border-[#0B3D2E]"
                   autoFocus
                   required
                 />
                 <button
                   type="submit"
                   disabled={otpVerifying || otpCode.length < 6}
-                  className="w-full py-2.5 px-4 bg-[#00873E] hover:bg-[#007033] text-white font-bold text-sm rounded-xl shadow-xs transition cursor-pointer disabled:opacity-50"
+                  className="w-full py-2.5 px-4 bg-[#0B3D2E] hover:bg-[#072A20] text-white font-bold text-sm rounded-xl shadow-xs transition cursor-pointer disabled:opacity-50"
                 >
                   {otpVerifying ? 'Verifying...' : 'Verify & Create Account'}
                 </button>
@@ -278,7 +278,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onGoToLogin }) => {
               <button
                 type="button"
                 onClick={() => { setOtpStep(false); setOtpCode(''); setOtpError(''); setSuccessMessage(''); }}
-                className="w-full flex items-center justify-center gap-1.5 text-center text-xs font-bold text-slate-500 hover:text-slate-700 cursor-pointer mt-4"
+                className="w-full flex items-center justify-center gap-1.5 text-center text-xs font-bold text-slate-500 hover:text-[#072A20] cursor-pointer mt-4"
               >
                 <ArrowLeft className="w-3.5 h-3.5" /> Back to registration form
               </button>
@@ -290,12 +290,12 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onGoToLogin }) => {
   }
 
   return (
-    <div className="min-h-screen w-full bg-gradient-to-br from-[#00873E] via-[#03693a] to-slate-900 flex items-center justify-center p-3 sm:p-6 py-8">
+    <div className="min-h-screen w-full bg-slate-100 flex items-center justify-center p-3 sm:p-6 py-8">
       <div className="w-full max-w-3xl bg-white rounded-3xl shadow-2xl overflow-hidden">
         <div className="p-6 sm:p-10 max-h-[92vh] overflow-y-auto">
           <div className="mb-6">
-            <div className="w-11 h-11 rounded-2xl bg-[#00873E]/10 flex items-center justify-center mb-4">
-              <UserPlus className="w-5 h-5 text-[#00873E]" />
+            <div className="w-11 h-11 rounded-2xl bg-[#0B3D2E]/10 flex items-center justify-center mb-4">
+              <UserPlus className="w-5 h-5 text-[#0B3D2E]" />
             </div>
             <h2 className="text-2xl font-black text-slate-900">Create your account</h2>
             <p className="text-xs text-slate-500 mt-1">Choose your account type to get the right access level.</p>
@@ -312,7 +312,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onGoToLogin }) => {
             {/* Account Type Selector */}
             <div>
               <label className="block text-xs font-extrabold text-slate-900 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                <Award className="w-4 h-4 text-[#00873E]" />
+                <Award className="w-4 h-4 text-[#0B3D2E]" />
                 I am registering as *
               </label>
               <div className={`grid grid-cols-2 ${superAdminExists ? '' : 'sm:grid-cols-3'} gap-2`}>
@@ -345,7 +345,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onGoToLogin }) => {
             {accountType !== 'super_admin' && (
               <div>
                 <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5 mb-2">
-                  <Building2 className="w-4 h-4 text-[#00873E]" />
+                  <Building2 className="w-4 h-4 text-[#0B3D2E]" />
                   Department / College *
                 </label>
                 <div className="grid grid-cols-4 gap-2">
@@ -357,7 +357,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onGoToLogin }) => {
                         type="button"
                         onClick={() => handleDepartmentChange(dept)}
                         className={`p-2 rounded-xl border text-left transition cursor-pointer ${
-                          isSelected ? 'border-[#00873E] bg-emerald-50 text-emerald-950 font-bold ring-1 ring-[#00873E]' : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
+                          isSelected ? 'border-[#0B3D2E] bg-emerald-50 text-emerald-950 font-bold ring-1 ring-[#0B3D2E]' : 'border-[#0B3D2E]/20 bg-white hover:bg-[#EEF4F0] text-[#0B3D2E]'
                         }`}
                       >
                         <div className="text-xs font-extrabold">{dept}</div>
@@ -377,7 +377,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onGoToLogin }) => {
                 <select
                   value={course}
                   onChange={(e) => setCourse(e.target.value)}
-                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#00873E] bg-white cursor-pointer"
+                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#0B3D2E] bg-white cursor-pointer"
                 >
                   {coursesInDept.map(c => (
                     <option key={c.id} value={c.name}>{c.name}</option>
@@ -392,13 +392,13 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onGoToLogin }) => {
                 <label className="block text-xs font-bold text-slate-700 mb-1">First Name *</label>
                 <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)}
                   placeholder="e.g. Juan"
-                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#00873E]" required />
+                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#0B3D2E]" required />
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">Last Name *</label>
                 <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)}
                   placeholder="e.g. Dela Cruz"
-                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#00873E]" required />
+                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#0B3D2E]" required />
               </div>
             </div>
 
@@ -410,7 +410,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onGoToLogin }) => {
                 <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
                   placeholder={accountType === 'student' ? 'e.g. jdelacruz@gbox.ncf.edu.ph' : 'e.g. jdelacruz@ncf.edu.ph'}
                   autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false}
-                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#00873E]" required />
+                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#0B3D2E]" required />
               </div>
               {accountType === 'student' && (
                 <div>
@@ -421,7 +421,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onGoToLogin }) => {
                     onChange={(e) => { setStudentNumber(e.target.value); setStudentIdAvailable(null); }}
                     onBlur={(e) => checkStudentIdAvailability(e.target.value)}
                     placeholder="e.g. 2024-00142"
-                    className={`w-full px-3 py-2 text-sm border rounded-xl focus:ring-2 focus:ring-[#00873E] ${
+                    className={`w-full px-3 py-2 text-sm border rounded-xl focus:ring-2 focus:ring-[#0B3D2E] ${
                       studentIdAvailable === false ? 'border-rose-400' : 'border-slate-300'
                     }`} />
                   {checkingStudentId && (
@@ -445,7 +445,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onGoToLogin }) => {
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">Year Level</label>
                   <select value={yearLevel} onChange={(e) => setYearLevel(e.target.value)}
-                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#00873E] bg-white cursor-pointer">
+                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#0B3D2E] bg-white cursor-pointer">
                     <option value="1st Year">1st Year</option>
                     <option value="2nd Year">2nd Year</option>
                     <option value="3rd Year">3rd Year</option>
@@ -456,7 +456,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onGoToLogin }) => {
                   <label className="block text-xs font-bold text-slate-700 mb-1">Section</label>
                   <input type="text" value={section} onChange={(e) => setSection(e.target.value)}
                     placeholder="e.g. CAF-1A"
-                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#00873E]" />
+                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#0B3D2E]" />
                 </div>
               </div>
             )}
@@ -469,9 +469,9 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onGoToLogin }) => {
                   <input type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)}
                     placeholder="Set a password"
                     autoComplete="new-password"
-                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#00873E]" />
+                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#0B3D2E]" />
                   <button type="button" onClick={() => setShowPassword(!showPassword)}
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600" tabIndex={-1}>
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-[#0B3D2E]" tabIndex={-1}>
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
@@ -484,14 +484,14 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onGoToLogin }) => {
                 <input type={showPassword ? 'text' : 'password'} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="Repeat password"
                   autoComplete="new-password"
-                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#00873E]" />
+                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#0B3D2E]" />
               </div>
             </div>
 
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full py-3 px-4 bg-[#00873E] hover:bg-[#007033] text-white font-bold text-sm rounded-xl shadow-xs transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              className="w-full py-3 px-4 bg-[#0B3D2E] hover:bg-[#072A20] text-white font-bold text-sm rounded-xl shadow-xs transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
             >
               <CheckCircle2 className="w-4 h-4" />
               <span>{isSubmitting ? 'Creating account...' : 'Complete Registration'}</span>
@@ -502,7 +502,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onGoToLogin }) => {
             Already have an account?{' '}
             <button
               onClick={onGoToLogin}
-              className="font-bold text-[#00873E] hover:text-[#007033] cursor-pointer underline underline-offset-2 inline-flex items-center gap-1"
+              className="font-bold text-[#0B3D2E] hover:text-[#072A20] cursor-pointer underline underline-offset-2 inline-flex items-center gap-1"
             >
               <LogIn className="w-3.5 h-3.5" /> Log in here
             </button>

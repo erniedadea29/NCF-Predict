@@ -6,7 +6,7 @@ import { ShieldAlert, Smartphone, Loader2 } from 'lucide-react';
 export const DeviceWaitingScreen: React.FC = () => {
   const { cancelDeviceLogin, deviceGate } = useApp();
   return (
-    <div className="min-h-screen w-full bg-gradient-to-br from-[#00873E] via-[#03693a] to-slate-900 flex items-center justify-center p-4">
+    <div className="min-h-screen w-full bg-slate-100 flex items-center justify-center p-4">
       <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6 text-center space-y-4">
         {deviceGate === 'pending' ? (
           <>
@@ -26,14 +26,14 @@ export const DeviceWaitingScreen: React.FC = () => {
             </div>
             <button
               onClick={cancelDeviceLogin}
-              className="w-full py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold cursor-pointer"
+              className="w-full py-2.5 rounded-xl bg-white border border-[#0B3D2E]/20 hover:bg-[#EEF4F0] text-[#0B3D2E] text-sm font-bold cursor-pointer"
             >
               Cancel and log out
             </button>
           </>
         ) : (
           <div className="py-6 flex items-center justify-center">
-            <Loader2 className="w-8 h-8 animate-spin text-[#00873E]" />
+            <Loader2 className="w-8 h-8 animate-spin text-[#0B3D2E]" />
           </div>
         )}
       </div>
@@ -47,8 +47,8 @@ export const DeviceRequestPrompt: React.FC = () => {
   if (!incomingDeviceRequest) return null;
   const when = new Date(incomingDeviceRequest.created_at).toLocaleString();
   return (
-    <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl border border-slate-200 p-6 space-y-4">
+    <div className="fixed inset-0 z-[100] bg-[#0B3D2E]/40 backdrop-blur-xs flex items-center justify-center p-4">
+      <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl border-t-4 border-t-[#F2B705] border border-slate-200 p-6 space-y-4">
         <div className="flex items-start gap-3">
           <div className="w-11 h-11 shrink-0 rounded-2xl bg-rose-100 text-rose-700 flex items-center justify-center">
             <ShieldAlert className="w-6 h-6" />
@@ -66,13 +66,13 @@ export const DeviceRequestPrompt: React.FC = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           <button
             onClick={() => answerDeviceRequest(true)}
-            className="py-2.5 rounded-xl bg-[#00873E] hover:bg-[#007033] text-white text-sm font-bold cursor-pointer"
+            className="py-2.5 rounded-xl bg-[#0B3D2E] hover:bg-[#072A20] text-white text-sm font-bold cursor-pointer"
           >
             Yes, it's me (allow)
           </button>
           <button
             onClick={() => answerDeviceRequest(false)}
-            className="py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-sm font-bold cursor-pointer"
+            className="py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-bold cursor-pointer"
           >
             No, block it
           </button>

@@ -91,10 +91,10 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ isOpen
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-50 bg-[#0B3D2E]/40 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+      <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl border-t-4 border-t-[#F2B705] border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         {/* Modal Header */}
-        <div className="px-6 py-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+        <div className="px-6 py-4 bg-[#EEF4F0] border-b border-[#0B3D2E]/10 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 font-bold flex items-center justify-center text-sm">
               +
@@ -106,7 +106,7 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ isOpen
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-full hover:bg-slate-200 text-slate-500 flex items-center justify-center transition cursor-pointer"
+            className="w-8 h-8 rounded-full hover:bg-[#EEF4F0] text-slate-500 flex items-center justify-center transition cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -141,8 +141,8 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ isOpen
                         onClick={() => { setDepartment(code); setChargedTo(''); }}
                         className={`py-2 px-1 text-center rounded-xl text-xs font-bold border transition cursor-pointer ${
                           isSelected
-                            ? 'bg-[#00873E] text-white border-[#00873E] shadow-xs'
-                            : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
+                            ? 'bg-[#0B3D2E] text-white border-[#0B3D2E] shadow-xs'
+                            : 'bg-white hover:bg-[#EEF4F0] text-[#0B3D2E] border-[#0B3D2E]/20'
                         }`}
                       >
                         {code}
@@ -171,8 +171,8 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ isOpen
                   onClick={() => setCategory(cat)}
                   className={`py-1.5 px-2 text-center rounded-xl text-xs font-semibold border transition cursor-pointer ${
                     category === cat
-                      ? 'bg-slate-900 text-white border-slate-900 shadow-2xs'
-                      : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
+                      ? 'bg-[#0B3D2E] text-white border-slate-900 shadow-2xs'
+                      : 'bg-white hover:bg-[#EEF4F0] text-[#0B3D2E] border-[#0B3D2E]/20'
                   }`}
                 >
                   {cat}
@@ -188,8 +188,8 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ isOpen
               onClick={() => setType('EXPENSE')}
               className={`py-2 rounded-xl text-xs font-bold border transition cursor-pointer ${
                 type === 'EXPENSE'
-                  ? 'bg-rose-50 text-rose-700 border-rose-300 ring-2 ring-rose-400/20'
-                  : 'bg-slate-50 text-slate-600 border-slate-200'
+                  ? 'bg-red-50 text-red-700 border-red-200 ring-2 ring-rose-400/20'
+                  : 'bg-slate-50 text-[#0B3D2E] border-[#0B3D2E]/20'
               }`}
             >
               💸 Disbursal / Expense
@@ -200,7 +200,7 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ isOpen
               className={`py-2 rounded-xl text-xs font-bold border transition cursor-pointer ${
                 type === 'INCOME'
                   ? 'bg-emerald-50 text-emerald-700 border-emerald-300 ring-2 ring-emerald-400/20'
-                  : 'bg-slate-50 text-slate-600 border-slate-200'
+                  : 'bg-slate-50 text-[#0B3D2E] border-[#0B3D2E]/20'
               }`}
             >
               💰 Revenue / SAF Cash-In
@@ -300,7 +300,7 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ isOpen
           <div className="pt-2">
             <button
               type="submit"
-              className="w-full py-3 bg-[#00873E] hover:bg-[#007033] text-white font-extrabold text-sm rounded-2xl shadow-lg transition transform active:scale-98 cursor-pointer flex items-center justify-center gap-2"
+              className="w-full py-3 bg-[#0B3D2E] hover:bg-[#072A20] text-white font-extrabold text-sm rounded-2xl shadow-lg transition transform active:scale-98 cursor-pointer flex items-center justify-center gap-2"
             >
               <Check className="w-4 h-4" />
               <span>Create Entry</span>

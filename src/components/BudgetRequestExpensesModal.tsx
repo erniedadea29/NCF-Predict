@@ -94,10 +94,10 @@ export const BudgetRequestExpensesModal: React.FC<BudgetRequestExpensesModalProp
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
-      <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl border border-slate-200 overflow-hidden my-4">
+    <div className="fixed inset-0 z-50 bg-[#0B3D2E]/40 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
+      <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl border-t-4 border-t-[#F2B705] border border-slate-200 overflow-hidden my-4">
         {/* Header */}
-        <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
+        <div className="px-6 py-4 bg-[#0B3D2E] text-white flex items-center justify-between">
           <div>
             <h3 className="font-extrabold text-base">Financial Execution & Disbursals</h3>
             <p className="text-xs text-slate-400">Proposal: {targetProposal.budget_title}</p>
@@ -112,7 +112,7 @@ export const BudgetRequestExpensesModal: React.FC<BudgetRequestExpensesModalProp
           <button
             onClick={() => setActiveTab('cashout')}
             className={`flex-1 py-3 text-center border-b-2 transition cursor-pointer ${
-              activeTab === 'cashout' ? 'border-[#00873E] text-[#00873E] bg-white' : 'border-transparent text-slate-600 hover:text-slate-900'
+              activeTab === 'cashout' ? 'border-[#0B3D2E] text-[#0B3D2E] bg-white' : 'border-transparent text-[#0B3D2E] hover:text-[#072A20]'
             }`}
           >
             1. Budget Request & Release (Cashout)
@@ -120,7 +120,7 @@ export const BudgetRequestExpensesModal: React.FC<BudgetRequestExpensesModalProp
           <button
             onClick={() => setActiveTab('expense')}
             className={`flex-1 py-3 text-center border-b-2 transition cursor-pointer ${
-              activeTab === 'expense' ? 'border-[#00873E] text-[#00873E] bg-white' : 'border-transparent text-slate-600 hover:text-slate-900'
+              activeTab === 'expense' ? 'border-[#0B3D2E] text-[#0B3D2E] bg-white' : 'border-transparent text-[#0B3D2E] hover:text-[#072A20]'
             }`}
           >
             2. Record Expenses & Invoices
@@ -190,7 +190,7 @@ export const BudgetRequestExpensesModal: React.FC<BudgetRequestExpensesModalProp
               <div className="pt-3">
                 <button
                   type="submit"
-                  className="w-full py-3 bg-[#00873E] hover:bg-[#007033] text-white text-xs font-bold rounded-2xl shadow-md transition cursor-pointer flex items-center justify-center gap-2"
+                  className="w-full py-3 bg-[#0B3D2E] hover:bg-[#072A20] text-white text-xs font-bold rounded-2xl shadow-md transition cursor-pointer flex items-center justify-center gap-2"
                 >
                   <Check className="w-4 h-4" />
                   <span>Release Funds & Generate Disbursement Voucher</span>
@@ -271,7 +271,7 @@ export const BudgetRequestExpensesModal: React.FC<BudgetRequestExpensesModalProp
               <div className="pt-3">
                 <button
                   type="submit"
-                  className="w-full py-3 bg-[#00873E] hover:bg-[#007033] text-white text-xs font-bold rounded-2xl shadow-md transition cursor-pointer flex items-center justify-center gap-2"
+                  className="w-full py-3 bg-[#0B3D2E] hover:bg-[#072A20] text-white text-xs font-bold rounded-2xl shadow-md transition cursor-pointer flex items-center justify-center gap-2"
                 >
                   <Receipt className="w-4 h-4" />
                   <span>Save Official Expense & Deduct from Budget</span>

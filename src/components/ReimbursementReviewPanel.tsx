@@ -57,7 +57,7 @@ export const ReimbursementReviewPanel: React.FC = () => {
           <button
             onClick={exportReimbursementsCsv}
             disabled={rows.length === 0}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-[#00873E] hover:bg-[#007033] disabled:bg-slate-300 text-white shadow-xs transition cursor-pointer disabled:cursor-not-allowed"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-[#0B3D2E] hover:bg-[#072A20] disabled:bg-[#0B3D2E]/35 text-white shadow-xs transition cursor-pointer disabled:cursor-not-allowed"
           >
             <Download className="w-3.5 h-3.5" />
             <span>Export Report (CSV)</span>
@@ -96,7 +96,7 @@ export const ReimbursementReviewPanel: React.FC = () => {
                       className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition cursor-pointer ${
                         r.reimbursement_status === 'Pending' && !viewedPhotos.has(r.id)
                           ? 'bg-amber-100 hover:bg-amber-200 text-amber-900 ring-1 ring-amber-300'
-                          : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                          : 'bg-white border border-[#0B3D2E]/20 hover:bg-[#EEF4F0] text-[#0B3D2E]'
                       }`}
                     >
                       <ImageIcon className="w-3.5 h-3.5" /> Photos
@@ -112,13 +112,13 @@ export const ReimbursementReviewPanel: React.FC = () => {
                         onClick={() => approveReimbursement(r.id)}
                         disabled={Boolean(r.expense_id) && !viewedPhotos.has(r.id)}
                         title={r.expense_id && !viewedPhotos.has(r.id) ? 'Open Photos to check the receipt before approving.' : undefined}
-                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#00873E] hover:bg-[#007033] disabled:bg-slate-300 disabled:cursor-not-allowed text-white text-[11px] font-bold transition cursor-pointer"
+                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#0B3D2E] hover:bg-[#072A20] disabled:bg-[#0B3D2E]/35 disabled:cursor-not-allowed text-white text-[11px] font-bold transition cursor-pointer"
                       >
                         <CheckCircle2 className="w-3.5 h-3.5" /> Approve
                       </button>
                       <button
                         onClick={() => { setRejectingId(r.id); setRejectRemark(''); }}
-                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-[11px] font-bold transition cursor-pointer"
+                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 text-[11px] font-bold transition cursor-pointer"
                       >
                         <XCircle className="w-3.5 h-3.5" /> Reject
                       </button>
@@ -145,13 +145,13 @@ export const ReimbursementReviewPanel: React.FC = () => {
                   />
                   <button
                     onClick={() => setRejectingId(null)}
-                    className="px-2.5 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-600 text-[11px] font-bold transition cursor-pointer border border-slate-200"
+                    className="px-2.5 py-1.5 rounded-lg bg-white hover:bg-[#EEF4F0] text-[#0B3D2E] text-[11px] font-bold transition cursor-pointer border border-[#0B3D2E]/20"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={() => handleReject(r.id)}
-                    className="px-2.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-bold transition cursor-pointer"
+                    className="px-2.5 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-[11px] font-bold transition cursor-pointer"
                   >
                     Confirm Reject
                   </button>

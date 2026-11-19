@@ -56,9 +56,9 @@ export const SchoolYearEditModal: React.FC<SchoolYearEditModalProps> = ({ isOpen
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
-      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-        <div className="bg-[#00873E] text-white px-5 py-4 flex items-center justify-between">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-[#0B3D2E]/40 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
+      <div className="bg-white rounded-2xl shadow-2xl border-t-4 border-t-[#F2B705] border border-slate-200 w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+        <div className="bg-[#0B3D2E] text-white px-5 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Calendar className="w-5 h-5" />
             <h3 className="font-extrabold text-base">Edit School Year & Semester</h3>
@@ -94,7 +94,7 @@ export const SchoolYearEditModal: React.FC<SchoolYearEditModalProps> = ({ isOpen
               value={syLabel}
               onChange={(e) => setSyLabel(e.target.value)}
               placeholder="e.g. SY 2025-2026"
-              className="w-full px-3 py-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#00873E] focus:border-[#00873E]"
+              className="w-full px-3 py-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#0B3D2E] focus:border-[#0B3D2E]"
               required
             />
           </div>
@@ -106,7 +106,7 @@ export const SchoolYearEditModal: React.FC<SchoolYearEditModalProps> = ({ isOpen
             <select
               value={semName}
               onChange={(e) => setSemName(e.target.value)}
-              className="w-full px-3 py-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#00873E] bg-white cursor-pointer"
+              className="w-full px-3 py-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#0B3D2E] bg-white cursor-pointer"
             >
               <option value="1st Semester">1st Semester</option>
               <option value="2nd Semester">2nd Semester</option>

@@ -56,7 +56,7 @@ export const StudentDashboardView: React.FC = () => {
       {/* View-only notice */}
       <div className="bg-blue-50 border border-blue-200 rounded-2xl p-3.5 flex items-center gap-2.5 text-xs text-blue-900">
         <Eye className="w-4 h-4 text-blue-600 shrink-0" />
-        <span>Student accounts have <strong>view-only</strong> access. To update information or settle fines, please visit your SSC Treasury / Adviser.</span>
+        <span>Student accounts have <strong>view-only</strong> access. To update information or settle fines, please visit your CSC Treasury / Adviser.</span>
       </div>
 
       {/* Header */}
@@ -103,7 +103,7 @@ export const StudentDashboardView: React.FC = () => {
                 </div>
               </div>
             ) : (
-              <div className="px-4 py-2 bg-amber-100 text-amber-900 border border-amber-300 rounded-2xl flex items-center gap-2">
+              <div className="px-4 py-2 bg-red-100 text-red-900 border border-red-300 rounded-2xl flex items-center gap-2">
                 <AlertTriangle className="w-5 h-5 text-amber-600" />
                 <div className="text-left">
                   <p className="text-[10px] uppercase font-bold text-amber-700">Exam Clearance</p>
@@ -144,8 +144,8 @@ export const StudentDashboardView: React.FC = () => {
         {(() => {
           const isPaid = Boolean(studentSaf?.paid);
           const tone = isPaid
-            ? { card: 'bg-gradient-to-br from-emerald-50 to-teal-50/60 border-emerald-300', icon: 'text-emerald-700', title: 'text-emerald-950', fee: 'text-emerald-800', box: 'border-emerald-100', note: 'text-emerald-800/80' }
-            : { card: 'bg-gradient-to-br from-rose-50 to-red-50/60 border-rose-300', icon: 'text-rose-700', title: 'text-rose-950', fee: 'text-rose-800', box: 'border-rose-100', note: 'text-rose-800' };
+            ? { card: 'bg-white border-emerald-200', icon: 'text-emerald-700', title: 'text-emerald-950', fee: 'text-emerald-800', box: 'border-emerald-100', note: 'text-emerald-800/80' }
+            : { card: 'bg-white border-rose-200', icon: 'text-rose-700', title: 'text-rose-950', fee: 'text-rose-800', box: 'border-rose-100', note: 'text-rose-800' };
           return (
             <div className={`p-5 rounded-2xl border space-y-3 ${tone.card}`}>
               <div className="flex items-center justify-between">
@@ -193,7 +193,7 @@ export const StudentDashboardView: React.FC = () => {
                 </div>
               </div>
               {!isPaid && (
-                <p className={`text-[11px] font-semibold ${tone.note}`}>Please settle your SAF fee at the SSC Treasury Office to update this status.</p>
+                <p className={`text-[11px] font-semibold ${tone.note}`}>Please settle your SAF fee at the CSC Treasury Office to update this status.</p>
               )}
             </div>
           );
@@ -215,7 +215,7 @@ export const StudentDashboardView: React.FC = () => {
                       const url = await getSignedReceiptUrl(r.path);
                       if (url) window.open(url, '_blank', 'noopener,noreferrer');
                     }}
-                    className="shrink-0 px-2.5 py-1 rounded-lg bg-[#00873E] hover:bg-[#007033] text-white font-bold cursor-pointer"
+                    className="shrink-0 px-2.5 py-1 rounded-lg bg-[#0B3D2E] hover:bg-[#072A20] text-white font-bold cursor-pointer"
                   >
                     View / Download
                   </button>

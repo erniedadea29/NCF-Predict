@@ -56,7 +56,7 @@ function MainAppContent() {
   }, [isAdminSystemOnly, currentTab, setCurrentTab]);
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] text-slate-800 flex flex-col font-sans selection:bg-[#00873E] selection:text-white">
+    <div className="min-h-screen bg-[#FBFAF4] text-slate-800 flex flex-col font-sans selection:bg-[#0B3D2E] selection:text-white">
       {/* Top Header (includes role-aware navigation) */}
       <Header />
 
@@ -156,7 +156,7 @@ function MainAppContent() {
       {/* Footer */}
       <footer className="bg-white border-t border-slate-200 py-6 px-4 text-center text-xs text-slate-500 space-y-1">
         <p className="font-bold text-slate-700">
-          Naga College Foundation (NCF) • Supreme Student Council (SSC)
+          Naga College Foundation (NCF) • College Student Council (CSC)
         </p>
         <p className="text-[11px] text-slate-400">
           Student Activity Fund (SAF) & Budget Proposal Double-Entry Ledger System
@@ -208,8 +208,8 @@ function AuthGate() {
   // for someone who's actually already signed in.
   if (isAuthLoading) {
     return (
-      <div className="min-h-screen w-full bg-gradient-to-br from-[#00873E] via-[#03693a] to-slate-900 flex items-center justify-center">
-        <div className="w-10 h-10 border-4 border-white/30 border-t-white rounded-full animate-spin" />
+      <div className="min-h-screen w-full bg-slate-100 flex items-center justify-center">
+        <div className="w-10 h-10 border-4 border-slate-200 border-t-[#0B3D2E] rounded-full animate-spin" />
       </div>
     );
   }

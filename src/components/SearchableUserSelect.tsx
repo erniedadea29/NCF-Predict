@@ -62,7 +62,7 @@ export const SearchableUserSelect: React.FC<SearchableUserSelectProps> = ({
             <span className="truncate text-slate-400 text-xs">({selected.email})</span>
           </span>
           {!disabled && (
-            <button type="button" onClick={handleClear} className="text-slate-400 hover:text-rose-600 cursor-pointer shrink-0">
+            <button type="button" onClick={handleClear} className="text-slate-400 hover:text-red-800 cursor-pointer shrink-0">
               <X className="w-3.5 h-3.5" />
             </button>
           )}
@@ -77,7 +77,7 @@ export const SearchableUserSelect: React.FC<SearchableUserSelectProps> = ({
             onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
             onFocus={() => setOpen(true)}
             placeholder={placeholder}
-            className="w-full pl-9 pr-8 py-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#00873E] focus:border-[#00873E] disabled:opacity-50"
+            className="w-full pl-9 pr-8 py-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#0B3D2E] focus:border-[#0B3D2E] disabled:opacity-50"
           />
           <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
         </div>

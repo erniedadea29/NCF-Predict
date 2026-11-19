@@ -218,10 +218,10 @@ export const LiquidationReturnModal: React.FC<LiquidationReturnModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
-      <div className="bg-white w-full max-w-3xl rounded-3xl shadow-2xl border border-slate-200 overflow-hidden my-4">
+    <div className="fixed inset-0 z-50 bg-[#0B3D2E]/40 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
+      <div className="bg-white w-full max-w-3xl rounded-3xl shadow-2xl border-t-4 border-t-[#F2B705] border border-slate-200 overflow-hidden my-4">
         {/* Header */}
-        <div className="px-6 py-4 bg-[#00873E] text-white flex items-center justify-between">
+        <div className="px-6 py-4 bg-[#0B3D2E] text-white flex items-center justify-between">
           <div>
             <h3 className="font-extrabold text-base">Liquidation Report & Budget Return</h3>
             <p className="text-xs text-emerald-100">{targetProposal.budget_title}</p>
@@ -236,7 +236,7 @@ export const LiquidationReturnModal: React.FC<LiquidationReturnModalProps> = ({
           <button
             onClick={() => setActiveTab('liquidation')}
             className={`flex-1 py-3 text-center border-b-2 transition cursor-pointer ${
-              activeTab === 'liquidation' ? 'border-[#00873E] text-[#00873E] bg-white' : 'border-transparent text-slate-600 hover:text-slate-900'
+              activeTab === 'liquidation' ? 'border-[#0B3D2E] text-[#0B3D2E] bg-white' : 'border-transparent text-[#0B3D2E] hover:text-[#072A20]'
             }`}
           >
             1. Liquidation Report
@@ -246,7 +246,7 @@ export const LiquidationReturnModal: React.FC<LiquidationReturnModalProps> = ({
             disabled={!canProcessReturn}
             title={canProcessReturn ? undefined : 'Available once the liquidation report is fully Audited (Adviser + Dean approved)'}
             className={`flex-1 py-3 text-center border-b-2 transition cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 ${
-              activeTab === 'return' ? 'border-[#00873E] text-[#00873E] bg-white' : 'border-transparent text-slate-600 hover:text-slate-900'
+              activeTab === 'return' ? 'border-[#0B3D2E] text-[#0B3D2E] bg-white' : 'border-transparent text-[#0B3D2E] hover:text-[#072A20]'
             }`}
           >
             2. Budget Return (Double-Entry Cash-In)
@@ -266,7 +266,7 @@ export const LiquidationReturnModal: React.FC<LiquidationReturnModalProps> = ({
             </div>
             <div className="p-3 bg-emerald-50 rounded-2xl border border-emerald-200 text-center">
               <span className="text-[10px] text-emerald-700 font-bold uppercase">Unspent Balance</span>
-              <p className="text-sm sm:text-base font-black text-[#00873E] mt-0.5">{peso(unspentBalance)}</p>
+              <p className="text-sm sm:text-base font-black text-[#0B3D2E] mt-0.5">{peso(unspentBalance)}</p>
             </div>
           </div>
 
@@ -290,7 +290,7 @@ export const LiquidationReturnModal: React.FC<LiquidationReturnModalProps> = ({
                   <button
                     type="button"
                     onClick={addItem}
-                    className="flex items-center gap-1 text-[11px] font-bold text-[#00873E] hover:text-[#007033] cursor-pointer shrink-0"
+                    className="flex items-center gap-1 text-[11px] font-bold text-[#0B3D2E] hover:text-[#072A20] cursor-pointer shrink-0"
                   >
                     <Plus className="w-3.5 h-3.5" /> Add Expense
                   </button>
@@ -351,7 +351,7 @@ export const LiquidationReturnModal: React.FC<LiquidationReturnModalProps> = ({
                             />
                           </td>
                           <td className="py-1.5 px-2 text-right">
-                            <button type="button" onClick={() => removeItem(idx)} title="Remove" className="text-slate-400 hover:text-rose-600 cursor-pointer">
+                            <button type="button" onClick={() => removeItem(idx)} title="Remove" className="text-slate-400 hover:text-red-800 cursor-pointer">
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           </td>
@@ -406,7 +406,7 @@ export const LiquidationReturnModal: React.FC<LiquidationReturnModalProps> = ({
               <button
                 type="submit"
                 disabled={submitting}
-                className="w-full py-3 bg-[#00873E] hover:bg-[#007033] disabled:bg-slate-300 text-white text-xs font-bold rounded-2xl shadow-md transition cursor-pointer flex items-center justify-center gap-2"
+                className="w-full py-3 bg-[#0B3D2E] hover:bg-[#072A20] disabled:bg-[#0B3D2E]/35 text-white text-xs font-bold rounded-2xl shadow-md transition cursor-pointer flex items-center justify-center gap-2"
               >
                 <FileCheck className="w-4 h-4" />
                 <span>{submitting ? 'Submitting...' : liq?.status === 'FOR_REVISION' ? 'Resubmit for Adviser Review' : 'Submit for Adviser Review'}</span>
@@ -446,7 +446,7 @@ export const LiquidationReturnModal: React.FC<LiquidationReturnModalProps> = ({
                   <div className="flex flex-wrap items-center gap-2">
                     <button
                       onClick={() => (isAdviserPending ? handleAdviserDecision('APPROVED') : handleDeanDecision('APPROVED'))}
-                      className="flex items-center gap-1.5 px-4 py-2 bg-[#00873E] hover:bg-[#007033] text-white text-xs font-bold rounded-xl shadow-xs cursor-pointer"
+                      className="flex items-center gap-1.5 px-4 py-2 bg-[#0B3D2E] hover:bg-[#072A20] text-white text-xs font-bold rounded-xl shadow-xs cursor-pointer"
                     >
                       <ThumbsUp className="w-3.5 h-3.5" /> {isAdviserPending ? 'Approve & Forward to Dean' : 'Approve & Certify Audited'}
                     </button>
@@ -458,7 +458,7 @@ export const LiquidationReturnModal: React.FC<LiquidationReturnModalProps> = ({
                     </button>
                     <button
                       onClick={() => (isAdviserPending ? handleAdviserDecision('REJECTED') : handleDeanDecision('REJECTED'))}
-                      className="flex items-center gap-1.5 px-3 py-2 bg-rose-100 hover:bg-rose-200 text-rose-800 text-xs font-bold rounded-xl cursor-pointer"
+                      className="flex items-center gap-1.5 px-3 py-2 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold rounded-xl cursor-pointer"
                     >
                       <ThumbsDown className="w-3.5 h-3.5" /> Reject
                     </button>
@@ -509,7 +509,7 @@ export const LiquidationReturnModal: React.FC<LiquidationReturnModalProps> = ({
               <button
                 type="submit"
                 disabled={unspentBalance <= 0}
-                className="w-full py-3 bg-[#00873E] hover:bg-[#007033] disabled:bg-slate-300 text-white text-xs font-bold rounded-2xl shadow-md transition cursor-pointer flex items-center justify-center gap-2"
+                className="w-full py-3 bg-[#0B3D2E] hover:bg-[#072A20] disabled:bg-[#0B3D2E]/35 text-white text-xs font-bold rounded-2xl shadow-md transition cursor-pointer flex items-center justify-center gap-2"
               >
                 <Check className="w-4 h-4" />
                 <span>Execute Cash-in Budget Return Double Entry</span>

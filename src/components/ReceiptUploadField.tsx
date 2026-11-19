@@ -76,7 +76,7 @@ export const ReceiptUploadField: React.FC<ReceiptUploadFieldProps> = ({ label = 
             type="button"
             onClick={() => inputRef.current?.click()}
             disabled={uploading}
-            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 border-2 border-dashed border-slate-300 hover:border-[#00873E] rounded-xl text-xs font-bold text-slate-600 hover:text-[#00873E] transition cursor-pointer disabled:opacity-50"
+            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 border-2 border-dashed border-[#0B3D2E]/20 hover:border-[#0B3D2E] rounded-xl text-xs font-bold text-[#0B3D2E] hover:text-[#0B3D2E] transition cursor-pointer disabled:opacity-50"
           >
             {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
             <span>{uploading ? 'Uploading...' : 'Take Photo / Choose File'}</span>

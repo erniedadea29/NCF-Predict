@@ -113,21 +113,21 @@ export const BudgetProposalWorkflow: React.FC<BudgetProposalWorkflowProps> = ({
   function getStageBadge(stage: ProposalStage) {
     switch(stage) {
       case 'DRAFT':
-        return { label: '1. Treasurer Draft', color: 'bg-amber-100 text-amber-800 border-amber-300' };
+        return { label: '1. Treasurer Draft', color: 'bg-slate-50 text-slate-700 border-slate-300' };
       case 'EXECUTIVE_REVIEW':
         return { label: '2. Governor Review', color: 'bg-purple-100 text-purple-800 border-purple-300' };
       case 'COUNCIL_VOTING':
         return { label: '3. Council Resolution & Voting', color: 'bg-blue-100 text-blue-800 border-blue-300' };
       case 'CSC_ADVISER_APPROVAL':
-        return { label: 'Waiting for Approval — Adviser', color: 'bg-indigo-100 text-indigo-800 border-indigo-300' };
+        return { label: 'Waiting for Approval — Adviser', color: 'bg-amber-50 text-amber-800 border-amber-300' };
       case 'DEAN_APPROVAL':
-        return { label: 'Waiting for Approval — Dean', color: 'bg-rose-100 text-rose-800 border-rose-300' };
+        return { label: 'Waiting for Approval — Dean', color: 'bg-amber-50 text-amber-800 border-amber-300' };
       case 'APPROVED_RELEASED':
-        return { label: 'Approved & Funds Released', color: 'bg-emerald-100 text-emerald-800 border-emerald-300' };
+        return { label: 'Approved & Funds Released', color: 'bg-emerald-50 text-emerald-800 border-emerald-300' };
       case 'FOR_REVISION':
         return { label: 'Needs Revision', color: 'bg-orange-100 text-orange-800 border-orange-300' };
       case 'REJECTED':
-        return { label: 'Rejected', color: 'bg-red-100 text-red-800 border-red-300' };
+        return { label: 'Rejected', color: 'bg-red-50 text-red-700 border-red-200' };
     }
   }
 
@@ -169,7 +169,7 @@ export const BudgetProposalWorkflow: React.FC<BudgetProposalWorkflowProps> = ({
           <button
             onClick={exportProposalsCsv}
             disabled={displayProposals.length === 0}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 disabled:bg-slate-50 disabled:text-slate-300 text-slate-700 shadow-2xs transition cursor-pointer disabled:cursor-not-allowed"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-white border border-[#0B3D2E]/20 hover:bg-[#EEF4F0] disabled:bg-slate-50 disabled:text-slate-300 text-[#0B3D2E] shadow-2xs transition cursor-pointer disabled:cursor-not-allowed"
           >
             <Download className="w-3.5 h-3.5" />
             <span>Export Report (CSV)</span>
@@ -177,7 +177,7 @@ export const BudgetProposalWorkflow: React.FC<BudgetProposalWorkflowProps> = ({
           {!hideOfficerActions && (
             <button
               onClick={onOpenCreateProposal}
-              className="flex items-center gap-1.5 px-4 py-2 bg-[#00873E] hover:bg-[#007033] text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer"
+              className="flex items-center gap-1.5 px-4 py-2 bg-[#0B3D2E] hover:bg-[#072A20] text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer"
             >
               <Plus className="w-4 h-4" />
               <span>+ Draft New Proposal</span>
@@ -187,7 +187,7 @@ export const BudgetProposalWorkflow: React.FC<BudgetProposalWorkflowProps> = ({
       </div>
 
       {/* Active Role Perspective Bar */}
-      <div className="bg-slate-900 text-white p-3 rounded-2xl flex items-center gap-2 text-xs">
+      <div className="bg-[#0B3D2E] text-white p-3 rounded-2xl flex items-center gap-2 text-xs">
         <ShieldCheck className="w-4 h-4 text-emerald-400" />
         <span className="font-bold text-slate-300">Logged in as:</span>
         <span className="font-extrabold text-white px-2 py-0.5 bg-white/20 rounded">
@@ -226,7 +226,7 @@ export const BudgetProposalWorkflow: React.FC<BudgetProposalWorkflowProps> = ({
                   <button
                     onClick={() => setProposalSearch('')}
                     title="Clear search"
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[#072A20] cursor-pointer"
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
@@ -241,7 +241,7 @@ export const BudgetProposalWorkflow: React.FC<BudgetProposalWorkflowProps> = ({
                 {!hideOfficerActions && (
                   <button
                     onClick={onOpenCreateProposal}
-                    className="px-3 py-1.5 bg-[#00873E] text-white text-xs font-bold rounded-lg shadow-xs cursor-pointer hover:bg-[#007033]"
+                    className="px-3 py-1.5 bg-[#0B3D2E] text-white text-xs font-bold rounded-lg shadow-xs cursor-pointer hover:bg-[#072A20]"
                   >
                     + Draft {userDepartment} Proposal
                   </button>
@@ -254,7 +254,7 @@ export const BudgetProposalWorkflow: React.FC<BudgetProposalWorkflowProps> = ({
                     <p className="text-xs text-slate-500 font-medium">No proposals match "{proposalSearch.trim()}".</p>
                     <button
                       onClick={() => setProposalSearch('')}
-                      className="text-[11px] font-bold text-[#00873E] hover:text-[#007033] cursor-pointer"
+                      className="text-[11px] font-bold text-[#0B3D2E] hover:text-[#072A20] cursor-pointer"
                     >
                       Clear search
                     </button>
@@ -271,7 +271,7 @@ export const BudgetProposalWorkflow: React.FC<BudgetProposalWorkflowProps> = ({
                       onClick={() => setSelectedProposalId(prop.id)}
                       className={`p-3.5 rounded-xl border transition cursor-pointer text-left space-y-1.5 ${
                         isSelected
-                          ? 'bg-emerald-50/70 border-[#00873E] ring-2 ring-emerald-500/20 shadow-xs'
+                          ? 'bg-emerald-50/70 border-[#0B3D2E] ring-2 ring-emerald-500/20 shadow-xs'
                           : 'bg-slate-50/50 hover:bg-white border-slate-200'
                       }`}
                     >
@@ -325,7 +325,7 @@ export const BudgetProposalWorkflow: React.FC<BudgetProposalWorkflowProps> = ({
                 {/* Printable Proposal Button */}
                 <button
                   onClick={() => setPrintableProposal(activeProposal)}
-                  className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl border border-slate-200 transition cursor-pointer self-start"
+                  className="flex items-center gap-1.5 px-3.5 py-2 bg-white border border-[#0B3D2E]/20 hover:bg-[#EEF4F0] text-[#0B3D2E] text-xs font-bold rounded-xl border border-[#0B3D2E]/20 transition cursor-pointer self-start"
                 >
                   <Printer className="w-4 h-4 text-slate-600" />
                   <span>{isReadOnlyStudent ? 'View / Download PDF' : 'Print Official Proposal'}</span>
@@ -503,13 +503,13 @@ export const BudgetProposalWorkflow: React.FC<BudgetProposalWorkflowProps> = ({
                     <div className="flex flex-wrap items-center gap-2">
                       <button
                         onClick={() => onOpenEditProposal(activeProposal.id)}
-                        className="px-4 py-2 bg-white hover:bg-slate-50 text-slate-800 text-xs font-bold rounded-xl border border-slate-300 shadow-xs transition cursor-pointer"
+                        className="px-4 py-2 bg-white hover:bg-[#EEF4F0] text-[#0B3D2E] text-xs font-bold rounded-xl border border-[#0B3D2E]/20 shadow-xs transition cursor-pointer"
                       >
                         ✎ Edit Request
                       </button>
                       <button
                         onClick={() => submitProposalForReview(activeProposal.id)}
-                        className="px-4 py-2 bg-[#00873E] hover:bg-[#007033] text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer"
+                        className="px-4 py-2 bg-[#0B3D2E] hover:bg-[#072A20] text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer"
                       >
                         {activeProposal.budget_status === 'DRAFT' ? 'Submit Request →' : 'Resubmit Request →'}
                       </button>
@@ -534,7 +534,7 @@ export const BudgetProposalWorkflow: React.FC<BudgetProposalWorkflowProps> = ({
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => executiveReviewProposal(activeProposal.id, 'APPROVED_TO_COUNCIL', reviewRemarks || 'Endorsed for Council Voting')}
-                        className="px-4 py-2 bg-[#00873E] hover:bg-[#007033] text-white text-xs font-bold rounded-xl shadow-xs cursor-pointer"
+                        className="px-4 py-2 bg-[#0B3D2E] hover:bg-[#072A20] text-white text-xs font-bold rounded-xl shadow-xs cursor-pointer"
                       >
                         ✓ Endorse to Council Voting
                       </button>
@@ -564,19 +564,19 @@ export const BudgetProposalWorkflow: React.FC<BudgetProposalWorkflowProps> = ({
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => voteOnProposal(activeProposal.id, 'IN_FAVOR', 'Voted In Favor')}
-                        className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-xs cursor-pointer"
+                        className="flex items-center gap-1.5 px-4 py-2 bg-[#0B3D2E] hover:bg-[#072A20] text-white text-xs font-bold rounded-xl shadow-xs cursor-pointer"
                       >
                         <ThumbsUp className="w-3.5 h-3.5" /> In Favor (Yay)
                       </button>
                       <button
                         onClick={() => voteOnProposal(activeProposal.id, 'AGAINST', 'Voted Against')}
-                        className="flex items-center gap-1.5 px-3 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl shadow-xs cursor-pointer"
+                        className="flex items-center gap-1.5 px-3 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl shadow-xs cursor-pointer"
                       >
                         <ThumbsDown className="w-3.5 h-3.5" /> Against (Nay)
                       </button>
                       <button
                         onClick={() => voteOnProposal(activeProposal.id, 'ABSTAIN', 'Abstained')}
-                        className="flex items-center gap-1.5 px-3 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-bold rounded-xl cursor-pointer"
+                        className="flex items-center gap-1.5 px-3 py-2 bg-white border border-[#0B3D2E]/20 hover:bg-[#EEF4F0] text-[#0B3D2E] text-xs font-bold rounded-xl cursor-pointer"
                       >
                         <MinusCircle className="w-3.5 h-3.5" /> Abstain
                       </button>
@@ -602,7 +602,7 @@ export const BudgetProposalWorkflow: React.FC<BudgetProposalWorkflowProps> = ({
                     <div className="flex flex-wrap items-center gap-2">
                       <button
                         onClick={() => adviserApproveProposal(activeProposal.id, 'APPROVED', reviewRemarks || 'Approved by CSC Adviser.')}
-                        className="px-4 py-2 bg-[#00873E] hover:bg-[#007033] text-white text-xs font-bold rounded-xl shadow-xs cursor-pointer"
+                        className="px-4 py-2 bg-[#0B3D2E] hover:bg-[#072A20] text-white text-xs font-bold rounded-xl shadow-xs cursor-pointer"
                       >
                         ✓ Approve & Forward to Dean
                       </button>
@@ -614,7 +614,7 @@ export const BudgetProposalWorkflow: React.FC<BudgetProposalWorkflowProps> = ({
                       </button>
                       <button
                         onClick={() => adviserApproveProposal(activeProposal.id, 'REJECTED', reviewRemarks || 'Rejected by CSC Adviser.')}
-                        className="px-3 py-2 bg-rose-100 hover:bg-rose-200 text-rose-800 text-xs font-bold rounded-xl cursor-pointer"
+                        className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold rounded-xl cursor-pointer"
                       >
                         ✗ Reject
                       </button>
@@ -675,7 +675,7 @@ export const BudgetProposalWorkflow: React.FC<BudgetProposalWorkflowProps> = ({
                           )) return;
                           deanApproveProposal(activeProposal.id, 'APPROVED_FUND_RELEASE', reviewRemarks || 'Executive Approval & Fund Release authorized.');
                         }}
-                        className="px-5 py-2.5 bg-[#00873E] hover:bg-[#007033] text-white text-xs font-extrabold rounded-xl shadow-md cursor-pointer"
+                        className="px-5 py-2.5 bg-[#0B3D2E] hover:bg-[#072A20] text-white text-xs font-extrabold rounded-xl shadow-md cursor-pointer"
                       >
                         ✓ Approve & Authorize Fund Release
                       </button>
@@ -687,7 +687,7 @@ export const BudgetProposalWorkflow: React.FC<BudgetProposalWorkflowProps> = ({
                       </button>
                       <button
                         onClick={() => deanApproveProposal(activeProposal.id, 'REJECTED', reviewRemarks || 'Rejected by Dean.')}
-                        className="px-3 py-2 bg-rose-100 hover:bg-rose-200 text-rose-800 text-xs font-bold rounded-xl cursor-pointer"
+                        className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold rounded-xl cursor-pointer"
                       >
                         ✗ Reject
                       </button>
@@ -697,13 +697,13 @@ export const BudgetProposalWorkflow: React.FC<BudgetProposalWorkflowProps> = ({
 
                 {/* Post-Approval Financial Flow Actions (Budget Requests, Expenses, Reimbursements, Liquidation, Return) */}
                 {!hideOfficerActions && activeProposal.budget_status === 'APPROVED_RELEASED' && (
-                  <div className="p-4 bg-slate-900 text-white rounded-2xl space-y-3">
+                  <div className="p-4 bg-[#EEF4F0] text-[#0B3D2E] border border-[#0B3D2E]/15 rounded-2xl space-y-3">
                     <div className="flex items-center justify-between">
-                      <span className="font-bold text-xs text-emerald-400 flex items-center gap-1.5">
+                      <span className="font-bold text-xs text-[#0B3D2E] flex items-center gap-1.5">
                         <CheckCircle2 className="w-4 h-4" />
                         Approved Budget Financial Execution
                       </span>
-                      <span className="text-[11px] text-slate-400">
+                      <span className="text-[11px] font-semibold text-[#0B3D2E]/70">
                         Total Released: ₱{activeProposal.cashouts.reduce((s, c) => s + c.amount_released, 0).toLocaleString()}
                       </span>
                     </div>
@@ -711,40 +711,40 @@ export const BudgetProposalWorkflow: React.FC<BudgetProposalWorkflowProps> = ({
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                       <button
                         onClick={() => onOpenBudgetRequestModal(activeProposal.id)}
-                        className="p-2.5 bg-slate-800 hover:bg-slate-700 rounded-xl text-left border border-slate-700 transition cursor-pointer"
+                        className="p-2.5 bg-white rounded-xl text-left border border-[#0B3D2E]/20 hover:border-[#0B3D2E] hover:shadow-sm transition cursor-pointer"
                       >
-                        <span className="font-bold text-xs text-white block">+ Fund Request</span>
-                        <span className="text-[10px] text-slate-400">Letters/Billings</span>
+                        <span className="font-bold text-xs text-[#0B3D2E] block">+ Fund Request</span>
+                        <span className="text-[10px] text-slate-500">Letters/Billings</span>
                       </button>
 
                       <button
                         onClick={() => onOpenBudgetRequestModal(activeProposal.id)}
-                        className="p-2.5 bg-slate-800 hover:bg-slate-700 rounded-xl text-left border border-slate-700 transition cursor-pointer"
+                        className="p-2.5 bg-white rounded-xl text-left border border-[#0B3D2E]/20 hover:border-[#0B3D2E] hover:shadow-sm transition cursor-pointer"
                       >
-                        <span className="font-bold text-xs text-white block">+ Add Expense</span>
-                        <span className="text-[10px] text-slate-400">{activeProposal.expenses.length} Recorded</span>
+                        <span className="font-bold text-xs text-[#0B3D2E] block">+ Add Expense</span>
+                        <span className="text-[10px] text-slate-500">{activeProposal.expenses.length} Recorded</span>
                       </button>
 
                       <button
                         onClick={() => onOpenLiquidationModal(activeProposal.id)}
-                        className="p-2.5 bg-slate-800 hover:bg-slate-700 rounded-xl text-left border border-slate-700 transition cursor-pointer"
+                        className="p-2.5 bg-white rounded-xl text-left border border-[#0B3D2E]/20 hover:border-[#0B3D2E] hover:shadow-sm transition cursor-pointer"
                       >
-                        <span className="font-bold text-xs text-white block">
+                        <span className="font-bold text-xs text-[#0B3D2E] block">
                           {canPrepareLiquidation(activeProposal, currentUser) && (!activeProposal.liquidation || activeProposal.liquidation.status === 'FOR_REVISION')
                             ? 'Prepare Liquidation'
                             : 'Liquidation Report'}
                         </span>
-                        <span className="text-[10px] text-slate-400">
+                        <span className="text-[10px] text-slate-500">
                           {activeProposal.liquidation ? activeProposal.liquidation.status : 'Not yet submitted'}
                         </span>
                       </button>
 
                       <button
                         onClick={() => onOpenLiquidationModal(activeProposal.id)}
-                        className="p-2.5 bg-slate-800 hover:bg-slate-700 rounded-xl text-left border border-slate-700 transition cursor-pointer"
+                        className="p-2.5 bg-white rounded-xl text-left border border-[#0B3D2E]/20 hover:border-[#0B3D2E] hover:shadow-sm transition cursor-pointer"
                       >
-                        <span className="font-bold text-xs text-white block">Budget Return</span>
-                        <span className="text-[10px] text-slate-400">Cash-in Double Entry</span>
+                        <span className="font-bold text-xs text-[#0B3D2E] block">Budget Return</span>
+                        <span className="text-[10px] text-slate-500">Cash-in Double Entry</span>
                       </button>
                     </div>
                   </div>
@@ -777,7 +777,7 @@ export const BudgetProposalWorkflow: React.FC<BudgetProposalWorkflowProps> = ({
                         <button
                           type="button"
                           onClick={() => setNotesThread('all')}
-                          className={`px-3 py-1 rounded-lg transition cursor-pointer ${activeThread === 'all' ? 'bg-white text-[#00873E] shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
+                          className={`px-3 py-1 rounded-lg transition cursor-pointer ${activeThread === 'all' ? 'bg-white text-[#0B3D2E] shadow-xs' : 'text-slate-500 hover:text-[#072A20]'}`}
                         >
                           Group Chat ({groupNotes.length})
                         </button>
@@ -785,7 +785,7 @@ export const BudgetProposalWorkflow: React.FC<BudgetProposalWorkflowProps> = ({
                           <button
                             type="button"
                             onClick={() => setNotesThread('officers')}
-                            className={`px-3 py-1 rounded-lg transition cursor-pointer flex items-center gap-1 ${isPrivate ? 'bg-white text-violet-700 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
+                            className={`px-3 py-1 rounded-lg transition cursor-pointer flex items-center gap-1 ${isPrivate ? 'bg-white text-violet-700 shadow-xs' : 'text-slate-500 hover:text-[#072A20]'}`}
                           >
                             <Lock className="w-3 h-3" /> Officers Only ({privateNotes.length})
                           </button>
@@ -844,7 +844,7 @@ export const BudgetProposalWorkflow: React.FC<BudgetProposalWorkflowProps> = ({
                         <button
                           type="submit"
                           className={`px-4 py-2 text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer flex items-center gap-1 shrink-0 ${
-                            isPrivate ? 'bg-violet-600 hover:bg-violet-700' : 'bg-[#00873E] hover:bg-[#007033]'
+                            isPrivate ? 'bg-[#0B3D2E] hover:bg-[#072A20]' : 'bg-[#0B3D2E] hover:bg-[#072A20]'
                           }`}
                         >
                           {isPrivate ? <Lock className="w-3.5 h-3.5" /> : <Send className="w-3.5 h-3.5" />}

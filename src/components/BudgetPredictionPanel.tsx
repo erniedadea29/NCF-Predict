@@ -38,7 +38,7 @@ export const BudgetPredictionPanel: React.FC<{ proposal: BudgetProposal }> = ({ 
           <button
             onClick={handlePredict}
             disabled={busy}
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-purple-700 hover:bg-purple-800 disabled:bg-slate-300 text-white text-[11px] font-bold cursor-pointer"
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#0B3D2E] hover:bg-[#072A20] disabled:bg-[#0B3D2E]/35 text-white text-[11px] font-bold cursor-pointer"
           >
             <RefreshCw className={`w-3 h-3 ${busy ? 'animate-spin' : ''}`} />
             {prediction ? 'Re-predict' : 'Predict'}

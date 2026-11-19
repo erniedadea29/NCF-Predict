@@ -44,9 +44,9 @@ export const ReceiptPhotosModal: React.FC<ReceiptPhotosModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[88vh]" onClick={e => e.stopPropagation()}>
-        <div className="px-5 py-4 bg-slate-900 text-white flex items-center justify-between shrink-0">
+    <div className="fixed inset-0 z-50 bg-[#0B3D2E]/40 backdrop-blur-xs flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl border-t-4 border-t-[#F2B705] border border-slate-200 overflow-hidden flex flex-col max-h-[88vh]" onClick={e => e.stopPropagation()}>
+        <div className="px-5 py-4 bg-[#0B3D2E] text-white flex items-center justify-between shrink-0">
           <div className="min-w-0">
             <h3 className="font-bold text-sm truncate">Receipt Photos: {title}</h3>
             {subtitle && <p className="text-[11px] text-slate-400 truncate">{subtitle}</p>}
@@ -69,7 +69,7 @@ export const ReceiptPhotosModal: React.FC<ReceiptPhotosModalProps> = ({
                   key={p.path}
                   type="button"
                   onClick={() => p.isPdf ? (p.url && window.open(p.url, '_blank', 'noopener,noreferrer')) : setViewing(p)}
-                  className="group rounded-xl border border-slate-200 overflow-hidden bg-slate-50 hover:border-[#00873E] transition cursor-pointer text-left"
+                  className="group rounded-xl border border-[#0B3D2E]/20 overflow-hidden bg-slate-50 hover:border-[#0B3D2E] transition cursor-pointer text-left"
                 >
                   <div className="aspect-square flex items-center justify-center bg-slate-100">
                     {p.isPdf || !p.url
@@ -94,7 +94,7 @@ export const ReceiptPhotosModal: React.FC<ReceiptPhotosModalProps> = ({
                 type="button"
                 onClick={() => inputRef.current?.click()}
                 disabled={uploading}
-                className="w-full flex items-center justify-center gap-1.5 px-3 py-2.5 border-2 border-dashed border-slate-300 hover:border-[#00873E] rounded-xl text-xs font-bold text-slate-600 hover:text-[#00873E] transition cursor-pointer disabled:opacity-50"
+                className="w-full flex items-center justify-center gap-1.5 px-3 py-2.5 border-2 border-dashed border-[#0B3D2E]/20 hover:border-[#0B3D2E] rounded-xl text-xs font-bold text-[#0B3D2E] hover:text-[#0B3D2E] transition cursor-pointer disabled:opacity-50"
               >
                 {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
                 {uploading ? 'Uploading...' : 'Add Photo / File'}
@@ -114,7 +114,7 @@ export const ReceiptPhotosModal: React.FC<ReceiptPhotosModalProps> = ({
       </div>
 
       {viewing && viewing.url && (
-        <div className="fixed inset-0 z-[60] bg-black/85 flex items-center justify-center p-4" onClick={e => { e.stopPropagation(); setViewing(null); }}>
+        <div className="fixed inset-0 z-[60] bg-[#0B3D2E]/90 flex items-center justify-center p-4" onClick={e => { e.stopPropagation(); setViewing(null); }}>
           <img src={viewing.url} alt={viewing.name} className="max-w-full max-h-full rounded-xl shadow-2xl" />
           <button className="absolute top-4 right-4 text-white/80 hover:text-white p-2 cursor-pointer"><X className="w-6 h-6" /></button>
         </div>

@@ -1107,7 +1107,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     y += 18;
     doc.setTextColor(0, 0, 0);
     doc.setFontSize(11.5);
-    doc.text('Supreme Student Council - Adviser Handover File', pageWidth / 2, y, { align: 'center' });
+    doc.text('College Student Council - Adviser Handover File', pageWidth / 2, y, { align: 'center' });
     y += 14;
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
@@ -2754,7 +2754,7 @@ ${error.message}`); return; }
     doc.text('NAGA COLLEGE FOUNDATION (NCF)', centerX, y, { align: 'center' });
     y += 18;
     doc.setFontSize(11);
-    doc.text('Supreme Student Council — Student Activity Fund (SAF)', centerX, y, { align: 'center' });
+    doc.text('College Student Council — Student Activity Fund (SAF)', centerX, y, { align: 'center' });
     y += 12;
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);

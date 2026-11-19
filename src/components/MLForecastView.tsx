@@ -94,28 +94,28 @@ export const MLForecastView: React.FC = () => {
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gradient-to-r from-slate-900 via-slate-800 to-emerald-950 p-6 rounded-3xl text-white shadow-lg border border-slate-700/50">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl text-slate-900 border border-slate-200">
         <div className="flex items-start gap-3">
-          <div className="p-2 bg-emerald-500/20 border border-emerald-400/30 rounded-xl text-emerald-400">
+          <div className="p-2 bg-emerald-50 border border-emerald-200 rounded-xl text-[#0B3D2E]">
             <Cpu className="w-6 h-6" />
           </div>
           <div className="space-y-1">
             <h1 className="text-xl sm:text-2xl font-black tracking-tight flex flex-wrap items-center gap-2">
               Machine Learning Budget Estimator
-              <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 font-bold">
+              <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold">
                 {trainedModel?.algorithm || 'Random Forest'}{trainedModel ? ` • model #${trainedModel.id}` : ''}
               </span>
             </h1>
-            <p className="text-xs text-slate-300">
+            <p className="text-xs text-slate-500">
               Trained on {TRAINING_DATASET.rows} budget line items from {TRAINING_DATASET.events} NCF events ({TRAINING_DATASET.years}).
               Predicts each item's cost and compares it with what was requested • {activeSemester.school_year_label}
             </p>
             <span
               title={PREDICT_API_URL}
               className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-2 py-0.5 rounded-full border ${
-                predictionApiOnline ? 'bg-emerald-500/15 border-emerald-400/30 text-emerald-300'
-                : predictionApiOnline === false ? 'bg-rose-500/15 border-rose-400/30 text-rose-300'
-                : 'bg-white/10 border-white/20 text-slate-300'
+                predictionApiOnline ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                : predictionApiOnline === false ? 'bg-red-50 border-red-200 text-red-700'
+                : 'bg-slate-50 border-slate-200 text-slate-600'
               }`}
             >
               {predictionApiOnline === false ? <WifiOff className="w-3 h-3" /> : <Wifi className="w-3 h-3" />}
@@ -127,7 +127,7 @@ export const MLForecastView: React.FC = () => {
           <select
             value={deptFilter}
             onChange={(e) => setDeptFilter(e.target.value)}
-            className="px-3 py-2 text-xs bg-white/10 text-white rounded-xl border border-white/20 font-semibold"
+            className="px-3 py-2 text-xs bg-white text-slate-800 rounded-xl border border-slate-300 font-semibold"
           >
             <option value="ALL" className="text-slate-900">All 8 Departments</option>
             {Object.keys(DEPARTMENTS).map(code => (
@@ -167,7 +167,7 @@ export const MLForecastView: React.FC = () => {
             key={tab.key}
             onClick={() => setActiveSubTab(tab.key)}
             className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center justify-center gap-2 ${
-              activeSubTab === tab.key ? 'bg-[#00873E] text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+              activeSubTab === tab.key ? 'bg-[#0B3D2E] text-white shadow-xs' : 'text-[#0B3D2E] hover:text-[#072A20]'
             }`}
           >
             <tab.icon className="w-4 h-4" />
@@ -230,7 +230,7 @@ export const MLForecastView: React.FC = () => {
                         <tr className="hover:bg-slate-50/80">
                           <td className="py-3 px-3">
                             {prediction && (
-                              <button onClick={() => setExpanded(isOpen ? null : proposal.id)} className="text-slate-400 hover:text-slate-700 cursor-pointer" title="Show items">
+                              <button onClick={() => setExpanded(isOpen ? null : proposal.id)} className="text-slate-400 hover:text-[#072A20] cursor-pointer" title="Show items">
                                 {isOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                               </button>
                             )}
@@ -263,7 +263,7 @@ export const MLForecastView: React.FC = () => {
                                 onClick={() => handlePredict(proposal.id)}
                                 disabled={busy === proposal.id || proposal.line_items.length === 0}
                                 title={proposal.line_items.length === 0 ? 'This request has no line items' : 'Run the trained model on this request'}
-                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 disabled:bg-slate-300 text-white text-[11px] font-bold cursor-pointer disabled:cursor-not-allowed"
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#0B3D2E] hover:bg-[#072A20] disabled:bg-[#0B3D2E]/35 text-white text-[11px] font-bold cursor-pointer disabled:cursor-not-allowed"
                               >
                                 <RefreshCw className={`w-3 h-3 ${busy === proposal.id ? 'animate-spin' : ''}`} />
                                 {prediction ? 'Re-predict' : 'Predict'}

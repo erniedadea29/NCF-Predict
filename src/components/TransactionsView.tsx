@@ -125,7 +125,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ onOpenAddMod
       ['Notes', tx.description || 'N/A'],
       [],
       ['Recorded in', 'NCF PREDICT Double-Entry Ledger System'],
-      ['Verified by', 'Supreme Student Council Treasury'],
+      ['Verified by', 'College Student Council Treasury'],
       ['Generated on', new Date().toLocaleString()]
     ];
 
@@ -163,7 +163,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ onOpenAddMod
           {!hideWriteActions && (
             <button
               onClick={onOpenAddModal}
-              className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs font-extrabold bg-[#00873E] hover:bg-[#007033] text-white shadow-md ring-2 ring-emerald-200 transition cursor-pointer"
+              className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs font-extrabold bg-[#0B3D2E] hover:bg-[#072A20] text-white shadow-md ring-2 ring-emerald-200 transition cursor-pointer"
             >
               <Plus className="w-4 h-4" />
               <span>Add Transaction</span>
@@ -172,7 +172,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ onOpenAddMod
           <button
             onClick={exportFilteredCsv}
             disabled={filteredTransactions.length === 0}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-white hover:bg-slate-50 border border-slate-300 disabled:text-slate-300 text-slate-700 shadow-2xs transition cursor-pointer disabled:cursor-not-allowed"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-white hover:bg-[#EEF4F0] border border-[#0B3D2E]/20 disabled:text-slate-300 text-[#0B3D2E] shadow-2xs transition cursor-pointer disabled:cursor-not-allowed"
           >
             <Download className="w-3.5 h-3.5" />
             <span>Export Report (CSV)</span>
@@ -181,8 +181,8 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ onOpenAddMod
             onClick={() => setShowArchived(!showArchived)}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer ${
               showArchived
-                ? 'bg-slate-800 text-white border-slate-800'
-                : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
+                ? 'bg-[#0B3D2E] text-white border-slate-800'
+                : 'bg-slate-100 hover:bg-[#EEF4F0] text-[#0B3D2E] border-[#0B3D2E]/20'
             }`}
           >
             <Archive className="w-3.5 h-3.5" />
@@ -199,8 +199,8 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ onOpenAddMod
             onClick={() => setSelectedCategory(cat)}
             className={`px-4 py-2 rounded-xl text-xs font-bold transition shadow-2xs whitespace-nowrap cursor-pointer ${
               selectedCategory === cat
-                ? 'bg-[#00873E] text-white shadow-xs'
-                : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'
+                ? 'bg-[#0B3D2E] text-white shadow-xs'
+                : 'bg-white hover:bg-[#EEF4F0] text-[#0B3D2E] border border-[#0B3D2E]/20'
             }`}
           >
             {cat}
@@ -256,7 +256,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ onOpenAddMod
           {!hideWriteActions && (
             <button
               onClick={onOpenAddModal}
-              className="px-4 py-2 bg-[#00873E] hover:bg-[#007033] text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer"
+              className="px-4 py-2 bg-[#0B3D2E] hover:bg-[#072A20] text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer"
             >
               + Add Transaction
             </button>
@@ -274,7 +274,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ onOpenAddMod
                 {/* Left vertical colored bar matching PDF screenshots */}
                 <div 
                   className="absolute left-0 top-0 bottom-0 w-1.5"
-                  style={{ backgroundColor: deptInfo?.color || '#00873E' }}
+                  style={{ backgroundColor: deptInfo?.color || '#0B3D2E' }}
                 />
 
                 <div className="flex items-center gap-3 pl-2">
@@ -337,7 +337,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ onOpenAddMod
                         </button>
                         <button
                           onClick={() => reviewTransaction(tx.id, 'Rejected')}
-                          className="flex items-center gap-1 px-2.5 h-8 rounded-xl bg-rose-100 hover:bg-rose-200 text-rose-800 text-[11px] font-bold transition cursor-pointer"
+                          className="flex items-center gap-1 px-2.5 h-8 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 text-[11px] font-bold transition cursor-pointer"
                           title="Reject transaction"
                         >
                           <XCircle className="w-3.5 h-3.5" /> Reject
@@ -348,7 +348,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ onOpenAddMod
                     {/* Download Receipt/Voucher */}
                     <button
                       onClick={() => exportSingleTransactionReceipt(tx)}
-                      className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center transition cursor-pointer"
+                      className="w-8 h-8 rounded-xl bg-white border border-[#0B3D2E]/20 hover:bg-[#EEF4F0] text-[#0B3D2E] flex items-center justify-center transition cursor-pointer"
                       title="Download Official Receipt (Spreadsheet / CSV)"
                     >
                       <Download className="w-4 h-4" />
@@ -359,7 +359,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ onOpenAddMod
                         {/* Archive / Restore Button */}
                         <button
                           onClick={() => toggleArchiveTransaction(tx.id)}
-                          className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center transition cursor-pointer"
+                          className="w-8 h-8 rounded-xl bg-white border border-[#0B3D2E]/20 hover:bg-[#EEF4F0] text-[#0B3D2E] flex items-center justify-center transition cursor-pointer"
                           title={tx.is_archived ? 'Restore transaction' : 'Archive transaction'}
                         >
                           {tx.is_archived ? <RotateCcw className="w-4 h-4 text-emerald-600" /> : <Archive className="w-4 h-4" />}
@@ -368,7 +368,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ onOpenAddMod
                         {/* Delete button */}
                         <button
                           onClick={() => deleteTransaction(tx.id)}
-                          className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-rose-100 text-slate-500 hover:text-rose-600 flex items-center justify-center transition cursor-pointer"
+                          className="w-8 h-8 rounded-xl bg-white border border-[#0B3D2E]/20 hover:bg-red-100 text-slate-500 hover:text-red-800 flex items-center justify-center transition cursor-pointer"
                           title="Delete record"
                         >
                           <Trash2 className="w-3.5 h-3.5" />

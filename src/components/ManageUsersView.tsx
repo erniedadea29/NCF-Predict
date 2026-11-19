@@ -88,7 +88,7 @@ const OfficerPromotionPanel: React.FC = () => {
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-4 sm:p-5 space-y-4">
       <div className="flex items-center gap-2">
-        <Award className="w-4.5 h-4.5 text-[#00873E]" />
+        <Award className="w-4.5 h-4.5 text-[#0B3D2E]" />
         <h3 className="font-extrabold text-slate-900 text-sm sm:text-base">Officer Promotion</h3>
       </div>
       <p className="text-[11px] text-slate-500 -mt-2">
@@ -116,7 +116,7 @@ const OfficerPromotionPanel: React.FC = () => {
         <div>
           <label className="block text-[11px] font-bold text-slate-700 mb-1 uppercase tracking-wider">Position</label>
           <select value={slotKey} onChange={(e) => setSlotKey(e.target.value as OfficerSlotKey)}
-            className="w-full px-3 py-2.5 text-sm border border-slate-300 rounded-xl bg-white focus:ring-2 focus:ring-[#00873E]">
+            className="w-full px-3 py-2.5 text-sm border border-slate-300 rounded-xl bg-white focus:ring-2 focus:ring-[#0B3D2E]">
             {OFFICER_SLOTS.map(key => (
               <option key={key} value={key} disabled={takenSlotKeys.has(key)}>
                 {OFFICER_POSITION_LABELS[key]}{takenSlotKeys.has(key) ? ' (Taken)' : ''}
@@ -126,7 +126,7 @@ const OfficerPromotionPanel: React.FC = () => {
         </div>
         <div className="flex items-end">
           <button type="submit" disabled={submitting || !studentId}
-            className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs font-bold bg-[#00873E] hover:bg-[#007033] text-white shadow-xs transition cursor-pointer disabled:opacity-50 whitespace-nowrap">
+            className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs font-bold bg-[#0B3D2E] hover:bg-[#072A20] text-white shadow-xs transition cursor-pointer disabled:opacity-50 whitespace-nowrap">
             {submitting ? 'Promoting...' : 'Promote'}
           </button>
         </div>
@@ -142,7 +142,7 @@ const OfficerPromotionPanel: React.FC = () => {
                 <p className="text-[10px] text-slate-500 truncate">{o.officer_position}</p>
               </div>
               <button onClick={() => handleVacate(o.id)} disabled={submitting}
-                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-[11px] font-bold transition cursor-pointer disabled:opacity-50 shrink-0"
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 text-[11px] font-bold transition cursor-pointer disabled:opacity-50 shrink-0"
                 title="Demote — reverts to student, keeps the account active">
                 <UserMinus className="w-3.5 h-3.5" /> Demote
               </button>
@@ -197,7 +197,7 @@ const AdminPromotionPanel: React.FC = () => {
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-4 sm:p-5 space-y-4">
       <div className="flex items-center gap-2">
-        <Crown className="w-4.5 h-4.5 text-[#00873E]" />
+        <Crown className="w-4.5 h-4.5 text-[#0B3D2E]" />
         <h3 className="font-extrabold text-slate-900 text-sm sm:text-base">Promote Employee to Admin</h3>
       </div>
       <p className="text-[11px] text-slate-500 -mt-2">
@@ -226,7 +226,7 @@ const AdminPromotionPanel: React.FC = () => {
                   disabled={taken}
                   onClick={() => setDepartmentCode(dept)}
                   className={`p-2 rounded-lg border text-xs font-extrabold transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
-                    departmentCode === dept ? 'border-[#00873E] bg-emerald-50 text-emerald-950 ring-1 ring-[#00873E]' : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
+                    departmentCode === dept ? 'border-[#0B3D2E] bg-emerald-50 text-emerald-950 ring-1 ring-[#0B3D2E]' : 'border-[#0B3D2E]/20 bg-white hover:bg-[#EEF4F0] text-[#0B3D2E]'
                   }`}
                   title={taken ? `${dept} already has an Admin` : dept}
                 >
@@ -248,7 +248,7 @@ const AdminPromotionPanel: React.FC = () => {
           </div>
           <div className="flex items-end">
             <button type="submit" disabled={submitting || !employeeId}
-              className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs font-bold bg-[#00873E] hover:bg-[#007033] text-white shadow-xs transition cursor-pointer disabled:opacity-50 whitespace-nowrap">
+              className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs font-bold bg-[#0B3D2E] hover:bg-[#072A20] text-white shadow-xs transition cursor-pointer disabled:opacity-50 whitespace-nowrap">
               {submitting ? 'Promoting...' : 'Promote'}
             </button>
           </div>
@@ -271,7 +271,7 @@ const AdminPromotionPanel: React.FC = () => {
                   <UserMinus className="w-3.5 h-3.5" /> Demote
                 </button>
                 <button onClick={() => handleDeactivate(a.id)} disabled={submitting}
-                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-[11px] font-bold transition cursor-pointer disabled:opacity-50"
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 text-[11px] font-bold transition cursor-pointer disabled:opacity-50"
                   title="Deactivate — frees this department's Admin slot">
                   <ShieldOff className="w-3.5 h-3.5" /> Deactivate
                 </button>
@@ -324,7 +324,7 @@ const DeanPromotionPanel: React.FC = () => {
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-4 sm:p-5 space-y-4">
       <div className="flex items-center gap-2">
-        <Landmark className="w-4.5 h-4.5 text-[#00873E]" />
+        <Landmark className="w-4.5 h-4.5 text-[#0B3D2E]" />
         <h3 className="font-extrabold text-slate-900 text-sm sm:text-base">Promote Employee to Dean</h3>
       </div>
       <p className="text-[11px] text-slate-500 -mt-2">
@@ -353,7 +353,7 @@ const DeanPromotionPanel: React.FC = () => {
               <UserMinus className="w-3.5 h-3.5" /> Demote
             </button>
             <button onClick={() => handleDeactivate(currentDean.id)} disabled={submitting}
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-[11px] font-bold transition cursor-pointer disabled:opacity-50"
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 text-[11px] font-bold transition cursor-pointer disabled:opacity-50"
               title="Deactivate — frees the Dean slot">
               <ShieldOff className="w-3.5 h-3.5" /> Deactivate
             </button>
@@ -372,7 +372,7 @@ const DeanPromotionPanel: React.FC = () => {
           </div>
           <div className="flex items-end">
             <button type="submit" disabled={submitting || !employeeId}
-              className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs font-bold bg-[#00873E] hover:bg-[#007033] text-white shadow-xs transition cursor-pointer disabled:opacity-50 whitespace-nowrap">
+              className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs font-bold bg-[#0B3D2E] hover:bg-[#072A20] text-white shadow-xs transition cursor-pointer disabled:opacity-50 whitespace-nowrap">
               {submitting ? 'Promoting...' : 'Promote'}
             </button>
           </div>
@@ -422,7 +422,7 @@ const AdviserPromotionPanel: React.FC = () => {
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-4 sm:p-5 space-y-4">
       <div className="flex items-center gap-2">
-        <GraduationCap className="w-4.5 h-4.5 text-[#00873E]" />
+        <GraduationCap className="w-4.5 h-4.5 text-[#0B3D2E]" />
         <h3 className="font-extrabold text-slate-900 text-sm sm:text-base">Promote Employee to Adviser</h3>
       </div>
       <p className="text-[11px] text-slate-500 -mt-2">
@@ -451,7 +451,7 @@ const AdviserPromotionPanel: React.FC = () => {
               <UserMinus className="w-3.5 h-3.5" /> Demote
             </button>
             <button onClick={() => handleDeactivate(currentAdviser.id)} disabled={submitting}
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-[11px] font-bold transition cursor-pointer disabled:opacity-50"
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 text-[11px] font-bold transition cursor-pointer disabled:opacity-50"
               title="Deactivate — frees the Adviser slot">
               <ShieldOff className="w-3.5 h-3.5" /> Deactivate
             </button>
@@ -470,7 +470,7 @@ const AdviserPromotionPanel: React.FC = () => {
           </div>
           <div className="flex items-end">
             <button type="submit" disabled={submitting || !employeeId}
-              className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs font-bold bg-[#00873E] hover:bg-[#007033] text-white shadow-xs transition cursor-pointer disabled:opacity-50 whitespace-nowrap">
+              className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs font-bold bg-[#0B3D2E] hover:bg-[#072A20] text-white shadow-xs transition cursor-pointer disabled:opacity-50 whitespace-nowrap">
               {submitting ? 'Promoting...' : 'Promote'}
             </button>
           </div>
@@ -556,7 +556,7 @@ export const ManageUsersView: React.FC = () => {
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
             <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 ${
-              u.is_active ? 'bg-[#00873E] text-white' : 'bg-slate-200 text-slate-500'
+              u.is_active ? 'bg-[#0B3D2E] text-white' : 'bg-slate-200 text-slate-500'
             }`}>
               {u.full_name.charAt(0)}
             </div>
@@ -577,7 +577,7 @@ export const ManageUsersView: React.FC = () => {
               u.is_active ? (
                 <button
                   onClick={() => deactivateUser(u.id)}
-                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-[11px] font-bold transition cursor-pointer"
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 text-[11px] font-bold transition cursor-pointer"
                   title="Deactivate (blocks their login)"
                 >
                   <ShieldOff className="w-3.5 h-3.5" /> Deactivate
@@ -605,7 +605,7 @@ export const ManageUsersView: React.FC = () => {
             {canHardDelete && confirmingDeleteId !== u.id && (
               <button
                 onClick={() => { setConfirmingDeleteId(u.id); setDeleteError(null); }}
-                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-black text-white text-[11px] font-bold transition cursor-pointer"
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#0B3D2E] hover:bg-[#072A20] text-white text-[11px] font-bold transition cursor-pointer"
                 title="Permanently delete this account — cannot be undone"
               >
                 <Trash2 className="w-3.5 h-3.5" /> Delete
@@ -615,7 +615,7 @@ export const ManageUsersView: React.FC = () => {
         </div>
 
         {canHardDelete && confirmingDeleteId === u.id && (
-          <div className="flex items-center justify-between gap-2 bg-slate-900 text-white rounded-xl px-3 py-2 text-xs">
+          <div className="flex items-center justify-between gap-2 bg-[#0B3D2E] text-white rounded-xl px-3 py-2 text-xs">
             <span>
               Permanently delete <strong>{u.full_name}</strong>? This cannot be undone.
               {ALLOW_DELETE_WITH_HISTORY && (
@@ -635,7 +635,7 @@ export const ManageUsersView: React.FC = () => {
               <button
                 onClick={() => handleDeleteAccount(u.id)}
                 disabled={deletingId === u.id}
-                className="px-2.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-bold transition cursor-pointer disabled:opacity-50"
+                className="px-2.5 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold transition cursor-pointer disabled:opacity-50"
               >
                 {deletingId === u.id ? 'Deleting...' : 'Yes, delete permanently'}
               </button>
@@ -660,9 +660,9 @@ export const ManageUsersView: React.FC = () => {
 
   const AccountListContainer: React.FC<{ title: string; users: UserAccountSummary[]; accent?: 'emerald' | 'indigo' | 'slate' | 'rose'; icon?: React.ReactNode }> = ({ title, users, accent = 'slate', icon }) => {
     const accentClasses = {
-      emerald: 'bg-[#00873E] text-white',
+      emerald: 'bg-[#0B3D2E] text-white',
       indigo: 'bg-indigo-600 text-white',
-      slate: 'bg-slate-800 text-white',
+      slate: 'bg-[#0B3D2E] text-white',
       rose: 'bg-rose-100 text-rose-800'
     }[accent];
     return (

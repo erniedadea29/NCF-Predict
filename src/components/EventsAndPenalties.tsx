@@ -327,7 +327,7 @@ export const EventsAndPenalties: React.FC = () => {
           {canProposeEvent && (
             <button
               onClick={() => setActiveTab('create_event')}
-              className="flex items-center gap-1.5 px-4 py-2.5 bg-[#00873E] hover:bg-[#007033] text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer"
+              className="flex items-center gap-1.5 px-4 py-2.5 bg-[#0B3D2E] hover:bg-[#072A20] text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer"
             >
               <Plus className="w-4 h-4" />
               <span>+ Propose {isDepartmentRestricted ? userDepartment : 'Semester'} Event</span>
@@ -367,19 +367,19 @@ export const EventsAndPenalties: React.FC = () => {
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => handleReviewEvent(ev.id, 'APPROVED')}
-                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#00873E] hover:bg-[#007033] text-white text-[11px] font-bold transition cursor-pointer"
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#0B3D2E] hover:bg-[#072A20] text-white text-[11px] font-bold transition cursor-pointer"
                       >
                         <CheckCircle2 className="w-3.5 h-3.5" /> Approve & Publish
                       </button>
                       <button
                         onClick={() => handleReviewEvent(ev.id, 'REJECTED')}
-                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-800 text-[11px] font-bold transition cursor-pointer"
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 text-[11px] font-bold transition cursor-pointer"
                       >
                         <XCircle className="w-3.5 h-3.5" /> Reject
                       </button>
                       <button
                         onClick={() => { setReviewingEventId(null); setEventReviewRemarks(''); }}
-                        className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 text-[11px] font-bold transition cursor-pointer"
+                        className="px-3 py-1.5 rounded-lg bg-white border border-[#0B3D2E]/20 hover:bg-[#EEF4F0] text-[#0B3D2E] text-[11px] font-bold transition cursor-pointer"
                       >
                         Cancel
                       </button>
@@ -388,7 +388,7 @@ export const EventsAndPenalties: React.FC = () => {
                 ) : (
                   <button
                     onClick={() => setReviewingEventId(ev.id)}
-                    className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-bold transition cursor-pointer"
+                    className="px-3 py-1.5 rounded-lg bg-[#0B3D2E] hover:bg-[#072A20] text-white text-[11px] font-bold transition cursor-pointer"
                   >
                     Review
                   </button>
@@ -402,9 +402,9 @@ export const EventsAndPenalties: React.FC = () => {
       {/* Treasurer confirmation-remark prompt — payment stays pending until
           this is filled in (Section 1f). */}
       {payingPenalty && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl border border-slate-200 overflow-hidden">
-            <div className="px-6 py-4 bg-[#00873E] text-white flex items-center justify-between">
+        <div className="fixed inset-0 z-50 bg-[#0B3D2E]/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl border-t-4 border-t-[#F2B705] border border-slate-200 overflow-hidden">
+            <div className="px-6 py-4 bg-[#0B3D2E] text-white flex items-center justify-between">
               <div>
                 <h3 className="font-extrabold text-base">Confirm Penalty Payment</h3>
                 <p className="text-xs text-emerald-100">Treasurer confirmation required to settle</p>
@@ -433,7 +433,7 @@ export const EventsAndPenalties: React.FC = () => {
               <button
                 type="submit"
                 disabled={!penaltyRemark.trim()}
-                className="w-full py-3 bg-[#00873E] hover:bg-[#007033] text-white font-bold rounded-2xl shadow-md transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full py-3 bg-[#0B3D2E] hover:bg-[#072A20] text-white font-bold rounded-2xl shadow-md transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Confirm & Settle Payment
               </button>
@@ -511,7 +511,7 @@ export const EventsAndPenalties: React.FC = () => {
         <button
           onClick={() => setActiveTab('events')}
           className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center justify-center gap-2 ${
-            activeTab === 'events' ? 'bg-[#00873E] text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+            activeTab === 'events' ? 'bg-[#0B3D2E] text-white shadow-xs' : 'text-[#0B3D2E] hover:text-[#072A20]'
           }`}
         >
           <Calendar className="w-4 h-4" />
@@ -520,7 +520,7 @@ export const EventsAndPenalties: React.FC = () => {
         <button
           onClick={() => setActiveTab('penalties')}
           className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center justify-center gap-2 ${
-            activeTab === 'penalties' ? 'bg-[#00873E] text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+            activeTab === 'penalties' ? 'bg-[#0B3D2E] text-white shadow-xs' : 'text-[#0B3D2E] hover:text-[#072A20]'
           }`}
         >
           <AlertTriangle className="w-4 h-4" />
@@ -537,7 +537,7 @@ export const EventsAndPenalties: React.FC = () => {
           <button
             onClick={() => setActiveTab('create_event')}
             className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center justify-center gap-2 ${
-              activeTab === 'create_event' ? 'bg-[#00873E] text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+              activeTab === 'create_event' ? 'bg-[#0B3D2E] text-white shadow-xs' : 'text-[#0B3D2E] hover:text-[#072A20]'
             }`}
           >
             <Plus className="w-4 h-4" />
@@ -595,7 +595,7 @@ export const EventsAndPenalties: React.FC = () => {
               {canProposeEvent && (
                 <button
                   onClick={() => setActiveTab('create_event')}
-                  className="px-4 py-2 bg-[#00873E] hover:bg-[#007033] text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer"
+                  className="px-4 py-2 bg-[#0B3D2E] hover:bg-[#072A20] text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer"
                 >
                   + Propose {isDepartmentRestricted ? userDepartment : 'New'} Event
                 </button>
@@ -699,7 +699,7 @@ export const EventsAndPenalties: React.FC = () => {
                       {canManageAttendance && isEventApproved(ev) && (
                         <button
                           onClick={() => setSelectedEventForAttendance(ev)}
-                          className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 shadow-xs"
+                          className="px-3.5 py-2 bg-[#0B3D2E] hover:bg-[#072A20] text-white rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 shadow-xs"
                         >
                           <UserCheck className="w-3.5 h-3.5 text-emerald-400" />
                           <span>Take Attendance</span>
@@ -743,7 +743,7 @@ export const EventsAndPenalties: React.FC = () => {
             <button
               onClick={exportPenaltiesCsv}
               disabled={filteredAttendances.length === 0}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-[#00873E] hover:bg-[#007033] disabled:bg-slate-300 text-white shadow-2xs transition cursor-pointer disabled:cursor-not-allowed shrink-0"
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-[#0B3D2E] hover:bg-[#072A20] disabled:bg-[#0B3D2E]/35 text-white shadow-2xs transition cursor-pointer disabled:cursor-not-allowed shrink-0"
             >
               <Download className="w-3.5 h-3.5" />
               <span>Export Report (CSV)</span>
@@ -849,7 +849,7 @@ export const EventsAndPenalties: React.FC = () => {
                             {!canManageAttendance ? (
                               hasPenalty && !isPaid ? (
                                 <span className="text-rose-600 text-xs font-bold">
-                                  {isReadOnlyStudent ? 'Settle at SSC Treasury' : 'Unpaid — view-only'}
+                                  {isReadOnlyStudent ? 'Settle at CSC Treasury' : 'Unpaid — view-only'}
                                 </span>
                               ) : hasPenalty && isPaid ? (
                                 <span className="text-emerald-700 text-xs font-bold flex items-center justify-end gap-1">
@@ -862,7 +862,7 @@ export const EventsAndPenalties: React.FC = () => {
                             ) : hasPenalty && !isPaid && canCollectPayment ? (
                               <button
                                 onClick={() => handleSettlePenalty(att.id, att.student_name, amount)}
-                                className="px-3 py-1.5 bg-[#00873E] hover:bg-[#007033] text-white font-bold rounded-xl text-xs shadow-xs transition cursor-pointer flex items-center gap-1 ml-auto"
+                                className="px-3 py-1.5 bg-[#0B3D2E] hover:bg-[#072A20] text-white font-bold rounded-xl text-xs shadow-xs transition cursor-pointer flex items-center gap-1 ml-auto"
                               >
                                 <Receipt className="w-3.5 h-3.5" />
                                 <span>Collect ₱{amount.toFixed(2)}</span>
@@ -1031,7 +1031,7 @@ export const EventsAndPenalties: React.FC = () => {
 
             <button
               type="submit"
-              className="w-full py-3.5 bg-[#00873E] hover:bg-[#007033] text-white font-bold rounded-2xl shadow-md transition cursor-pointer text-sm"
+              className="w-full py-3.5 bg-[#0B3D2E] hover:bg-[#072A20] text-white font-bold rounded-2xl shadow-md transition cursor-pointer text-sm"
             >
               Submit for Dean/Adviser Approval
             </button>
@@ -1041,9 +1041,9 @@ export const EventsAndPenalties: React.FC = () => {
 
       {/* ATTENDANCE CHECK-IN MODAL */}
       {selectedEventForAttendance && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-3xl rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[85vh]">
-            <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between shrink-0">
+        <div className="fixed inset-0 z-50 bg-[#0B3D2E]/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-3xl rounded-3xl shadow-2xl border-t-4 border-t-[#F2B705] border border-slate-200 overflow-hidden flex flex-col max-h-[85vh]">
+            <div className="px-6 py-4 bg-[#0B3D2E] text-white flex items-center justify-between shrink-0">
               <div>
                 <h3 className="font-bold text-base flex items-center gap-2">
                   <UserCheck className="w-5 h-5 text-emerald-400" />
@@ -1069,7 +1069,7 @@ export const EventsAndPenalties: React.FC = () => {
                 </p>
                 <button
                   onClick={() => markStudents(displayStudents, 'Present', 'the whole roster')}
-                  className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-xl text-xs shadow-2xs whitespace-nowrap cursor-pointer"
+                  className="px-3 py-1.5 bg-[#0B3D2E] hover:bg-[#072A20] text-white font-bold rounded-xl text-xs shadow-2xs whitespace-nowrap cursor-pointer"
                 >
                   ✓ Mark All Present
                 </button>
@@ -1081,7 +1081,7 @@ export const EventsAndPenalties: React.FC = () => {
                     key={y}
                     onClick={() => setAttendanceYear(y)}
                     className={`px-2.5 py-1 rounded-full border transition cursor-pointer ${
-                      attendanceYear === y ? 'bg-slate-900 border-slate-900 text-white' : 'bg-white border-slate-200 text-slate-600 hover:border-slate-400'
+                      attendanceYear === y ? 'bg-[#0B3D2E] border-slate-900 text-white' : 'bg-white border-[#0B3D2E]/20 text-[#0B3D2E] hover:border-[#0B3D2E]/40'
                     }`}
                   >
                     {y === 'ALL' ? `All Year Levels (${displayStudents.length})` : `${y} (${displayStudents.filter(s => yearLabel(s) === y).length})`}
@@ -1124,7 +1124,7 @@ export const EventsAndPenalties: React.FC = () => {
                 const collapsed = collapsedYears.has(year);
                 return (
                   <div key={year} className="space-y-2">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-3 py-2 rounded-xl bg-slate-800 text-white text-xs">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-3 py-2 rounded-xl bg-[#0B3D2E] text-white text-xs">
                       <button
                         onClick={() => setCollapsedYears(prev => { const n = new Set(prev); if (n.has(year)) n.delete(year); else n.add(year); return n; })}
                         className="flex items-center gap-2 font-black text-left cursor-pointer"
@@ -1136,9 +1136,9 @@ export const EventsAndPenalties: React.FC = () => {
                       </button>
                       <div className="flex items-center gap-1.5 shrink-0">
                         <span className="text-[10px] text-slate-400 uppercase font-bold">Mark all:</span>
-                        <button onClick={() => markStudents(yearStudents, 'Present', year)} className="px-2 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 font-bold text-[11px] cursor-pointer">Present</button>
-                        <button onClick={() => markStudents(yearStudents, 'Absent', year)} className="px-2 py-1 rounded-lg bg-rose-600 hover:bg-rose-700 font-bold text-[11px] cursor-pointer">Absent</button>
-                        <button onClick={() => markStudents(yearStudents, 'Excused', year)} className="px-2 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 font-bold text-[11px] cursor-pointer">Excused</button>
+                        <button onClick={() => markStudents(yearStudents, 'Present', year)} className="px-2 py-1 rounded-lg bg-white hover:bg-[#EEF4F0] text-[#0B3D2E] font-bold text-[11px] cursor-pointer">Present</button>
+                        <button onClick={() => markStudents(yearStudents, 'Absent', year)} className="px-2 py-1 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold text-[11px] cursor-pointer">Absent</button>
+                        <button onClick={() => markStudents(yearStudents, 'Excused', year)} className="px-2 py-1 rounded-lg bg-[#F2B705] hover:bg-[#D9A404] text-[#0B3D2E] font-bold text-[11px] cursor-pointer">Excused</button>
                         <button
                           onClick={async () => {
                             const marked = yearStudents.filter(s => statusOf(s));
@@ -1147,7 +1147,7 @@ export const EventsAndPenalties: React.FC = () => {
                             const n = await clearAttendance(selectedEventForAttendance.id, marked.map(s => s.id));
                             if (n > 0 && n < marked.length) alert(`${n} cleared. ${marked.length - n} kept (paid penalty or not allowed).`);
                           }}
-                          className="px-2 py-1 rounded-lg bg-slate-600 hover:bg-slate-500 font-bold text-[11px] cursor-pointer"
+                          className="px-2 py-1 rounded-lg bg-transparent hover:bg-white/10 border border-white/60 text-white font-bold text-[11px] cursor-pointer"
                           title="Undo the marks of this year level"
                         >
                           Clear
@@ -1181,8 +1181,8 @@ export const EventsAndPenalties: React.FC = () => {
                           onClick={() => recordAttendance(selectedEventForAttendance.id, stud.id, 'Present')}
                           className={`px-3 py-1.5 rounded-xl font-bold transition cursor-pointer ${
                             status === 'Present'
-                              ? 'bg-emerald-600 text-white shadow-xs'
-                              : 'bg-slate-100 hover:bg-emerald-50 text-slate-700 hover:text-emerald-700'
+                              ? 'bg-[#0B3D2E] text-white shadow-xs'
+                              : 'bg-slate-100 hover:bg-[#EEF4F0] text-[#0B3D2E] hover:text-emerald-700'
                           }`}
                         >
                           ✓ Present
@@ -1191,8 +1191,8 @@ export const EventsAndPenalties: React.FC = () => {
                           onClick={() => recordAttendance(selectedEventForAttendance.id, stud.id, 'Absent')}
                           className={`px-3 py-1.5 rounded-xl font-bold transition cursor-pointer ${
                             status === 'Absent'
-                              ? 'bg-rose-600 text-white shadow-xs'
-                              : 'bg-slate-100 hover:bg-rose-50 text-slate-700 hover:text-rose-700'
+                              ? 'bg-red-600 text-white shadow-xs'
+                              : 'bg-white border border-red-200 hover:bg-red-50 text-red-700 hover:text-red-800'
                           }`}
                         >
                           ✗ Absent
@@ -1201,8 +1201,8 @@ export const EventsAndPenalties: React.FC = () => {
                           onClick={() => recordAttendance(selectedEventForAttendance.id, stud.id, 'Excused')}
                           className={`px-2.5 py-1.5 rounded-xl font-bold transition cursor-pointer ${
                             status === 'Excused'
-                              ? 'bg-blue-600 text-white shadow-xs'
-                              : 'bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-700'
+                              ? 'bg-[#F2B705] text-[#0B3D2E] shadow-xs'
+                              : 'bg-[#FFF8E1] hover:bg-[#FDEFC2] text-[#7A5A00] hover:text-[#5C4300]'
                           }`}
                         >
                           Excused
@@ -1217,7 +1217,7 @@ export const EventsAndPenalties: React.FC = () => {
                           }}
                           disabled={!existingAtt}
                           title={existingAtt ? 'Clear this mark (back to not yet marked)' : 'Not marked yet'}
-                          className="px-2.5 py-1.5 rounded-xl font-bold transition cursor-pointer bg-slate-100 hover:bg-slate-200 text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed"
+                          className="px-2.5 py-1.5 rounded-xl font-bold transition cursor-pointer bg-white border border-[#0B3D2E]/20 hover:bg-[#EEF4F0] text-[#0B3D2E] disabled:opacity-40 disabled:cursor-not-allowed"
                         >
                           ✕ Clear
                         </button>
@@ -1236,7 +1236,7 @@ export const EventsAndPenalties: React.FC = () => {
               </span>
               <button
                 onClick={() => setSelectedEventForAttendance(null)}
-                className="px-4 py-2 bg-slate-900 text-white font-bold rounded-xl text-xs hover:bg-slate-800 transition cursor-pointer"
+                className="px-4 py-2 bg-[#0B3D2E] text-white font-bold rounded-xl text-xs hover:bg-[#072A20] transition cursor-pointer"
               >
                 Done & Save Attendance
               </button>

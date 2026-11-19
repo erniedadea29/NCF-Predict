@@ -114,13 +114,13 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
           {onOpenDeptSwitch && (
             <button
               onClick={onOpenDeptSwitch}
-              className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer border border-slate-300"
+              className="px-3 py-1.5 rounded-xl bg-white border border-[#0B3D2E]/20 hover:bg-[#EEF4F0] text-[#0B3D2E] text-xs font-bold transition flex items-center gap-1.5 cursor-pointer border border-[#0B3D2E]/20"
             >
               <Building2 className="w-3.5 h-3.5 text-blue-600" />
               Switch / Register Dept
             </button>
           )}
-          <span className="px-3 py-1.5 rounded-xl bg-[#00873E] text-white text-xs font-bold shadow-xs flex items-center gap-1.5">
+          <span className="px-3 py-1.5 rounded-xl bg-[#0B3D2E] text-white text-xs font-bold shadow-xs flex items-center gap-1.5">
             <Calendar className="w-3.5 h-3.5" />
             {activeSemester.school_year_label} • {activeSemester.semester_name}
           </span>
@@ -148,36 +148,36 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
       )}
 
       {/* Primary Annual Budget Hero Card (Scoped to Designated Department) */}
-      <div className="bg-[#00873E] text-white rounded-2xl p-5 sm:p-6 shadow-md overflow-hidden relative">
+      <div className="bg-white text-slate-900 rounded-2xl p-5 sm:p-6 border border-slate-200 overflow-hidden relative">
         <div className="relative z-10 space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
               <div className="flex items-center gap-2">
-                <p className="text-xs font-semibold text-emerald-100 uppercase tracking-wider">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
                   {isDepartmentRestricted ? `${scopedDepartmentInfo.name} (${userDepartment}) Available Funds` : 'Available Funds (All Departments)'}
                 </p>
-                <span className="px-2 py-0.5 bg-white/20 text-white text-[10px] font-black rounded-md uppercase">
+                <span className="px-2 py-0.5 bg-slate-100 text-slate-600 text-[10px] font-black rounded-md uppercase">
                   {userDepartment}
                 </span>
               </div>
               {/* Current balance: goes UP with every income (SAF, penalties,
                   returns) and DOWN with every expense as soon as it's Completed,
                   and with the funds released to an approved budget. */}
-              <h2 className={`text-3xl sm:text-4xl font-extrabold tracking-tight mt-0.5 ${totalRemaining < 0 ? 'text-rose-200' : ''}`}>
+              <h2 className={`text-3xl sm:text-4xl font-extrabold tracking-tight mt-0.5 ${totalRemaining < 0 ? 'text-red-600' : 'text-slate-900'}`}>
                 {peso(totalRemaining)}
               </h2>
-              <p className="text-[11px] text-emerald-100 mt-1 font-mono">
+              <p className="text-[11px] text-slate-500 mt-1 font-mono">
                 {peso(totalAllocated)} allocated
-                <span className="text-lime-200"> + {peso(totalIncome)} collected</span>
-                <span className="text-rose-200"> − {peso(totalSpent)} spent / released</span>
+                <span className="text-[#0B3D2E]"> + {peso(totalIncome)} collected</span>
+                <span className="text-slate-700"> − {peso(totalSpent)} spent / released</span>
               </p>
               {totalRemaining < 0 && (
-                <p className="mt-1.5 inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-rose-600 text-white text-[11px] font-bold">
+                <p className="mt-1.5 inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-red-50 text-red-700 border border-red-200 text-[11px] font-bold">
                   ⚠️ Not enough funds: released budgets and expenses exceed the available funds by {peso(-totalRemaining)}.
                 </p>
               )}
               {(pendingIncome > 0 || pendingSpent > 0) && (
-                <p className="text-[11px] text-amber-200 mt-0.5">
+                <p className="text-[11px] text-amber-700 mt-0.5">
                   Awaiting approval (not yet counted):
                   {pendingIncome > 0 && ` +${peso(pendingIncome)} income`}
                   {pendingIncome > 0 && pendingSpent > 0 && ','}
@@ -192,14 +192,14 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
                   : liveSyncStatus === 'polling'
                   ? 'Realtime unavailable: refreshing every 30 seconds'
                   : 'Not syncing'}
-                className="px-3 py-1 bg-white/20 backdrop-blur-xs text-white text-xs font-bold rounded-full border border-white/20 flex items-center gap-1.5"
+                className="px-3 py-1 bg-white text-slate-700 text-xs font-semibold rounded-full border border-slate-200 flex items-center gap-1.5"
               >
                 <span className={`w-2 h-2 rounded-full ${
-                  liveSyncStatus === 'live' ? 'bg-lime-300 animate-pulse' : liveSyncStatus === 'polling' ? 'bg-amber-300' : 'bg-slate-300'
+                  liveSyncStatus === 'live' ? 'bg-[#0B3D2E] animate-pulse' : liveSyncStatus === 'polling' ? 'bg-amber-400' : 'bg-slate-300'
                 }`}></span>
                 {liveSyncStatus === 'live' ? 'Live' : liveSyncStatus === 'polling' ? 'Syncing' : 'Offline'}
               </span>
-              <span className="px-3 py-1 bg-white/20 backdrop-blur-xs text-white text-xs font-bold rounded-full border border-white/20">
+              <span className="px-3 py-1 bg-white text-slate-700 text-xs font-semibold rounded-full border border-slate-200">
                 {activeSemester.school_year_label}
               </span>
             </div>
@@ -207,16 +207,16 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
 
           {/* Progress Bar */}
           <div className="space-y-1.5">
-            <div className="flex justify-between text-xs font-medium text-emerald-100">
+            <div className="flex justify-between text-xs font-medium text-slate-500">
               <span>
                 {peso(totalSpent)} spent of {peso(totalAvailable)}
-                {totalIncome > 0 && <span className="text-emerald-200"> (incl. {peso(totalIncome)} income)</span>}
+                {totalIncome > 0 && <span className="text-slate-400"> (incl. {peso(totalIncome)} income)</span>}
               </span>
-              <span className="font-bold text-white text-sm">{spentPercent}%</span>
+              <span className="font-bold text-slate-900 text-sm">{spentPercent}%</span>
             </div>
-            <div className="w-full h-3 bg-black/20 rounded-full overflow-hidden p-0.5">
+            <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
               <div 
-                className="h-full bg-white rounded-full transition-all duration-500 shadow-sm"
+                className="h-full bg-[#0B3D2E] rounded-full transition-all duration-500"
                 style={{ width: `${Math.min(100, spentPercent)}%` }}
               ></div>
             </div>
@@ -224,20 +224,20 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
 
           {/* Key Metrics Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
-            <div className="bg-white/10 backdrop-blur-xs rounded-xl p-3 border border-white/15">
-              <p className="text-[11px] text-emerald-100 font-medium">Total Funds (Allocated + Collected)</p>
-              <p className="text-lg sm:text-xl font-bold text-white">{peso(totalAvailable)}</p>
+            <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+              <p className="text-[11px] text-slate-500 font-medium">Total Funds (Allocated + Collected)</p>
+              <p className="text-lg sm:text-xl font-bold text-slate-900">{peso(totalAvailable)}</p>
             </div>
 
-            <div className="bg-white/10 backdrop-blur-xs rounded-xl p-3 border border-white/15">
+            <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
               {/* Trained Random Forest's estimate of what this scope's budget requests should cost */}
-              <p className="text-[11px] text-emerald-100 font-medium">Random Forest Estimate (Budget Requests)</p>
-              <p className="text-lg sm:text-xl font-bold text-white">{peso(forecastAmount)}</p>
+              <p className="text-[11px] text-slate-500 font-medium">Random Forest Estimate (Budget Requests)</p>
+              <p className="text-lg sm:text-xl font-bold text-slate-900">{peso(forecastAmount)}</p>
             </div>
 
-            <div className="bg-white/10 backdrop-blur-xs rounded-xl p-3 border border-white/15">
-              <p className="text-[11px] text-emerald-100 font-medium">Department SAF Collected</p>
-              <p className="text-lg sm:text-xl font-bold text-white">{peso(totalSafCollected)}</p>
+            <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+              <p className="text-[11px] text-slate-500 font-medium">Department SAF Collected</p>
+              <p className="text-lg sm:text-xl font-bold text-slate-900">{peso(totalSafCollected)}</p>
             </div>
           </div>
         </div>
@@ -252,7 +252,7 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
         {!isViewOnlyReviewer && !isAuditor(currentUser) && (
           <button
             onClick={onOpenCreateProposal}
-            className="p-3.5 bg-white hover:bg-emerald-50/50 border border-slate-200 rounded-xl flex flex-col items-start text-left transition shadow-2xs group cursor-pointer"
+            className="p-3.5 bg-white hover:bg-emerald-50/50 border border-[#0B3D2E]/20 rounded-xl flex flex-col items-start text-left transition shadow-2xs group cursor-pointer"
           >
             <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center mb-2 group-hover:scale-105 transition">
               <FileText className="w-4 h-4" />
@@ -265,7 +265,7 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
         {!isViewOnlyReviewer && (
           <button
             onClick={onOpenAddTransaction}
-            className="p-3.5 bg-white hover:bg-emerald-50/50 border border-slate-200 rounded-xl flex flex-col items-start text-left transition shadow-2xs group cursor-pointer"
+            className="p-3.5 bg-white hover:bg-emerald-50/50 border border-[#0B3D2E]/20 rounded-xl flex flex-col items-start text-left transition shadow-2xs group cursor-pointer"
           >
             <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center mb-2 group-hover:scale-105 transition">
               <PlusCircle className="w-4 h-4" />
@@ -277,7 +277,7 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
 
         <button
           onClick={() => setActiveTab('saf_students')}
-          className="p-3.5 bg-white hover:bg-emerald-50/50 border border-slate-200 rounded-xl flex flex-col items-start text-left transition shadow-2xs group cursor-pointer"
+          className="p-3.5 bg-white hover:bg-emerald-50/50 border border-[#0B3D2E]/20 rounded-xl flex flex-col items-start text-left transition shadow-2xs group cursor-pointer"
         >
           <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center mb-2 group-hover:scale-105 transition">
             <Receipt className="w-4 h-4" />
@@ -288,7 +288,7 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
 
         <button
           onClick={() => setActiveTab('events_attendance')}
-          className="p-3.5 bg-white hover:bg-emerald-50/50 border border-slate-200 rounded-xl flex flex-col items-start text-left transition shadow-2xs group cursor-pointer"
+          className="p-3.5 bg-white hover:bg-emerald-50/50 border border-[#0B3D2E]/20 rounded-xl flex flex-col items-start text-left transition shadow-2xs group cursor-pointer"
         >
           <div className="w-8 h-8 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center mb-2 group-hover:scale-105 transition">
             <UserCheck className="w-4 h-4" />

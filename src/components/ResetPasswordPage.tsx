@@ -30,10 +30,10 @@ export const ResetPasswordPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen w-full bg-gradient-to-br from-[#00873E] via-[#03693a] to-slate-900 flex items-center justify-center p-3 sm:p-6">
+    <div className="min-h-screen w-full bg-slate-100 flex items-center justify-center p-3 sm:p-6">
       <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden p-6 sm:p-10">
-        <div className="w-11 h-11 rounded-2xl bg-[#00873E]/10 flex items-center justify-center mb-4">
-          <KeyRound className="w-5 h-5 text-[#00873E]" />
+        <div className="w-11 h-11 rounded-2xl bg-[#0B3D2E]/10 flex items-center justify-center mb-4">
+          <KeyRound className="w-5 h-5 text-[#0B3D2E]" />
         </div>
         <h2 className="text-2xl font-black text-slate-900">Set a new password</h2>
         <p className="text-xs text-slate-500 mt-1 mb-6">Choose a new password for your account.</p>
@@ -57,11 +57,11 @@ export const ResetPasswordPage: React.FC = () => {
               <div className="relative">
                 <input
                   type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)}
-                  className="w-full px-3 py-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#00873E]"
+                  className="w-full px-3 py-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#0B3D2E]"
                   required
                 />
                 <button type="button" onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600" tabIndex={-1}>
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-[#0B3D2E]" tabIndex={-1}>
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
@@ -73,13 +73,13 @@ export const ResetPasswordPage: React.FC = () => {
               <label className="block text-xs font-bold text-slate-700 mb-1">Confirm New Password</label>
               <input
                 type={showPassword ? 'text' : 'password'} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full px-3 py-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#00873E]"
+                className="w-full px-3 py-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#0B3D2E]"
                 required
               />
             </div>
             <button
               type="submit" disabled={submitting}
-              className="w-full py-2.5 px-4 bg-[#00873E] hover:bg-[#007033] text-white font-bold text-sm rounded-xl shadow-xs transition cursor-pointer disabled:opacity-50"
+              className="w-full py-2.5 px-4 bg-[#0B3D2E] hover:bg-[#072A20] text-white font-bold text-sm rounded-xl shadow-xs transition cursor-pointer disabled:opacity-50"
             >
               {submitting ? 'Updating...' : 'Update Password'}
             </button>

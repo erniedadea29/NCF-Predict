@@ -123,7 +123,7 @@ export const SafCollectionAndStudents: React.FC<SafCollectionAndStudentsProps> =
     doc.text('NAGA COLLEGE FOUNDATION (NCF)', centerX, y, { align: 'center' });
     y += 18;
     doc.setFontSize(11);
-    doc.text('Supreme Student Council — Student Activity Fund (SAF)', centerX, y, { align: 'center' });
+    doc.text('College Student Council — Student Activity Fund (SAF)', centerX, y, { align: 'center' });
     y += 12;
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
@@ -209,7 +209,7 @@ export const SafCollectionAndStudents: React.FC<SafCollectionAndStudentsProps> =
         <button
           onClick={exportSafCsv}
           disabled={filteredSaf.length === 0}
-          className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-[#00873E] hover:bg-[#007033] disabled:bg-slate-300 text-white shadow-xs transition cursor-pointer disabled:cursor-not-allowed shrink-0"
+          className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-[#0B3D2E] hover:bg-[#072A20] disabled:bg-[#0B3D2E]/35 text-white shadow-xs transition cursor-pointer disabled:cursor-not-allowed shrink-0"
         >
           <Download className="w-3.5 h-3.5" />
           <span>Export Report (CSV)</span>
@@ -258,7 +258,7 @@ export const SafCollectionAndStudents: React.FC<SafCollectionAndStudentsProps> =
           <span className="text-[11px] font-bold text-slate-400 uppercase">Collection Rate</span>
           <p className="text-xl sm:text-2xl font-black text-slate-900">{collectionPercentage}%</p>
           <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-            <div className="h-full bg-[#00873E]" style={{ width: `${collectionPercentage}%` }} />
+            <div className="h-full bg-[#0B3D2E]" style={{ width: `${collectionPercentage}%` }} />
           </div>
         </div>
       </div>
@@ -268,7 +268,7 @@ export const SafCollectionAndStudents: React.FC<SafCollectionAndStudentsProps> =
         <button
           onClick={() => setActiveSubTab('saf_ledger')}
           className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer ${
-            activeSubTab === 'saf_ledger' ? 'bg-[#00873E] text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+            activeSubTab === 'saf_ledger' ? 'bg-[#0B3D2E] text-white shadow-xs' : 'text-[#0B3D2E] hover:text-[#072A20]'
           }`}
         >
           Ledger ({filteredSaf.length})
@@ -277,7 +277,7 @@ export const SafCollectionAndStudents: React.FC<SafCollectionAndStudentsProps> =
         <button
           onClick={() => setActiveSubTab('students_dir')}
           className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer ${
-            activeSubTab === 'students_dir' ? 'bg-[#00873E] text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+            activeSubTab === 'students_dir' ? 'bg-[#0B3D2E] text-white shadow-xs' : 'text-[#0B3D2E] hover:text-[#072A20]'
           }`}
         >
           Student Directory ({displayStudents.length})
@@ -286,7 +286,7 @@ export const SafCollectionAndStudents: React.FC<SafCollectionAndStudentsProps> =
         <button
           onClick={() => setActiveSubTab('clearances')}
           className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer ${
-            activeSubTab === 'clearances' ? 'bg-[#00873E] text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+            activeSubTab === 'clearances' ? 'bg-[#0B3D2E] text-white shadow-xs' : 'text-[#0B3D2E] hover:text-[#072A20]'
           }`}
         >
           SAF Clearance
@@ -406,7 +406,7 @@ export const SafCollectionAndStudents: React.FC<SafCollectionAndStudentsProps> =
                           {rec.paid ? (
                             <button
                               onClick={() => printOfficialReceipt(rec)}
-                              className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition cursor-pointer"
+                              className="px-2.5 py-1 rounded-lg bg-white border border-[#0B3D2E]/20 hover:bg-[#EEF4F0] text-[#0B3D2E] text-xs font-bold transition cursor-pointer"
                               title="Download Official SAF Receipt"
                             >
                               <Printer className="w-3.5 h-3.5 inline mr-1" />
@@ -417,7 +417,7 @@ export const SafCollectionAndStudents: React.FC<SafCollectionAndStudentsProps> =
                           ) : canCollectPayment ? (
                             <button
                               onClick={() => setPayingSafRecord(rec)}
-                              className="px-3 py-1 rounded-lg bg-[#00873E] hover:bg-[#007033] text-white text-xs font-bold shadow-2xs transition cursor-pointer"
+                              className="px-3 py-1 rounded-lg bg-[#0B3D2E] hover:bg-[#072A20] text-white text-xs font-bold shadow-2xs transition cursor-pointer"
                             >
                               Cash-In
                             </button>
@@ -546,7 +546,7 @@ export const SafCollectionAndStudents: React.FC<SafCollectionAndStudentsProps> =
                             <button
                               onClick={() => handleGenerateClearance(stud.id)}
                               disabled={generatingFor === stud.id}
-                              className="flex items-center gap-1 ml-auto px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-bold transition cursor-pointer disabled:opacity-50"
+                              className="flex items-center gap-1 ml-auto px-2.5 py-1.5 rounded-lg bg-[#0B3D2E] hover:bg-[#072A20] text-white text-[11px] font-bold transition cursor-pointer disabled:opacity-50"
                             >
                               <RefreshCw className={`w-3.5 h-3.5 ${generatingFor === stud.id ? 'animate-spin' : ''}`} />
                               {record ? 'Refresh' : 'Generate'}
@@ -565,9 +565,9 @@ export const SafCollectionAndStudents: React.FC<SafCollectionAndStudentsProps> =
 
       {/* CASH-IN PAYMENT MODAL */}
       {payingSafRecord && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl border border-slate-200 overflow-hidden">
-            <div className="px-6 py-4 bg-[#00873E] text-white flex items-center justify-between">
+        <div className="fixed inset-0 z-50 bg-[#0B3D2E]/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl border-t-4 border-t-[#F2B705] border border-slate-200 overflow-hidden">
+            <div className="px-6 py-4 bg-[#0B3D2E] text-white flex items-center justify-between">
               <div>
                 <h3 className="font-extrabold text-base">Record SAF Cash-In Payment</h3>
                 <p className="text-xs text-emerald-100">Debit SAF, Credit Cash Double Entry</p>
@@ -586,7 +586,7 @@ export const SafCollectionAndStudents: React.FC<SafCollectionAndStudentsProps> =
 
               <div className="space-y-1">
                 <label className="font-bold text-slate-700">Payment Method</label>
-                <div className="py-2 px-3 rounded-xl text-xs font-bold bg-slate-900 text-white text-center">
+                <div className="py-2 px-3 rounded-xl text-xs font-bold bg-[#0B3D2E] text-white text-center">
                   Cash
                 </div>
                 <p className="text-[10px] text-slate-400">SAF payments are collected on a cash basis only.</p>
@@ -612,7 +612,7 @@ export const SafCollectionAndStudents: React.FC<SafCollectionAndStudentsProps> =
               <button
                 type="submit"
                 disabled={!paymentNotes.trim()}
-                className="w-full py-3 bg-[#00873E] hover:bg-[#007033] text-white font-bold rounded-2xl shadow-md transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full py-3 bg-[#0B3D2E] hover:bg-[#072A20] text-white font-bold rounded-2xl shadow-md transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Confirm Payment & Issue Official Receipt
               </button>

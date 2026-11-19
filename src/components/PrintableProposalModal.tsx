@@ -50,7 +50,7 @@ export const PrintableProposalModal: React.FC<PrintableProposalModalProps> = ({ 
   // visual effect from text data).
   const Signatory: React.FC<{ name: string }> = ({ name }) => (
     redactSignatures ? (
-      <div className="bg-black h-4 mx-2 rounded-sm" aria-label="Redacted" />
+      <div className="bg-slate-400 h-4 mx-2 rounded-sm" aria-label="Redacted" />
     ) : (
       // Blank signature line when nobody has signed yet — never a placeholder name.
       <p className="font-bold text-slate-900 border-b border-slate-400 pb-1 mx-2">{name || ' '}</p>
@@ -58,10 +58,10 @@ export const PrintableProposalModal: React.FC<PrintableProposalModalProps> = ({ 
   );
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
-      <div className="bg-white w-full max-w-4xl rounded-3xl shadow-2xl border border-slate-200 overflow-hidden my-4">
+    <div className="fixed inset-0 z-50 bg-[#0B3D2E]/40 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
+      <div className="bg-white w-full max-w-4xl rounded-3xl shadow-2xl border-t-4 border-t-[#F2B705] border border-slate-200 overflow-hidden my-4">
         {/* Modal Controls Header */}
-        <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between no-print">
+        <div className="px-6 py-4 bg-[#0B3D2E] text-white flex items-center justify-between no-print">
           <div className="flex items-center gap-2">
             <Printer className="w-5 h-5 text-emerald-400" />
             <div>
@@ -72,7 +72,7 @@ export const PrintableProposalModal: React.FC<PrintableProposalModalProps> = ({ 
           <div className="flex items-center gap-2">
             <button
               onClick={handlePrint}
-              className="flex items-center gap-1.5 px-4 py-1.5 bg-[#00873E] hover:bg-[#007033] text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer"
+              className="flex items-center gap-1.5 px-4 py-1.5 bg-[#0B3D2E] hover:bg-[#072A20] text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer"
             >
               <Printer className="w-3.5 h-3.5" />
               <span>Print / Save as PDF</span>
@@ -90,14 +90,14 @@ export const PrintableProposalModal: React.FC<PrintableProposalModalProps> = ({ 
         <div className="p-8 sm:p-12 max-h-[80vh] overflow-y-auto font-serif text-slate-900 bg-white space-y-6">
           {/* Institutional Letterhead */}
           <div className="text-center border-b-2 border-emerald-800 pb-4 space-y-1">
-            <div className="w-12 h-12 rounded-full bg-[#00873E] text-white font-black text-2xl flex items-center justify-center mx-auto mb-2 font-sans">
+            <div className="w-12 h-12 rounded-full bg-[#0B3D2E] text-white font-black text-2xl flex items-center justify-center mx-auto mb-2 font-sans">
               Σ
             </div>
             <h1 className="text-xl font-bold uppercase tracking-widest text-emerald-950 font-sans">
               NAGA COLLEGE FOUNDATION
             </h1>
             <h2 className="text-xs font-medium uppercase tracking-wider text-slate-600 font-sans">
-              Supreme Student Council • Student Activity Fund (SAF) Board
+              College Student Council • Student Activity Fund (SAF) Board
             </h2>
             <p className="text-[11px] text-slate-500 font-sans">
               M.T. Villanueva Ave., Naga City, Camarines Sur, Philippines
