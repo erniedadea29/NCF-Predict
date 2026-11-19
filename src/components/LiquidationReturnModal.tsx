@@ -132,7 +132,12 @@ export const LiquidationReturnModal: React.FC<LiquidationReturnModalProps> = ({
 
   const totalReleased = targetProposal.cashouts.reduce((s, c) => s + c.amount_released, 0) || targetProposal.total_budget_amount;
   const recordedSpent = targetProposal.expenses.reduce((s, e) => s + e.amount_spent, 0);
-  const unspentBalance = Math.max(0, totalReleased - recordedSpent);
+  // Once a liquidation report exists, what was spent is what the report lists
+  // (backed by official receipts); before that, the expenses recorded in the system.
+  // The unspent balance to return is released minus that spend.
+  const liquidatedSpent = liq ? liq.accounting_summary.reduce((s, l) => s + l.spent, 0) : null;
+  const spentForBalance = liquidatedSpent ?? recordedSpent;
+  const unspentBalance = Math.max(0, Math.round((totalReleased - spentForBalance) * 100) / 100);
 
   const reportTotal = items.reduce((s, i) => s + (parseFloat(i.amount) || 0), 0);
   const matchesRecorded = Math.abs(reportTotal - recordedSpent) < 0.005;
@@ -277,8 +282,8 @@ export const LiquidationReturnModal: React.FC<LiquidationReturnModalProps> = ({
               <p className="text-sm sm:text-base font-extrabold text-slate-800 mt-0.5">{peso(totalReleased)}</p>
             </div>
             <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 text-center">
-              <span className="text-[10px] text-slate-400 font-bold uppercase">Recorded Expenses</span>
-              <p className="text-sm sm:text-base font-extrabold text-slate-800 mt-0.5">{peso(recordedSpent)}</p>
+              <span className="text-[10px] text-slate-400 font-bold uppercase">{liquidatedSpent !== null ? 'Spent (Liquidation Report)' : 'Recorded Expenses'}</span>
+              <p className="text-sm sm:text-base font-extrabold text-slate-800 mt-0.5">{peso(spentForBalance)}</p>
             </div>
             <div className="p-3 bg-emerald-50 rounded-2xl border border-emerald-200 text-center">
               <span className="text-[10px] text-emerald-700 font-bold uppercase">Unspent Balance</span>
