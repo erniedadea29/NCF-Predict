@@ -109,20 +109,30 @@ export const LiquidationReportDashboard: React.FC<LiquidationReportDashboardProp
     };
   }, [rows]);
 
-  // Category spend breakdown aggregated from every certified liquidation on record
+  // Category spend from CERTIFIED liquidations only: reports the Adviser and
+  // Dean have audited (status Audited, or Closed after the budget return).
+  // Liquidations still under review are counted separately, not in the totals.
+  const isCertified = (status?: string) => status === 'Audited' || status === 'Closed';
   const categoryBreakdown = useMemo(() => {
-    const map: Record<string, number> = {};
+    const map: Record<string, { spent: number; budgets: Set<string> }> = {};
     rows.forEach(r => {
-      r.proposal.liquidation?.accounting_summary.forEach(c => {
-        map[c.category] = (map[c.category] || 0) + c.spent;
+      const liq = r.proposal.liquidation;
+      if (!liq || !isCertified(liq.status)) return;
+      liq.accounting_summary.forEach(c => {
+        if (!(c.spent > 0)) return;
+        const entry = (map[c.category] ??= { spent: 0, budgets: new Set<string>() });
+        entry.spent += c.spent;
+        entry.budgets.add(r.proposal.id);
       });
     });
     return Object.entries(map)
-      .map(([category, spent]) => ({ category, spent }))
+      .map(([category, v]) => ({ category, spent: v.spent, budgets: v.budgets.size }))
       .sort((a, b) => b.spent - a.spent);
   }, [rows]);
 
-  const maxCategorySpend = categoryBreakdown[0]?.spent || 1;
+  const certifiedTotal = categoryBreakdown.reduce((s, c) => s + c.spent, 0);
+  const certifiedBudgets = rows.filter(r => isCertified(r.proposal.liquidation?.status)).length;
+  const liquidationsInReview = rows.filter(r => r.proposal.liquidation && !isCertified(r.proposal.liquidation.status)).length;
 
   const filteredRows = rows.filter(r => {
     if (statusFilter !== 'ALL' && r.statusFilter !== statusFilter) return false;
@@ -355,35 +365,67 @@ export const LiquidationReportDashboard: React.FC<LiquidationReportDashboardProp
         </div>
       </div>
 
-      {/* Category Spend Breakdown */}
-      {categoryBreakdown.length > 0 && (
-        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs space-y-4">
-          <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-            <PieChart className="w-4 h-4 text-slate-500" />
+      {/* Category Spend Breakdown: audited (certified) liquidations only */}
+      <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs space-y-4">
+        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-3">
+          <div className="flex items-center gap-2">
+            <PieChart className="w-4 h-4 text-[#0B3D2E]" />
             <div>
               <h3 className="text-sm font-bold text-slate-900">Certified Spend by Category</h3>
-              <p className="text-[11px] text-slate-500">Aggregated from all audited liquidation records</p>
+              <p className="text-[11px] text-slate-500">
+                From liquidation reports already audited by the Adviser and Dean
+                {certifiedBudgets > 0 && ` • ${certifiedBudgets} budget${certifiedBudgets > 1 ? 's' : ''}`}
+              </p>
             </div>
           </div>
-
-          <div className="space-y-3">
-            {categoryBreakdown.map(c => (
-              <div key={c.category} className="space-y-1">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-semibold text-slate-700">{c.category}</span>
-                  <span className="font-bold text-slate-900">{peso(c.spent)}</span>
-                </div>
-                <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-[#0B3D2E] rounded-full transition-all duration-500"
-                    style={{ width: `${Math.max(4, Math.round((c.spent / maxCategorySpend) * 100))}%` }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
+          {certifiedTotal > 0 && (
+            <div className="text-right">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Total certified spend</p>
+              <p className="text-base font-black text-[#0B3D2E]">{peso(certifiedTotal)}</p>
+            </div>
+          )}
         </div>
-      )}
+
+        {categoryBreakdown.length === 0 ? (
+          <p className="text-xs text-slate-500 bg-[#FBFAF4] border border-slate-200 rounded-xl p-3">
+            No audited liquidation yet. Spending appears here once the Adviser and Dean audit a liquidation report.
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {categoryBreakdown.map(c => {
+              const share = certifiedTotal > 0 ? (c.spent / certifiedTotal) * 100 : 0;
+              return (
+                <div key={c.category} className="space-y-1">
+                  <div className="flex items-center justify-between gap-2 text-xs">
+                    <span className="font-semibold text-slate-700">
+                      {c.category}
+                      <span className="ml-1.5 font-medium text-slate-400">
+                        {c.budgets} budget{c.budgets > 1 ? 's' : ''}
+                      </span>
+                    </span>
+                    <span className="flex items-center gap-2">
+                      <span className="px-1.5 py-0.5 rounded-md bg-[#EEF4F0] text-[#0B3D2E] text-[10px] font-bold">{share.toFixed(0)}%</span>
+                      <span className="font-bold text-slate-900">{peso(c.spent)}</span>
+                    </span>
+                  </div>
+                  <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-[#0B3D2E] rounded-full transition-all duration-500"
+                      style={{ width: `${Math.max(2, share)}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {liquidationsInReview > 0 && (
+          <p className="text-[11px] text-[#7A5A00] bg-[#FFF8E1] border border-[#F2B705]/40 rounded-lg px-3 py-2">
+            {liquidationsInReview} liquidation report{liquidationsInReview > 1 ? 's are' : ' is'} still under review and not counted yet.
+          </p>
+        )}
+      </div>
 
       {/* Status Filter Pills */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
