@@ -144,9 +144,7 @@ export const Header: React.FC = () => {
         <div className="flex items-center gap-2 sm:gap-3">
           {/* Brand Logo */}
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center text-[#0B3D2E] font-bold text-lg shadow-xs tracking-tight">
-              Σ
-            </div>
+            <img src="/ncf-logo.png" alt="Naga College Foundation logo" className="w-9 h-9 object-contain shrink-0" />
             <div>
               <div className="font-extrabold text-white text-sm leading-tight flex items-center gap-1.5">
                 NCF PREDICT

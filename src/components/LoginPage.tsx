@@ -108,9 +108,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
           <div className="absolute -right-10 -top-10 w-52 h-52 rounded-full bg-white/10"></div>
           <div className="absolute -left-16 bottom-0 w-64 h-64 rounded-full bg-white/5"></div>
           <div className="relative z-10">
-            <div className="w-14 h-14 rounded-2xl bg-white/15 flex items-center justify-center text-white font-black text-2xl backdrop-blur-xs shadow-inner mb-6">
-              Σ
-            </div>
+            <img src="/ncf-logo.png" alt="Naga College Foundation logo" className="w-16 h-16 object-contain mb-6" />
             <h1 className="text-2xl font-black tracking-tight leading-tight">NCF PREDICT</h1>
             <p className="text-emerald-100/90 text-sm mt-1">Budget & Student Activity Fund (SAF) System</p>
           </div>

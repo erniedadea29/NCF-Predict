@@ -90,9 +90,7 @@ export const PrintableProposalModal: React.FC<PrintableProposalModalProps> = ({ 
         <div className="p-8 sm:p-12 max-h-[80vh] overflow-y-auto font-serif text-slate-900 bg-white space-y-6">
           {/* Institutional Letterhead */}
           <div className="text-center border-b-2 border-emerald-800 pb-4 space-y-1">
-            <div className="w-12 h-12 rounded-full bg-[#0B3D2E] text-white font-black text-2xl flex items-center justify-center mx-auto mb-2 font-sans">
-              Σ
-            </div>
+            <img src="/ncf-logo.png" alt="Naga College Foundation logo" className="w-14 h-14 rounded-full object-contain mx-auto mb-2" />
             <h1 className="text-xl font-bold uppercase tracking-widest text-emerald-950 font-sans">
               NAGA COLLEGE FOUNDATION
             </h1>
