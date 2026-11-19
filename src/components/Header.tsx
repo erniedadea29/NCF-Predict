@@ -148,7 +148,6 @@ export const Header: React.FC = () => {
             <div>
               <div className="font-extrabold text-white text-sm leading-tight flex items-center gap-1.5">
                 NCF PREDICT
-                <span className="text-[10px] font-semibold px-1.5 py-0.5 bg-[#F2B705] text-[#0B3D2E] rounded">v2.5</span>
               </div>
               <p className="text-[11px] text-[#B9D3C4] hidden sm:block">Budget & Student Activity Fund (SAF) System</p>
             </div>
