@@ -138,21 +138,21 @@ export const Header: React.FC = () => {
           : fullNav;
 
   return (
-    <header className="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-xs no-print">
+    <header className="bg-[#0B3D2E] border-b-4 border-[#F2B705] sticky top-0 z-40 shadow-xs no-print">
       {/* Top Utility Bar */}
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2 flex items-center justify-between border-b border-slate-100 text-xs text-slate-600">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2 flex items-center justify-between border-b border-white/10 text-xs text-[#DCE9E1]">
         <div className="flex items-center gap-2 sm:gap-3">
           {/* Brand Logo */}
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-[#0B3D2E] flex items-center justify-center text-white font-bold text-lg shadow-xs tracking-tight">
+            <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center text-[#0B3D2E] font-bold text-lg shadow-xs tracking-tight">
               Σ
             </div>
             <div>
-              <div className="font-extrabold text-slate-900 text-sm leading-tight flex items-center gap-1.5">
+              <div className="font-extrabold text-white text-sm leading-tight flex items-center gap-1.5">
                 NCF PREDICT
-                <span className="text-[10px] font-semibold px-1.5 py-0.5 bg-emerald-100 text-emerald-800 rounded">v2.5</span>
+                <span className="text-[10px] font-semibold px-1.5 py-0.5 bg-[#F2B705] text-[#0B3D2E] rounded">v2.5</span>
               </div>
-              <p className="text-[11px] text-slate-500 hidden sm:block">Budget & Student Activity Fund (SAF) System</p>
+              <p className="text-[11px] text-[#B9D3C4] hidden sm:block">Budget & Student Activity Fund (SAF) System</p>
             </div>
           </div>
         </div>
@@ -164,8 +164,8 @@ export const Header: React.FC = () => {
               school year); everyone else, including students, is read-only. */}
           <button
             onClick={() => isAdminSystemOnly && setIsSyModalOpen(true)}
-            className={`flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#0B3D2E] text-white font-medium text-xs shadow-xs transition ${
-              isAdminSystemOnly ? 'hover:bg-[#072A20] cursor-pointer' : 'cursor-default opacity-90'
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#F2B705] text-[#0B3D2E] font-bold text-xs shadow-xs transition ${
+              isAdminSystemOnly ? 'hover:bg-[#D9A404] cursor-pointer' : 'cursor-default opacity-90'
             }`}
             title={isAdminSystemOnly ? 'Click to edit Semester & School Year' : 'Current academic period — only Admin/Super Admin can change this'}
           >
@@ -177,10 +177,10 @@ export const Header: React.FC = () => {
           {/* Mobile Shell Simulation Toggle */}
           <button
             onClick={() => setMobileFrameMode(!mobileFrameMode)}
-            className="hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-full bg-white border border-[#0B3D2E]/20 hover:bg-[#EEF4F0] text-[#0B3D2E] border border-[#0B3D2E]/20 transition text-xs font-medium cursor-pointer"
+            className="hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/10 border border-white/20 hover:bg-white/20 text-white transition text-xs font-medium cursor-pointer"
             title="Toggle Mobile Simulator View"
           >
-            {mobileFrameMode ? <Monitor className="w-3.5 h-3.5 text-slate-600" /> : <Smartphone className="w-3.5 h-3.5 text-slate-600" />}
+            {mobileFrameMode ? <Monitor className="w-3.5 h-3.5 text-white" /> : <Smartphone className="w-3.5 h-3.5 text-white" />}
             <span>{mobileFrameMode ? 'Full View' : 'Mobile Frame'}</span>
           </button>
 
@@ -188,10 +188,10 @@ export const Header: React.FC = () => {
           <div className="relative">
             <button
               onClick={() => { setNotifOpen(!notifOpen); setRoleMenuOpen(false); }}
-              className="relative p-1.5 sm:p-2 rounded-full bg-white border border-[#0B3D2E]/20 hover:bg-[#EEF4F0] border border-[#0B3D2E]/20 transition cursor-pointer"
+              className="relative p-1.5 sm:p-2 rounded-full bg-white/10 border border-white/20 hover:bg-white/20 transition cursor-pointer"
               title="Notifications"
             >
-              <Bell className="w-4 h-4 text-slate-600" />
+              <Bell className="w-4 h-4 text-white" />
               {unreadCount > 0 && (
                 <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-rose-600 text-white text-[9px] font-black flex items-center justify-center">
                   {unreadCount > 9 ? '9+' : unreadCount}
@@ -248,15 +248,15 @@ export const Header: React.FC = () => {
           <div className="relative">
             <button
               onClick={() => { setRoleMenuOpen(!roleMenuOpen); setNotifOpen(false); }}
-              className="flex items-center gap-1.5 p-1 sm:px-2.5 sm:py-1 rounded-full bg-white border border-[#0B3D2E]/20 hover:bg-[#EEF4F0] border border-[#0B3D2E]/20 transition cursor-pointer"
+              className="flex items-center gap-1.5 p-1 sm:px-2.5 sm:py-1 rounded-full bg-white/10 border border-white/20 hover:bg-white/20 transition cursor-pointer"
             >
-              <div className="w-6 h-6 rounded-full bg-[#0B3D2E] text-white font-bold flex items-center justify-center text-xs">
+              <div className="w-6 h-6 rounded-full bg-[#F2B705] text-[#0B3D2E] font-bold flex items-center justify-center text-xs">
                 {currentUser.name.charAt(0)}
               </div>
-              <span className="hidden lg:inline text-xs font-semibold text-slate-800 truncate max-w-[110px]">
+              <span className="hidden lg:inline text-xs font-semibold text-white truncate max-w-[110px]">
                 {currentUser.name.split(' ')[0]}
               </span>
-              <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
+              <ChevronDown className="w-3.5 h-3.5 text-[#DCE9E1]" />
             </button>
 
             {roleMenuOpen && (
@@ -328,8 +328,8 @@ export const Header: React.FC = () => {
               onClick={() => setActiveTab(item.id)}
               className={`pb-2 px-3 border-b-2 transition whitespace-nowrap cursor-pointer ${
                 activeTab === item.id
-                  ? 'border-[#0B3D2E] text-[#0B3D2E]'
-                  : 'border-transparent text-[#0B3D2E] hover:text-[#072A20] hover:border-[#0B3D2E]/40'
+                  ? 'border-[#F2B705] text-white'
+                  : 'border-transparent text-[#DCE9E1] hover:text-white hover:border-white/40'
               }`}
             >
               {item.label}
