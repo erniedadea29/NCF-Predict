@@ -4,6 +4,7 @@ import { DEPARTMENTS } from '../data/mockData';
 import { BudgetProposal, DepartmentCode } from '../types';
 import { downloadCsv } from '../utils/csvExport';
 import { canPrepareLiquidation } from '../utils/liquidation';
+import { isAuditor } from '../utils/budgetRequest';
 import { formatDateTime } from '../utils/roleLabels';
 import {
   Wallet,
@@ -159,7 +160,7 @@ export const LiquidationReportDashboard: React.FC<LiquidationReportDashboardProp
       case 'UNDER_REVIEW':
         return liqStatus === 'Rejected'
           ? { label: 'Liquidation Rejected', color: 'bg-rose-100 text-rose-800 border-rose-300', icon: XCircle }
-          : { label: liqStatus === 'PENDING_DEAN' ? 'Under Review: Dean' : 'Under Review: Adviser', color: 'bg-indigo-100 text-indigo-800 border-indigo-300', icon: ShieldCheck };
+          : { label: liqStatus === 'PENDING_DEAN' ? 'Under Review: Dean' : liqStatus === 'PENDING_AUDITOR' ? 'Pre-Audit: Auditor' : 'Under Review: Adviser', color: 'bg-indigo-100 text-indigo-800 border-indigo-300', icon: ShieldCheck };
       case 'PENDING_RETURN':
         return { label: 'Audited: Pending Fund Return', color: 'bg-blue-100 text-blue-800 border-blue-300', icon: AlertCircle };
       case 'RETURNED':
@@ -186,7 +187,7 @@ export const LiquidationReportDashboard: React.FC<LiquidationReportDashboardProp
       canCreate: isPreparer && open,
       action: liq?.status === 'FOR_REVISION' ? 'Revise' : 'Create',
       reason: !open
-        ? `Report already submitted (${liq!.status === 'PENDING_ADVISER' ? 'Under Review: Adviser' : liq!.status === 'PENDING_DEAN' ? 'Under Review: Dean' : liq!.status})`
+        ? `Report already submitted (${liq!.status === 'PENDING_AUDITOR' ? 'Pre-Audit: Auditor' : liq!.status === 'PENDING_ADVISER' ? 'Under Review: Adviser' : liq!.status === 'PENDING_DEAN' ? 'Under Review: Dean' : liq!.status})`
         : !isPreparer
         ? `Only ${p.created_by_officer || 'the Treasurer who filed this request'} can prepare it`
         : ''
@@ -569,6 +570,8 @@ export const LiquidationReportDashboard: React.FC<LiquidationReportDashboardProp
                       <FileText className="w-3.5 h-3.5" />
                       {r.statusFilter === 'AWAITING_LIQUIDATION' && canPrepareLiquidation(r.proposal, currentUser)
                         ? (liq?.status === 'FOR_REVISION' ? 'Revise Liquidation Report' : 'Prepare Liquidation Report')
+                        : liq?.status === 'PENDING_AUDITOR' && isAuditor(currentUser)
+                        ? 'Pre-Audit Liquidation Report'
                         : r.statusFilter === 'PENDING_RETURN'
                         ? 'Process Fund Return'
                         : 'View Liquidation Report'}

@@ -374,11 +374,14 @@ export interface LiquidationRecord {
   total_released: number;
   total_spent: number;
   balance: number; // unspent fund to be returned
-  status: 'Draft' | 'Submitted' | 'PENDING_ADVISER' | 'PENDING_DEAN' | 'FOR_REVISION' | 'Audited' | 'Rejected' | 'Closed';
+  status: 'Draft' | 'Submitted' | 'PENDING_AUDITOR' | 'PENDING_ADVISER' | 'PENDING_DEAN' | 'FOR_REVISION' | 'Audited' | 'Rejected' | 'Closed';
   accounting_summary: LiquidationSummaryLine[];
   submitted_by: string;
   submitted_date: string;
+  /** Department Auditor's pre-audit (before the Adviser). */
+  auditor_decision?: 'VERIFIED' | 'NEEDS_CORRECTION';
   auditor_remarks?: string;
+  auditor_reviewed_at?: string;
   notes?: string;
   adviser_decision?: 'APPROVED' | 'REVISION' | 'REJECTED';
   adviser_remarks?: string;

@@ -182,6 +182,7 @@ interface AppContextType {
   reviewEvent: (eventId: string, decision: 'APPROVED' | 'REJECTED', remarks?: string) => Promise<void>;
 
   // Liquidation review (Adviser -> Dean)
+  auditorReviewLiquidation: (liquidationId: string, decision: 'VERIFIED' | 'NEEDS_CORRECTION', remarks?: string) => Promise<boolean>;
   adviserReviewLiquidation: (liquidationId: string, decision: 'APPROVED' | 'REVISION' | 'REJECTED', remarks?: string) => Promise<void>;
   deanReviewLiquidation: (liquidationId: string, decision: 'APPROVED' | 'REVISION' | 'REJECTED', remarks?: string) => Promise<void>;
   updateOwnProfile: (updates: {
@@ -1386,8 +1387,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // ============================================================
-  // Liquidation review: Adviser -> Dean
+  // Liquidation review: Auditor pre-audit -> Adviser -> Dean
   // ============================================================
+  const auditorReviewLiquidation = async (liquidationId: string, decision: 'VERIFIED' | 'NEEDS_CORRECTION', remarks?: string): Promise<boolean> => {
+    const client = getSupabase();
+    const { error } = await client.rpc('auditor_review_liquidation', { p_liquidation_id: liquidationId, p_decision: decision, p_remarks: remarks || null });
+    if (error) {
+      console.error('Failed to submit auditor pre-audit', error);
+      const missing = error.code === 'PGRST202' || error.code === '42883';
+      alert(missing
+        ? 'Pre-audit was NOT saved: the pre-audit step is not installed yet. Ask the Super Admin to run supabase/migrations/20261120_liquidation_pre_audit.sql in Supabase.'
+        : `Pre-audit was NOT saved. ${error.message}`);
+      return false;
+    }
+    setProposals(prev => prev.map(p => p.liquidation?.id === liquidationId ? {
+      ...p,
+      liquidation: {
+        ...p.liquidation!,
+        status: decision === 'VERIFIED' ? 'PENDING_ADVISER' : 'FOR_REVISION',
+        auditor_decision: decision, auditor_remarks: remarks, auditor_reviewed_at: new Date().toISOString()
+      }
+    } : p));
+    return true;
+  };
+
   const adviserReviewLiquidation = async (liquidationId: string, decision: 'APPROVED' | 'REVISION' | 'REJECTED', remarks?: string) => {
     const client = getSupabase();
     const { error } = await client.rpc('adviser_review_liquidation', { p_liquidation_id: liquidationId, p_decision: decision, p_remarks: remarks });
@@ -1514,7 +1537,11 @@ ${error.message}`); return; }
       accounting_summary: row.liquidation_reports[0].accounting_summary || [],
       // Only the requesting Treasurer can submit a liquidation report, so their name is the submitter's.
       submitted_by: row.requested_by_name || '', submitted_date: row.liquidation_reports[0].created_at?.slice(0, 10) || '',
-      auditor_remarks: row.liquidation_reports[0].remarks || undefined,
+      auditor_decision: row.liquidation_reports[0].pre_audit_decision || undefined,
+      auditor_remarks: row.liquidation_reports[0].pre_audit_remarks || undefined,
+      auditor_reviewed_at: row.liquidation_reports[0].pre_audit_at || undefined,
+      adviser_remarks: row.liquidation_reports[0].adviser_remarks || undefined,
+      dean_remarks: row.liquidation_reports[0].dean_remarks || undefined,
       notes: row.liquidation_reports[0].remarks || undefined
     } : undefined,
     budget_return: row.budget_returns?.[0] ? {
@@ -4102,6 +4129,7 @@ ${error?.message || 'The database did not save the report.'}`);
         getSignedHandoverFileUrl,
         proposeEvent,
         reviewEvent,
+        auditorReviewLiquidation,
         adviserReviewLiquidation,
         deanReviewLiquidation,
         updateOwnProfile,

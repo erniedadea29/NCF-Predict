@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { LiquidationItem, LiquidationRecord } from '../types';
 import { canPrepareLiquidation, liquidationItemsFromSummary, summarizeLiquidationItems } from '../utils/liquidation';
-import { X, Check, FileCheck, ArrowDownLeft, ShieldCheck, Plus, Trash2, ThumbsUp, ThumbsDown, RotateCcw, AlertTriangle, CheckCircle2, Lock } from 'lucide-react';
+import { isAuditor } from '../utils/budgetRequest';
+import { X, Check, FileCheck, ArrowDownLeft, ShieldCheck, Plus, Trash2, ThumbsUp, ThumbsDown, RotateCcw, AlertTriangle, CheckCircle2, Lock, SearchCheck } from 'lucide-react';
 
 interface LiquidationReturnModalProps {
   proposalId: string | null;
@@ -85,7 +86,7 @@ export const LiquidationReturnModal: React.FC<LiquidationReturnModalProps> = ({
   isOpen,
   onClose
 }) => {
-  const { proposals, submitLiquidation, recordBudgetReturn, currentUser, adviserReviewLiquidation, deanReviewLiquidation } = useApp();
+  const { proposals, submitLiquidation, recordBudgetReturn, currentUser, auditorReviewLiquidation, adviserReviewLiquidation, deanReviewLiquidation } = useApp();
   const [activeTab, setActiveTab] = useState<'liquidation' | 'return'>('liquidation');
   const [certification, setCertification] = useState('');
   const [returnRemarks, setReturnRemarks] = useState('Return of unused SAF event budget back to supreme treasury vault.');
@@ -96,7 +97,9 @@ export const LiquidationReturnModal: React.FC<LiquidationReturnModalProps> = ({
   const targetProposal = proposals.find(p => p.id === proposalId);
   const liq = targetProposal?.liquidation;
 
-  // Adviser -> Dean sequential review, mirroring the budget proposal workflow.
+  // Auditor pre-audit -> Adviser -> Dean sequential review.
+  const isAuditorPending = liq?.status === 'PENDING_AUDITOR' && isAuditor(currentUser)
+    && (!currentUser.department || currentUser.department === targetProposal?.department);
   const isAdviserPending = liq?.status === 'PENDING_ADVISER' && currentUser.role === 'csc_adviser';
   const isDeanPending = liq?.status === 'PENDING_DEAN' && currentUser.role === 'dean';
   // Only the Treasurer who filed this budget request prepares its liquidation
@@ -183,6 +186,18 @@ export const LiquidationReturnModal: React.FC<LiquidationReturnModalProps> = ({
     onClose();
   };
 
+  const handleAuditorDecision = async (decision: 'VERIFIED' | 'NEEDS_CORRECTION') => {
+    if (!liq) return;
+    if (decision === 'NEEDS_CORRECTION' && !reviewRemarks.trim()) {
+      alert('Please explain what the Treasurer needs to correct.');
+      return;
+    }
+    setSubmitting(true);
+    const ok = await auditorReviewLiquidation(liq.id, decision, reviewRemarks.trim() || undefined);
+    setSubmitting(false);
+    if (ok) { setReviewRemarks(''); onClose(); }
+  };
+
   const handleAdviserDecision = async (decision: 'APPROVED' | 'REVISION' | 'REJECTED') => {
     if (!liq) return;
     await adviserReviewLiquidation(liq.id, decision, reviewRemarks || undefined);
@@ -202,7 +217,8 @@ export const LiquidationReturnModal: React.FC<LiquidationReturnModalProps> = ({
   const statusMessage = (() => {
     if (!liq) return null;
     switch (liq.status) {
-      case 'PENDING_ADVISER': return { tone: 'slate', text: 'Awaiting Adviser review.' };
+      case 'PENDING_AUDITOR': return { tone: 'slate', text: 'Awaiting pre-audit by the department Auditor.' };
+      case 'PENDING_ADVISER': return { tone: 'slate', text: liq.auditor_decision === 'VERIFIED' ? 'Verified by the Auditor. Awaiting Adviser review.' : 'Awaiting Adviser review.' };
       case 'PENDING_DEAN': return { tone: 'slate', text: 'Endorsed by the Adviser. Awaiting Dean review.' };
       case 'FOR_REVISION': return { tone: 'orange', text: `Sent back for revision. Waiting for ${preparerName} to resubmit.` };
       case 'Audited': return { tone: 'emerald', text: 'Audited: approved by the Adviser and the Dean.' };
@@ -273,9 +289,10 @@ export const LiquidationReturnModal: React.FC<LiquidationReturnModalProps> = ({
           {activeTab === 'liquidation' && canEditLiquidation ? (
             /* ---------- Treasurer authoring form (blank) ---------- */
             <form onSubmit={handleLiquidationSubmit} className="space-y-4">
-              {liq?.status === 'FOR_REVISION' && (liq.adviser_remarks || liq.dean_remarks) && (
+              {liq?.status === 'FOR_REVISION' && (liq.adviser_remarks || liq.dean_remarks || liq.auditor_remarks) && (
                 <div className="p-3 rounded-xl bg-orange-50 border border-orange-200 text-orange-900 text-xs space-y-1">
                   <p className="font-bold">Sent back for revision. Correct your report and resubmit:</p>
+                  {liq.auditor_decision === 'NEEDS_CORRECTION' && liq.auditor_remarks && <p>Auditor: {liq.auditor_remarks}</p>}
                   {liq.adviser_remarks && <p>Adviser: {liq.adviser_remarks}</p>}
                   {liq.dean_remarks && <p>Dean: {liq.dean_remarks}</p>}
                 </div>
@@ -409,7 +426,7 @@ export const LiquidationReturnModal: React.FC<LiquidationReturnModalProps> = ({
                 className="w-full py-3 bg-[#0B3D2E] hover:bg-[#072A20] disabled:bg-[#0B3D2E]/35 text-white text-xs font-bold rounded-2xl shadow-md transition cursor-pointer flex items-center justify-center gap-2"
               >
                 <FileCheck className="w-4 h-4" />
-                <span>{submitting ? 'Submitting...' : liq?.status === 'FOR_REVISION' ? 'Resubmit for Adviser Review' : 'Submit for Adviser Review'}</span>
+                <span>{submitting ? 'Submitting...' : liq?.status === 'FOR_REVISION' ? 'Resubmit for Review' : 'Submit for Review'}</span>
               </button>
             </form>
           ) : activeTab === 'liquidation' && !liq ? (
@@ -426,7 +443,45 @@ export const LiquidationReturnModal: React.FC<LiquidationReturnModalProps> = ({
             <div className="space-y-4">
               <SubmittedReport liq={liq} />
 
-              {(isAdviserPending || isDeanPending) ? (
+              {isAuditorPending ? (
+                <div className="p-4 rounded-2xl border space-y-2 bg-[#FFF8E1] border-[#F2B705]/50">
+                  <span className="font-bold text-xs flex items-center gap-1.5 text-[#5C4300]">
+                    <SearchCheck className="w-4 h-4" /> Auditor Pre-Audit
+                  </span>
+                  <p className="text-xs text-[#7A5A00]">
+                    Check each expense against its official receipt: the OR number, the amount, and that it belongs to this approved budget.
+                    Verify to send it to the Adviser, or send it back to the Treasurer with what needs correcting.
+                  </p>
+                  <ul className="text-[11px] text-[#7A5A00] list-disc pl-4 space-y-0.5">
+                    <li>Every expense has an official receipt (OR) number</li>
+                    <li>The amounts match the receipts and the recorded expenses</li>
+                    <li>The total does not exceed the funds released</li>
+                  </ul>
+                  <textarea
+                    rows={2}
+                    placeholder="Pre-audit remarks (required when sending back for correction)..."
+                    value={reviewRemarks}
+                    onChange={(e) => setReviewRemarks(e.target.value)}
+                    className="w-full px-3 py-2 text-xs bg-white rounded-xl border border-slate-200"
+                  />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      onClick={() => handleAuditorDecision('VERIFIED')}
+                      disabled={submitting}
+                      className="flex items-center gap-1.5 px-4 py-2 bg-[#0B3D2E] hover:bg-[#072A20] disabled:bg-[#0B3D2E]/35 text-white text-xs font-bold rounded-xl shadow-xs cursor-pointer"
+                    >
+                      <ShieldCheck className="w-3.5 h-3.5" /> Verified, Forward to Adviser
+                    </button>
+                    <button
+                      onClick={() => handleAuditorDecision('NEEDS_CORRECTION')}
+                      disabled={submitting}
+                      className="flex items-center gap-1.5 px-3 py-2 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 text-xs font-bold rounded-xl cursor-pointer"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" /> Needs Correction
+                    </button>
+                  </div>
+                </div>
+              ) : (isAdviserPending || isDeanPending) ? (
                 <div className={`p-4 rounded-2xl border space-y-2 ${isAdviserPending ? 'bg-emerald-50 border-emerald-200' : 'bg-rose-50 border-rose-200'}`}>
                   <span className={`font-bold text-xs block ${isAdviserPending ? 'text-emerald-900' : 'text-rose-900'}`}>
                     {isAdviserPending ? 'Adviser Review' : 'Dean Final Review'}
@@ -436,6 +491,11 @@ export const LiquidationReturnModal: React.FC<LiquidationReturnModalProps> = ({
                       ? 'Check the itemized expenses and receipts above, then forward to the Dean, send back for revision, or reject.'
                       : 'This report was endorsed by the Adviser. Approve to certify it as Audited, send it back for revision, or reject it.'}
                   </p>
+                  {isAdviserPending && liq.auditor_decision === 'VERIFIED' && (
+                    <p className="text-[11px] font-semibold text-[#0B3D2E] flex items-center gap-1">
+                      <ShieldCheck className="w-3.5 h-3.5" /> Verified by the Auditor{liq.auditor_remarks ? `: ${liq.auditor_remarks}` : '.'}
+                    </p>
+                  )}
                   <textarea
                     rows={2}
                     placeholder="Remarks (optional)..."
@@ -467,6 +527,7 @@ export const LiquidationReturnModal: React.FC<LiquidationReturnModalProps> = ({
               ) : statusMessage && (
                 <div className={`p-3 rounded-2xl border text-xs space-y-1 ${toneClass[statusMessage.tone]}`}>
                   <p className="font-bold flex items-center gap-1.5"><ShieldCheck className="w-4 h-4" /> {statusMessage.text}</p>
+                  {liq.auditor_remarks && <p>Auditor remarks: {liq.auditor_remarks}</p>}
                   {liq.adviser_remarks && <p>Adviser remarks: {liq.adviser_remarks}</p>}
                   {liq.dean_remarks && <p>Dean remarks: {liq.dean_remarks}</p>}
                 </div>
