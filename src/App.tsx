@@ -154,11 +154,11 @@ function MainAppContent() {
       </main>
 
       {/* Footer */}
-      <footer className="bg-white border-t border-slate-200 py-6 px-4 text-center text-xs text-slate-500 space-y-1">
-        <p className="font-bold text-slate-700">
+      <footer className="bg-[#0B3D2E] border-t-4 border-[#F2B705] py-6 px-4 text-center text-xs text-[#DCE9E1] space-y-1">
+        <p className="font-bold text-white">
           Naga College Foundation (NCF) • College Student Council (CSC)
         </p>
-        <p className="text-[11px] text-slate-400">
+        <p className="text-[11px] text-[#B9D3C4]">
           Student Activity Fund (SAF) & Budget Proposal Double-Entry Ledger System
         </p>
       </footer>
