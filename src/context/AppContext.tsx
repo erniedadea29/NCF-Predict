@@ -3084,8 +3084,14 @@ ${error?.message || 'The database did not save it.'}`);
 
   const deleteTransaction = async (id: string) => {
     const client = getSupabase();
-    const { error } = await client.from('transactions').delete().eq('id', id);
-    if (error) { console.error('Failed to delete transaction', error); return; }
+    const { data, error } = await client.from('transactions').delete().eq('id', id).select('id');
+    if (error || !data || data.length === 0) {
+      console.error('Failed to delete transaction', error);
+      alert(`The transaction was NOT deleted.
+
+${error?.message || 'You do not have permission to delete it. Archive it instead.'}`);
+      return;
+    }
     setTransactions(prev => prev.filter(tx => tx.id !== id));
   };
 

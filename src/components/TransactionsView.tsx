@@ -53,6 +53,9 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ onOpenAddMod
   // Dean/Adviser see this screen as "CCS Transactions" — view-only, no
   // add/archive/delete (Section 5).
   const hideWriteActions = isReadOnlyStudent || isViewOnlyReviewer;
+  // Transactions are the financial record: only the Admin / Super Admin may
+  // delete one. Officers can Archive (reversible) instead.
+  const canDelete = currentUser.role === 'admin' || currentUser.role === 'super_admin';
 
   const [selectedCategory, setSelectedCategory] = useState<TransactionCategory>('All');
   const [showArchived, setShowArchived] = useState<boolean>(false);
@@ -362,14 +365,18 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ onOpenAddMod
                               >
                                 {tx.is_archived ? <RotateCcw className="w-3.5 h-3.5" /> : <Archive className="w-3.5 h-3.5" />}
                               </button>
-                              <button
-                                onClick={() => deleteTransaction(tx.id)}
-                                className="w-7 h-7 rounded-lg bg-white border border-red-200 hover:bg-red-50 text-red-600 flex items-center justify-center transition cursor-pointer"
-                                title="Delete record"
-                                aria-label="Delete record"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
+                              {canDelete && (
+                                <button
+                                  onClick={() => {
+                                    if (window.confirm(`Delete "${tx.title}" permanently? This changes the department's funds and cannot be undone.`)) deleteTransaction(tx.id);
+                                  }}
+                                  className="w-7 h-7 rounded-lg bg-white border border-red-200 hover:bg-red-50 text-red-600 flex items-center justify-center transition cursor-pointer"
+                                  title="Delete record"
+                                  aria-label="Delete record"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
                             </>
                           )}
                         </div>
