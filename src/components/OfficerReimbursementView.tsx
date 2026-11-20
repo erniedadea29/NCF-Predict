@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext';
 import { DEPARTMENTS } from '../data/mockData';
 import { downloadCsv } from '../utils/csvExport';
 import { ReceiptPhotosModal } from './ReceiptPhotosModal';
-import { ReimbursementDetailModal } from './ReimbursementDetailModal';
+import { ReimbursementGroupModal, groupReimbursements, statusLabel, STATUS_STYLES as GROUP_STATUS_STYLES } from './ReimbursementDetailModal';
 import { expensePhotoFolder, receiptFileProblem, uploadExpensePhotos } from '../utils/receiptPhotos';
 import { Receipt, Send, Clock, CheckCircle2, XCircle, Download, Search, Info, Camera, X, Plus, Image as ImageIcon, Eye } from 'lucide-react';
 
@@ -104,10 +104,13 @@ export const OfficerReimbursementView: React.FC = () => {
     ? rows.filter(r => [r.budget_title, r.department, r.officer_name, r.receipt_ref, r.reimbursement_status, r.remarks, r.expense?.expense_desc]
         .some(f => (f || '').toLowerCase().includes(term)))
     : rows;
-  const viewed = viewing ? rows.find(r => r.id === viewing) : undefined;
+  // Receipts filed together (same budget, officer and day) are one request.
+  const groups = useMemo(() => groupReimbursements(listed), [listed]);
+  const viewed = viewing ? groupReimbursements(rows).find(g => g.key === viewing) : undefined;
 
   const sum = (status: string[]) => rows.filter(r => status.includes(r.reimbursement_status)).reduce((s, r) => s + r.amount_spent, 0);
-  const count = (status: string[]) => rows.filter(r => status.includes(r.reimbursement_status)).length;
+  // Counted per request (receipts filed together count once).
+  const count = (status: string[]) => groupReimbursements(rows.filter(r => status.includes(r.reimbursement_status))).length;
 
   const linesTotal = lines.reduce((s, l) => s + lineAmount(l), 0);
   const canSubmit = Boolean(selectedProposal) && (mode === 'recorded'
@@ -461,7 +464,7 @@ export const OfficerReimbursementView: React.FC = () => {
         <div className="lg:col-span-3 bg-white rounded-2xl border border-slate-200 overflow-hidden self-start">
           <div className="p-3 border-b border-slate-200 bg-[#EEF4F0]/60 flex items-center gap-2">
             <h3 className="text-xs font-black text-[#0B3D2E] uppercase tracking-wider shrink-0">
-              Requests ({term ? `${listed.length} of ${rows.length}` : rows.length})
+              Requests ({groups.length})
             </h3>
             <div className="relative flex-1">
               <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
@@ -475,25 +478,27 @@ export const OfficerReimbursementView: React.FC = () => {
             </div>
           </div>
           <div className="divide-y divide-slate-100 max-h-[560px] overflow-y-auto">
-            {listed.map(r => (
-              <div key={r.id} className="p-3.5 flex items-start justify-between gap-3 hover:bg-[#FBFAF4] transition">
+            {groups.map(g => (
+              <div key={g.key} className="p-3.5 flex items-start justify-between gap-3 hover:bg-[#FBFAF4] transition">
                 <div className="min-w-0">
-                  <p className="font-bold text-sm text-slate-900 truncate">{r.expense?.expense_desc || r.budget_title}</p>
+                  <p className="font-bold text-sm text-slate-900 truncate">{g.budget_title}</p>
                   <p className="text-[11px] text-slate-500 truncate">
-                    {r.budget_title} • {r.officer_name} • {r.date_submitted}{r.receipt_ref ? ` • ${r.receipt_ref}` : ''}
+                    {g.officer_name} • {g.date_submitted} • {g.items.length} receipt{g.items.length === 1 ? '' : 's'}
                   </p>
-                  {r.remarks && <p className="text-[11px] text-slate-400 truncate">{r.remarks}</p>}
+                  <p className="text-[11px] text-slate-400 truncate">
+                    {g.items.map(r => r.expense?.expense_desc || r.remarks).filter(Boolean).join(', ')}
+                  </p>
                 </div>
                 <div className="flex flex-col items-end gap-1 shrink-0">
                   <div className="flex items-center gap-1.5">
-                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-black border ${DEPARTMENTS[r.department]?.badgeBg}`}>{r.department}</span>
-                    <span className="font-mono text-sm font-bold text-[#0B3D2E]">{peso(r.amount_spent)}</span>
+                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-black border ${DEPARTMENTS[g.department]?.badgeBg}`}>{g.department}</span>
+                    <span className="font-mono text-sm font-bold text-[#0B3D2E]">{peso(g.total)}</span>
                   </div>
-                  <span className={`px-2 py-0.5 rounded-full border text-[10px] font-bold ${STATUS_STYLES[r.reimbursement_status] || STATUS_STYLES.Pending}`}>
-                    {r.reimbursement_status === 'Pending' ? 'Pending Review' : r.reimbursement_status}
+                  <span className={`px-2 py-0.5 rounded-full border text-[10px] font-bold ${GROUP_STATUS_STYLES[g.status]}`}>
+                    {statusLabel(g.status)}
                   </span>
                   <button
-                    onClick={() => setViewing(r.id)}
+                    onClick={() => setViewing(g.key)}
                     className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-white border border-[#0B3D2E]/20 hover:bg-[#EEF4F0] text-[#0B3D2E] text-[10px] font-bold cursor-pointer"
                   >
                     <Eye className="w-3 h-3" /> View
@@ -512,15 +517,15 @@ export const OfficerReimbursementView: React.FC = () => {
       </div>
 
       {viewed && (
-        <ReimbursementDetailModal
-          row={viewed}
+        <ReimbursementGroupModal
+          group={viewed}
           onClose={() => setViewing(null)}
           note="Submitted requests can no longer be edited. View only."
-          onOpenPhotos={() => setPhotosFor({
-            title: viewed.expense?.expense_desc || viewed.budget_title,
-            subtitle: `${viewed.budget_title} • ${viewed.officer_name}${viewed.receipt_ref ? ` • ${viewed.receipt_ref}` : ''}`,
-            department: viewed.department, proposalId: viewed.budget_id, expenseId: viewed.expense_id,
-            legacyPath: viewed.expense?.proof_attach?.[0]?.url
+          onOpenPhotos={(r) => setPhotosFor({
+            title: r.expense?.expense_desc || r.budget_title,
+            subtitle: `${r.budget_title} • ${r.officer_name}${r.receipt_ref ? ` • ${r.receipt_ref}` : ''}`,
+            department: r.department, proposalId: r.budget_id, expenseId: r.expense_id,
+            legacyPath: r.expense?.proof_attach?.[0]?.url
           })}
         />
       )}
