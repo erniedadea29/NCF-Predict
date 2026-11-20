@@ -263,123 +263,123 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ onOpenAddMod
           )}
         </div>
       ) : (
-        <div className="space-y-3">
-          {filteredTransactions.map((tx) => {
-            const deptInfo = DEPARTMENTS[tx.department];
-            return (
-              <div
-                key={tx.id}
-                className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-2xs hover:shadow-xs transition flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative overflow-hidden"
-              >
-                {/* Left vertical colored bar matching PDF screenshots */}
-                <div 
-                  className="absolute left-0 top-0 bottom-0 w-1.5"
-                  style={{ backgroundColor: deptInfo?.color || '#0B3D2E' }}
-                />
-
-                <div className="flex items-center gap-3 pl-2">
-                  {/* Department Badge */}
-                  <div className={`px-2.5 py-1.5 rounded-lg text-xs font-black border ${deptInfo?.badgeBg || 'bg-slate-100 text-slate-800'}`}>
-                    {tx.department}
-                  </div>
-
-                  {/* Title & Metadata */}
-                  <div>
-                    <h4 className="font-bold text-sm text-slate-900">{tx.title}</h4>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className="text-[11px] font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-600">
-                        {tx.category}
-                      </span>
-                      <span className="text-[11px] text-slate-400 font-medium">
-                        {tx.date}
-                      </span>
-                      <span className="text-[10px] text-slate-400 font-mono hidden md:inline">
-                        • {tx.reference_code}
-                      </span>
-                      {tx.proposal_id && (
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 border border-emerald-200 text-emerald-800 truncate max-w-[180px]">
-                          Budget: {proposals.find(p => p.id === tx.proposal_id)?.budget_title || 'Approved budget'}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[860px] text-left text-xs">
+              <thead className="bg-[#EEF4F0] text-[#0B3D2E] text-[11px] font-bold uppercase tracking-wider border-b border-slate-200">
+                <tr>
+                  <th className="py-3 px-4 w-[96px]">Date</th>
+                  <th className="py-3 px-3 w-[150px]">Reference</th>
+                  <th className="py-3 px-3">Description</th>
+                  <th className="py-3 px-3 w-[96px]">Category</th>
+                  <th className="py-3 px-3 w-[110px]">Status</th>
+                  <th className="py-3 px-3 w-[140px] text-right">Amount</th>
+                  <th className="py-3 px-4 w-[1%] text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredTransactions.map((tx) => {
+                  const budgetTitle = tx.proposal_id
+                    ? proposals.find(p => p.id === tx.proposal_id)?.budget_title || 'Approved budget'
+                    : null;
+                  const isIncome = tx.type === 'INCOME';
+                  return (
+                    <tr key={tx.id} className="hover:bg-[#FBFAF4] transition align-middle">
+                      <td className="py-3 px-4 text-slate-600 whitespace-nowrap">{tx.date}</td>
+                      <td className="py-3 px-3 font-mono text-[11px] text-slate-500 whitespace-nowrap">{tx.reference_code}</td>
+                      <td className="py-3 px-3">
+                        <div className="flex items-center gap-2 min-w-0">
+                          {!isDepartmentRestricted && (
+                            <span className={`shrink-0 px-1.5 py-0.5 rounded text-[10px] font-black border ${DEPARTMENTS[tx.department]?.badgeBg || 'bg-slate-100 text-slate-800'}`}>
+                              {tx.department}
+                            </span>
+                          )}
+                          <span className="font-semibold text-slate-900 truncate" title={tx.title}>{tx.title}</span>
+                        </div>
+                        {budgetTitle && (
+                          <p className="text-[10px] text-[#0B3D2E]/80 mt-0.5 truncate" title={budgetTitle}>Budget: {budgetTitle}</p>
+                        )}
+                      </td>
+                      <td className="py-3 px-3">
+                        <span className="text-[11px] font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-600">{tx.category}</span>
+                      </td>
+                      <td className="py-3 px-3 whitespace-nowrap">
+                        {tx.status === 'Pending' ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#FFF8E1] border border-[#F2B705]/50 text-[#7A5A00]">
+                            <Clock className="w-2.5 h-2.5" /> Pending
+                          </span>
+                        ) : tx.status === 'Rejected' ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-50 border border-red-200 text-red-700">
+                            <XCircle className="w-2.5 h-2.5" /> Rejected
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#EEF4F0] border border-[#0B3D2E]/15 text-[#0B3D2E]">
+                            <CheckCircle2 className="w-2.5 h-2.5" /> Completed
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-3 px-3 text-right whitespace-nowrap">
+                        <span className={`font-mono text-sm font-bold ${isIncome ? 'text-[#0B3D2E]' : 'text-red-700'}`}>
+                          {isIncome ? '+' : '−'}₱{tx.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </span>
-                      )}
-                      {tx.status === 'Pending' && (
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 flex items-center gap-1">
-                          <Clock className="w-2.5 h-2.5" /> Pending Review
-                        </span>
-                      )}
-                      {tx.status === 'Rejected' && (
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 flex items-center gap-1">
-                          <XCircle className="w-2.5 h-2.5" /> Rejected
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Right Action Icons (Matching PDF: Download icon button & Edit/Trash) */}
-                <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
-                  <div className="text-right mr-2">
-                    <span className={`text-sm font-black ${tx.type === 'INCOME' ? 'text-emerald-700' : 'text-slate-900'}`}>
-                      {tx.type === 'INCOME' ? '+' : '-'}₱{tx.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                    </span>
-                    <p className="text-[10px] text-slate-400 uppercase tracking-wider">{tx.type}</p>
-                  </div>
-
-                  <div className="flex items-center gap-1.5">
-                    {/* Approve / Reject — only for the reviewer roles, only on Pending rows */}
-                    {canReview && tx.status === 'Pending' && (
-                      <>
-                        <button
-                          onClick={() => reviewTransaction(tx.id, 'Completed')}
-                          className="flex items-center gap-1 px-2.5 h-8 rounded-xl bg-emerald-100 hover:bg-emerald-200 text-emerald-800 text-[11px] font-bold transition cursor-pointer"
-                          title="Approve transaction"
-                        >
-                          <CheckCircle2 className="w-3.5 h-3.5" /> Approve
-                        </button>
-                        <button
-                          onClick={() => reviewTransaction(tx.id, 'Rejected')}
-                          className="flex items-center gap-1 px-2.5 h-8 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 text-[11px] font-bold transition cursor-pointer"
-                          title="Reject transaction"
-                        >
-                          <XCircle className="w-3.5 h-3.5" /> Reject
-                        </button>
-                      </>
-                    )}
-
-                    {/* Download Receipt/Voucher */}
-                    <button
-                      onClick={() => exportSingleTransactionReceipt(tx)}
-                      className="w-8 h-8 rounded-xl bg-white border border-[#0B3D2E]/20 hover:bg-[#EEF4F0] text-[#0B3D2E] flex items-center justify-center transition cursor-pointer"
-                      title="Download Official Receipt (Spreadsheet / CSV)"
-                    >
-                      <Download className="w-4 h-4" />
-                    </button>
-
-                    {!hideWriteActions && (
-                      <>
-                        {/* Archive / Restore Button */}
-                        <button
-                          onClick={() => toggleArchiveTransaction(tx.id)}
-                          className="w-8 h-8 rounded-xl bg-white border border-[#0B3D2E]/20 hover:bg-[#EEF4F0] text-[#0B3D2E] flex items-center justify-center transition cursor-pointer"
-                          title={tx.is_archived ? 'Restore transaction' : 'Archive transaction'}
-                        >
-                          {tx.is_archived ? <RotateCcw className="w-4 h-4 text-emerald-600" /> : <Archive className="w-4 h-4" />}
-                        </button>
-
-                        {/* Delete button */}
-                        <button
-                          onClick={() => deleteTransaction(tx.id)}
-                          className="w-8 h-8 rounded-xl bg-white border border-[#0B3D2E]/20 hover:bg-red-100 text-slate-500 hover:text-red-800 flex items-center justify-center transition cursor-pointer"
-                          title="Delete record"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+                        <p className="text-[9px] text-slate-400 uppercase tracking-wider">{isIncome ? 'Income' : 'Expense'}</p>
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="flex items-center justify-end gap-1.5">
+                          {canReview && tx.status === 'Pending' && (
+                            <>
+                              <button
+                                onClick={() => reviewTransaction(tx.id, 'Completed')}
+                                className="flex items-center gap-1 px-2 h-7 rounded-lg bg-[#0B3D2E] hover:bg-[#072A20] text-white text-[11px] font-bold transition cursor-pointer"
+                                title="Approve transaction"
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5" /> Approve
+                              </button>
+                              <button
+                                onClick={() => reviewTransaction(tx.id, 'Rejected')}
+                                className="flex items-center gap-1 px-2 h-7 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 text-[11px] font-bold transition cursor-pointer"
+                                title="Reject transaction"
+                              >
+                                <XCircle className="w-3.5 h-3.5" /> Reject
+                              </button>
+                            </>
+                          )}
+                          <button
+                            onClick={() => exportSingleTransactionReceipt(tx)}
+                            className="w-7 h-7 rounded-lg bg-white border border-[#0B3D2E]/20 hover:bg-[#EEF4F0] text-[#0B3D2E] flex items-center justify-center transition cursor-pointer"
+                            title="Download Official Receipt (Spreadsheet / CSV)"
+                            aria-label="Download receipt"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                          </button>
+                          {!hideWriteActions && (
+                            <>
+                              <button
+                                onClick={() => toggleArchiveTransaction(tx.id)}
+                                className="w-7 h-7 rounded-lg bg-white border border-[#0B3D2E]/20 hover:bg-[#EEF4F0] text-[#0B3D2E] flex items-center justify-center transition cursor-pointer"
+                                title={tx.is_archived ? 'Restore transaction' : 'Archive transaction'}
+                                aria-label={tx.is_archived ? 'Restore transaction' : 'Archive transaction'}
+                              >
+                                {tx.is_archived ? <RotateCcw className="w-3.5 h-3.5" /> : <Archive className="w-3.5 h-3.5" />}
+                              </button>
+                              <button
+                                onClick={() => deleteTransaction(tx.id)}
+                                className="w-7 h-7 rounded-lg bg-white border border-red-200 hover:bg-red-50 text-red-600 flex items-center justify-center transition cursor-pointer"
+                                title="Delete record"
+                                aria-label="Delete record"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
