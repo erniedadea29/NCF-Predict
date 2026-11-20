@@ -3977,8 +3977,16 @@ You can add them again from the request's Photos button.`);
     const client = getSupabase();
     const updatePayload: Record<string, unknown> = { status: decision };
     if (remarks) updatePayload.remarks = remarks;
-    const { error } = await client.from('reimbursements').update(updatePayload).eq('id', reimbursementId);
-    if (error) { console.error('Failed to update reimbursement', error); return; }
+    // .select() makes a change blocked by row-level security visible: it
+    // returns no row instead of failing, which looked saved until a refresh.
+    const { data, error } = await client.from('reimbursements').update(updatePayload).eq('id', reimbursementId).select('id');
+    if (error || !data || data.length === 0) {
+      console.error('Failed to update reimbursement', error);
+      alert(`The reimbursement was NOT ${decision === 'Approved' ? 'approved' : 'rejected'}.
+
+${error?.message || 'You do not have permission to update it in the database.'}`);
+      return;
+    }
 
     setProposals(prev => prev.map(p => {
       const matchReimb = p.reimbursements.find(r => r.id === reimbursementId);

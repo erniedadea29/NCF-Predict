@@ -12,8 +12,6 @@ import {
   Download,
   Edit3,
   Trash2,
-  Archive,
-  RotateCcw,
   FileText,
   Filter,
   Search,
@@ -37,7 +35,6 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ onOpenAddMod
     proposals,
     transactions,
     scopedTransactions,
-    toggleArchiveTransaction,
     deleteTransaction,
     reviewTransaction,
     activeSemester,
@@ -54,11 +51,10 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ onOpenAddMod
   // add/archive/delete (Section 5).
   const hideWriteActions = isReadOnlyStudent || isViewOnlyReviewer;
   // Transactions are the financial record: only the Admin / Super Admin may
-  // delete one. Officers can Archive (reversible) instead.
+  // delete one. Officers can only view and download.
   const canDelete = currentUser.role === 'admin' || currentUser.role === 'super_admin';
 
   const [selectedCategory, setSelectedCategory] = useState<TransactionCategory>('All');
-  const [showArchived, setShowArchived] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedDeptFilter, setSelectedDeptFilter] = useState<DepartmentCode | 'ALL'>(() => {
     return isDepartmentRestricted ? userDepartment : 'ALL';
@@ -71,12 +67,6 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ onOpenAddMod
 
   // Filter transactions
   const filteredTransactions = baseTransactions.filter(tx => {
-    if (showArchived) {
-      if (!tx.is_archived) return false;
-    } else {
-      if (tx.is_archived) return false;
-    }
-
     if (selectedCategory !== 'All' && tx.category !== selectedCategory) {
       return false;
     }
@@ -151,16 +141,14 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ onOpenAddMod
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
         <div>
           <h2 className="text-xl font-black text-slate-900 tracking-tight">
-            {showArchived ? 'Archived Transactions' : 'Department Transactions'}
+            Department Transactions
           </h2>
           <p className="text-xs text-slate-500">
-            {showArchived 
-              ? `${filteredTransactions.length} Archived Records` 
-              : `SAF Collections, Budget Releases, & Operational Disbursals (${activeSemester.school_year_label})`}
+            {`SAF Collections, Budget Releases, & Operational Disbursals (${activeSemester.school_year_label})`}
           </p>
         </div>
 
-        {/* Toggle Archive & Refresh */}
+        {/* Header actions */}
         <div className="flex flex-wrap items-center gap-2">
           {/* Add Transaction sits up here so it is easy to find. */}
           {!hideWriteActions && (
@@ -179,17 +167,6 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ onOpenAddMod
           >
             <Download className="w-3.5 h-3.5" />
             <span>Export Report (CSV)</span>
-          </button>
-          <button
-            onClick={() => setShowArchived(!showArchived)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer ${
-              showArchived
-                ? 'bg-[#0B3D2E] text-white border-slate-800'
-                : 'bg-slate-100 hover:bg-[#EEF4F0] text-[#0B3D2E] border-[#0B3D2E]/20'
-            }`}
-          >
-            <Archive className="w-3.5 h-3.5" />
-            <span>{showArchived ? 'Active Records' : 'Archive'}</span>
           </button>
         </div>
       </div>
@@ -357,14 +334,6 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ onOpenAddMod
                           </button>
                           {!hideWriteActions && (
                             <>
-                              <button
-                                onClick={() => toggleArchiveTransaction(tx.id)}
-                                className="w-7 h-7 rounded-lg bg-white border border-[#0B3D2E]/20 hover:bg-[#EEF4F0] text-[#0B3D2E] flex items-center justify-center transition cursor-pointer"
-                                title={tx.is_archived ? 'Restore transaction' : 'Archive transaction'}
-                                aria-label={tx.is_archived ? 'Restore transaction' : 'Archive transaction'}
-                              >
-                                {tx.is_archived ? <RotateCcw className="w-3.5 h-3.5" /> : <Archive className="w-3.5 h-3.5" />}
-                              </button>
                               {canDelete && (
                                 <button
                                   onClick={() => {
