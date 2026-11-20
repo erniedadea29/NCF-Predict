@@ -112,9 +112,18 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onGoToLogin }) => {
     return (DEFAULT_COURSES[department] || []).map((name, i) => ({ id: -1 - i, name }));
   }, [courses, department]);
 
+  // Student ID format: two digits, a dash, then 4 or 5 digits (e.g. 22-20052).
+  // Only digits can be typed; the dash is added automatically after the 2nd digit.
+  const STUDENT_ID_PATTERN = /^\d{2}-\d{4,5}$/;
+  const formatStudentId = (raw: string) => {
+    const digits = raw.replace(/\D/g, '').slice(0, 7);
+    return digits.length > 2 ? `${digits.slice(0, 2)}-${digits.slice(2)}` : digits;
+  };
+  const studentIdInvalid = studentNumber.trim() !== '' && !STUDENT_ID_PATTERN.test(studentNumber.trim());
+
   const checkStudentIdAvailability = async (value: string) => {
     const trimmed = value.trim();
-    if (!trimmed) { setStudentIdAvailable(null); return; }
+    if (!trimmed || !STUDENT_ID_PATTERN.test(trimmed)) { setStudentIdAvailable(null); return; }
     setCheckingStudentId(true);
     try {
       const { data, error: rpcError } = await getSupabase().rpc('check_student_number_available', { p_student_number: trimmed });
@@ -169,6 +178,10 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onGoToLogin }) => {
     }
     if (password !== confirmPassword) {
       setError('Password and Confirm Password do not match.');
+      return;
+    }
+    if (accountType === 'student' && studentIdInvalid) {
+      setError('Student ID must be numbers in the format 00-0000 (two digits, a dash, then 4 or 5 digits), e.g. 22-20052.');
       return;
     }
     if (accountType === 'student' && studentIdAvailable === false) {
@@ -418,12 +431,20 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onGoToLogin }) => {
                     <IdCard className="w-3.5 h-3.5 text-slate-400" /> Student ID
                   </label>
                   <input type="text" value={studentNumber}
-                    onChange={(e) => { setStudentNumber(e.target.value); setStudentIdAvailable(null); }}
+                    inputMode="numeric"
+                    maxLength={8}
+                    onChange={(e) => { setStudentNumber(formatStudentId(e.target.value)); setStudentIdAvailable(null); }}
                     onBlur={(e) => checkStudentIdAvailability(e.target.value)}
-                    placeholder="e.g. 2024-00142"
-                    className={`w-full px-3 py-2 text-sm border rounded-xl focus:ring-2 focus:ring-[#0B3D2E] ${
-                      studentIdAvailable === false ? 'border-rose-400' : 'border-slate-300'
+                    placeholder="e.g. 22-20052"
+                    aria-invalid={studentIdInvalid || studentIdAvailable === false}
+                    className={`w-full px-3 py-2 text-sm font-mono border rounded-xl focus:ring-2 focus:ring-[#0B3D2E] ${
+                      studentIdAvailable === false || studentIdInvalid ? 'border-rose-400' : 'border-slate-300'
                     }`} />
+                  {studentIdInvalid && (
+                    <p className="text-[11px] text-rose-600 font-semibold mt-1 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3" /> Format: 00-0000 (numbers only, e.g. 22-20052)
+                    </p>
+                  )}
                   {checkingStudentId && (
                     <p className="text-[11px] text-slate-400 mt-1">Checking availability&hellip;</p>
                   )}
