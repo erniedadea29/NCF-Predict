@@ -112,9 +112,9 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onGoToLogin }) => {
     return (DEFAULT_COURSES[department] || []).map((name, i) => ({ id: -1 - i, name }));
   }, [courses, department]);
 
-  // Student ID format: two digits, a dash, then 4 or 5 digits (e.g. 22-20052).
+  // Student ID format: two digits, a dash, then 5 digits (e.g. 22-20052).
   // Only digits can be typed; the dash is added automatically after the 2nd digit.
-  const STUDENT_ID_PATTERN = /^\d{2}-\d{4,5}$/;
+  const STUDENT_ID_PATTERN = /^\d{2}-\d{5}$/;
   const formatStudentId = (raw: string) => {
     const digits = raw.replace(/\D/g, '').slice(0, 7);
     return digits.length > 2 ? `${digits.slice(0, 2)}-${digits.slice(2)}` : digits;
@@ -181,7 +181,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onGoToLogin }) => {
       return;
     }
     if (accountType === 'student' && studentIdInvalid) {
-      setError('Student ID must be numbers in the format 00-0000 (two digits, a dash, then 4 or 5 digits), e.g. 22-20052.');
+      setError('Student ID must be numbers in the format 00-00000 (two digits, a dash, then 5 digits), e.g. 22-20052.');
       return;
     }
     if (accountType === 'student' && studentIdAvailable === false) {
@@ -442,7 +442,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onGoToLogin }) => {
                     }`} />
                   {studentIdInvalid && (
                     <p className="text-[11px] text-rose-600 font-semibold mt-1 flex items-center gap-1">
-                      <AlertCircle className="w-3 h-3" /> Format: 00-0000 (numbers only, e.g. 22-20052)
+                      <AlertCircle className="w-3 h-3" /> Format: 00-00000 (numbers only, e.g. 22-20052)
                     </p>
                   )}
                   {checkingStudentId && (
