@@ -200,7 +200,17 @@ export const Header: React.FC = () => {
               <div className="absolute right-0 mt-2 w-72 bg-white rounded-xl shadow-xl border border-slate-200 py-2 z-50 animate-in fade-in zoom-in-95 max-h-96 overflow-y-auto">
                 <div className="px-3 py-1.5 border-b border-slate-100 flex items-center justify-between">
                   <p className="text-xs font-bold text-slate-700">Notifications</p>
-                  {unreadCount > 0 && <span className="text-[10px] text-rose-600 font-bold">{unreadCount} unread</span>}
+                  {unreadCount > 0 && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] text-red-600 font-bold">{unreadCount} unread</span>
+                      <button
+                        onClick={() => notifications.filter(n => !n.read_at).forEach(n => markNotificationRead(n.id))}
+                        className="text-[10px] font-bold text-[#0B3D2E] hover:underline cursor-pointer"
+                      >
+                        Mark all read
+                      </button>
+                    </div>
+                  )}
                 </div>
                 {notifications.length === 0 ? (
                   <p className="px-3 py-6 text-center text-xs text-slate-400">No notifications yet.</p>
@@ -220,12 +230,18 @@ export const Header: React.FC = () => {
                             else if (target) setActiveTab(target);
                             setNotifOpen(false);
                           }}
-                          className={`w-full text-left px-3 py-2 text-xs transition cursor-pointer ${
-                            n.read_at ? 'hover:bg-[#EEF4F0]' : 'bg-emerald-50/60 hover:bg-emerald-50'
+                          className={`relative w-full text-left pl-3 pr-7 py-2.5 text-xs transition cursor-pointer border-l-4 border-b border-b-slate-100 ${
+                            n.read_at
+                              ? 'border-l-transparent bg-white hover:bg-[#FBFAF4]'
+                              : 'border-l-[#F2B705] bg-[#FFF8E1] hover:bg-[#FDEFC2]'
                           }`}
                         >
-                          <p className={`font-bold ${n.read_at ? 'text-slate-700' : 'text-emerald-900'}`}>{n.title}</p>
-                          {n.body && <p className="text-slate-500 mt-0.5">{n.body}</p>}
+                          {/* Unread dot, upper right */}
+                          {!n.read_at && (
+                            <span className="absolute top-3 right-2.5 w-2.5 h-2.5 rounded-full bg-red-600 ring-2 ring-white" aria-label="Unread" />
+                          )}
+                          <p className={n.read_at ? 'font-medium text-slate-600' : 'font-extrabold text-[#0B3D2E]'}>{n.title}</p>
+                          {n.body && <p className={`mt-0.5 ${n.read_at ? 'text-slate-400' : 'text-slate-700'}`}>{n.body}</p>}
                           <p className="text-[10px] text-slate-400 mt-1 flex items-center justify-between gap-2">
                             <span>{new Date(n.created_at).toLocaleString()}</span>
                             {isSignIn
