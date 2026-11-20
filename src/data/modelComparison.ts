@@ -19,3 +19,45 @@ export const MODEL_COMPARISON: { metric: string; higherIsBetter: boolean; peso?:
 
 /** Training dataset summary (ncf_synthetic_budget_data_expanded.csv). */
 export const TRAINING_DATASET = { rows: 213, events: 58, years: '2021–2026', file: 'ncf_synthetic_budget_data_expanded.csv' };
+
+/**
+ * Hyperparameter search per algorithm, from TRAIN_MODEL/models/tuning_log.csv:
+ * how many configurations were tried, the best one, and the spread of
+ * R² (line item) across all of them (a narrow spread = a stable algorithm).
+ */
+export const MODEL_TUNING: Record<(typeof MODEL_ALGORITHMS)[number], {
+  configs: number;
+  bestParams: string;
+  r2Min: number;
+  r2Max: number;
+  howItLearns: string;
+}> = {
+  'Random Forest': {
+    configs: 18,
+    bestParams: '300 trees, max_features 0.3, min_samples_leaf 1',
+    r2Min: 0.4308,
+    r2Max: 0.5058,
+    howItLearns: 'Averages 300 independent decision trees, each trained on a random sample of the data.'
+  },
+  'Gradient Boosting': {
+    configs: 24,
+    bestParams: '500 trees, learning_rate 0.03, max_depth 2',
+    r2Min: 0.2055,
+    r2Max: 0.4805,
+    howItLearns: 'Adds trees one after another, each correcting the errors of the previous ones.'
+  },
+  'Linear Regression': {
+    configs: 18,
+    bestParams: 'Ridge alpha 0.3',
+    r2Min: -1.0559,
+    r2Max: 0.3998,
+    howItLearns: 'Fits one straight-line formula over the features.'
+  }
+};
+
+/** Chart colors per model (validated for color-vision deficiency on a light surface). */
+export const MODEL_COLORS: Record<(typeof MODEL_ALGORITHMS)[number], string> = {
+  'Random Forest': '#1A7F4E',
+  'Gradient Boosting': '#C07F00',
+  'Linear Regression': '#6F7FD0'
+};

@@ -4,6 +4,7 @@ import { BudgetRequestPrediction, DepartmentCode } from '../types';
 import { DEPARTMENTS } from '../data/mockData';
 import { MODEL_ALGORITHMS, MODEL_COMPARISON, TRAINING_DATASET } from '../data/modelComparison';
 import { PREDICT_API_URL } from '../lib/predictionApi';
+import { ModelComparisonReport } from './ModelComparisonReport';
 import {
   Sparkles, Cpu, AlertTriangle, CheckCircle2, Building2, BarChart3, Percent, Activity,
   RefreshCw, ChevronDown, ChevronRight, Trophy, Wifi, WifiOff, FileText
@@ -161,7 +162,7 @@ export const MLForecastView: React.FC = () => {
         {([
           { key: 'requests', label: 'Budget Requests vs Model', icon: FileText },
           { key: 'departments', label: 'Department Summary', icon: Building2 },
-          { key: 'model', label: 'Model Comparison', icon: Trophy }
+          { key: 'model', label: 'Model Comparison (3 Models)', icon: Trophy }
         ] as const).map(tab => (
           <button
             key={tab.key}
@@ -369,46 +370,8 @@ export const MLForecastView: React.FC = () => {
         </div>
       )}
 
-      {/* TAB 3: algorithm comparison (thesis results) */}
-      {activeSubTab === 'model' && (
-        <div className="space-y-3">
-          <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-xs">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200 uppercase tracking-wider text-[11px]">
-                  <tr>
-                    <th className="py-3 px-4">Metric</th>
-                    {MODEL_ALGORITHMS.map(a => <th key={a} className="py-3 px-4 text-right">{a}</th>)}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {MODEL_COMPARISON.map(row => {
-                    const vals = MODEL_ALGORITHMS.map(a => row.values[a]);
-                    const best = row.higherIsBetter ? Math.max(...vals) : Math.min(...vals);
-                    return (
-                      <tr key={row.metric}>
-                        <td className="py-2.5 px-4 font-semibold text-slate-800">{row.metric}</td>
-                        {MODEL_ALGORITHMS.map(a => {
-                          const v = row.values[a];
-                          return (
-                            <td key={a} className={`py-2.5 px-4 text-right font-mono ${v === best ? 'font-black text-emerald-700' : 'text-slate-600'}`}>
-                              {row.peso ? peso(v) : v.toFixed(row.metric.startsWith('R²') ? 3 : 1)}{v === best ? ' ★' : ''}
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-          <p className="text-[11px] text-slate-500">
-            Each algorithm was tuned with a hyperparameter grid and scored with repeated GroupKFold by event (5 folds × 3 repeats),
-            so every score is for events the model never saw. Random Forest ranked 1st on every metric (★) and is the deployed model.
-          </p>
-        </div>
-      )}
+      {/* TAB 3: comparative analysis of the three predictive models */}
+      {activeSubTab === 'model' && <ModelComparisonReport />}
     </div>
   );
 };
