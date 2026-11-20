@@ -3,8 +3,9 @@ import { useApp } from '../context/AppContext';
 import { DEPARTMENTS } from '../data/mockData';
 import { downloadCsv } from '../utils/csvExport';
 import { ReceiptPhotosModal } from './ReceiptPhotosModal';
+import { ReimbursementDetailModal } from './ReimbursementDetailModal';
 import { expensePhotoFolder, receiptFileProblem, uploadExpensePhotos } from '../utils/receiptPhotos';
-import { Receipt, Send, Clock, CheckCircle2, XCircle, Download, Search, Info, Camera, X, Plus, Image as ImageIcon, Eye, Lock } from 'lucide-react';
+import { Receipt, Send, Clock, CheckCircle2, XCircle, Download, Search, Info, Camera, X, Plus, Image as ImageIcon, Eye } from 'lucide-react';
 
 const peso = (n: number) => `₱${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -511,62 +512,17 @@ export const OfficerReimbursementView: React.FC = () => {
       </div>
 
       {viewed && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-[#0B3D2E]/40 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4" onClick={() => setViewing(null)}>
-          <div className="bg-white rounded-2xl shadow-2xl border-t-4 border-t-[#F2B705] border border-slate-200 w-full max-w-md overflow-hidden" onClick={(e) => e.stopPropagation()}>
-            <div className="bg-[#0B3D2E] text-white px-5 py-4 flex items-center justify-between">
-              <div className="flex items-center gap-2 min-w-0">
-                <Receipt className="w-5 h-5 shrink-0" />
-                <h3 className="font-extrabold text-base truncate">Reimbursement Request</h3>
-              </div>
-              <button onClick={() => setViewing(null)} className="p-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition cursor-pointer">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="p-5 space-y-4">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="font-extrabold text-slate-900">{viewed.expense?.expense_desc || viewed.budget_title}</p>
-                  <p className="text-[11px] text-slate-500">{viewed.budget_title}</p>
-                </div>
-                <span className={`shrink-0 px-2 py-0.5 rounded-full border text-[10px] font-bold ${STATUS_STYLES[viewed.reimbursement_status] || STATUS_STYLES.Pending}`}>
-                  {viewed.reimbursement_status === 'Pending' ? 'Pending Review' : viewed.reimbursement_status}
-                </span>
-              </div>
-              <div className="rounded-xl bg-[#EEF4F0] border border-[#0B3D2E]/15 px-4 py-3 flex items-center justify-between">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-[#0B3D2E]/70">Amount to reimburse</span>
-                <span className="font-mono text-lg font-black text-[#0B3D2E]">{peso(viewed.amount_spent)}</span>
-              </div>
-              <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-xs">
-                <div><dt className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Department</dt><dd className="font-semibold text-slate-800">{viewed.department}</dd></div>
-                <div><dt className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Filed by</dt><dd className="font-semibold text-slate-800">{viewed.officer_name || '-'}</dd></div>
-                <div><dt className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Date submitted</dt><dd className="font-semibold text-slate-800">{viewed.date_submitted}</dd></div>
-                <div><dt className="text-[10px] font-bold uppercase tracking-wider text-slate-400">OR / Receipt No.</dt><dd className="font-semibold text-slate-800">{viewed.receipt_ref || '-'}</dd></div>
-                <div className="col-span-2"><dt className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Remarks</dt><dd className="text-slate-700 whitespace-pre-wrap">{viewed.remarks || '-'}</dd></div>
-              </dl>
-              <p className="flex items-center gap-1.5 text-[11px] text-slate-500 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2">
-                <Lock className="w-3.5 h-3.5 shrink-0" /> Submitted requests can no longer be edited. View only.
-              </p>
-              <div className="flex gap-2">
-                {viewed.expense_id && (
-                  <button
-                    onClick={() => setPhotosFor({
-                      title: viewed.expense?.expense_desc || viewed.budget_title,
-                      subtitle: `${viewed.budget_title} • ${viewed.officer_name}${viewed.receipt_ref ? ` • ${viewed.receipt_ref}` : ''}`,
-                      department: viewed.department, proposalId: viewed.budget_id, expenseId: viewed.expense_id,
-                      legacyPath: viewed.expense?.proof_attach?.[0]?.url
-                    })}
-                    className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold bg-white border border-[#0B3D2E]/20 hover:bg-[#EEF4F0] text-[#0B3D2E] transition cursor-pointer"
-                  >
-                    <ImageIcon className="w-3.5 h-3.5" /> Receipt Photos
-                  </button>
-                )}
-                <button onClick={() => setViewing(null)} className="flex-1 py-2 rounded-xl text-xs font-bold bg-[#0B3D2E] hover:bg-[#072A20] text-white transition cursor-pointer">
-                  Close
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <ReimbursementDetailModal
+          row={viewed}
+          onClose={() => setViewing(null)}
+          note="Submitted requests can no longer be edited. View only."
+          onOpenPhotos={() => setPhotosFor({
+            title: viewed.expense?.expense_desc || viewed.budget_title,
+            subtitle: `${viewed.budget_title} • ${viewed.officer_name}${viewed.receipt_ref ? ` • ${viewed.receipt_ref}` : ''}`,
+            department: viewed.department, proposalId: viewed.budget_id, expenseId: viewed.expense_id,
+            legacyPath: viewed.expense?.proof_attach?.[0]?.url
+          })}
+        />
       )}
 
       {photosFor && (
