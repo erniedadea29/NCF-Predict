@@ -281,10 +281,6 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onCl
             {saving ? 'Saving...' : 'Save Changes'}
           </button>
         </form>
-
-        <div className="px-5 pb-5">
-          <TwoFactorAuthSection />
-        </div>
       </div>
     </div>
   );
