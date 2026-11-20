@@ -1642,7 +1642,8 @@ ${error.message}`); return; }
   //               released to it and the Completed expenses charged to it
   //               (money leaves the treasury when it is released; expenses
   //               paid from that released cash are not counted twice, and
-  //               spending above the release, e.g. reimbursements, still is)
+  //               spending above the release, e.g. reimbursements, still is;
+  //               an Audited liquidation total above the release counts too)
   //             An unspent budget returned comes back as an INCOME transaction.
   //   remaining = allocated + income - spent
   // Pending transactions are tracked separately (pendingIncome/pendingSpent)
@@ -1658,13 +1659,18 @@ ${error.message}`); return; }
     // SAF receipt numbers already represented by an income transaction.
     const receiptsInTransactions = new Set<string>();
     // Funds released per budget (cash handed out for that budget).
-    const releasedByBudget = new Map<string, { dept: DepartmentCode; released: number }>();
+    // `liquidated` = the audited liquidation total (the certified actual
+    // spend). When it is above the release, the overspend (e.g. money an
+    // officer advanced and is reimbursed for) comes out of department funds.
+    const releasedByBudget = new Map<string, { dept: DepartmentCode; released: number; liquidated: number }>();
     if (proposalsLoaded) {
       proposals.forEach(p => {
         const released = p.cashouts
           .filter(c => c.cashout_status !== 'Pending' && c.cashout_status !== 'Declined')
           .reduce((s, c) => s + c.amount_released, 0);
-        if (released > 0) releasedByBudget.set(p.id, { dept: p.department, released });
+        const liq = p.liquidation;
+        const liquidated = liq && (liq.status === 'Audited' || liq.status === 'Closed') ? Number(liq.total_spent) || 0 : 0;
+        if (released > 0) releasedByBudget.set(p.id, { dept: p.department, released, liquidated });
       });
     }
     const chargedToBudget = new Map<string, number>();
@@ -1683,8 +1689,8 @@ ${error.message}`); return; }
       }
     });
 
-    releasedByBudget.forEach(({ dept, released }, id) => {
-      bucket(dept).spent += Math.max(released, chargedToBudget.get(id) || 0);
+    releasedByBudget.forEach(({ dept, released, liquidated }, id) => {
+      bucket(dept).spent += Math.max(released, chargedToBudget.get(id) || 0, liquidated);
     });
 
     safRecords.forEach(rec => {
