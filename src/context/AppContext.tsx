@@ -122,6 +122,7 @@ interface AppContextType {
     department: DepartmentCode;
     course_id?: number;
     student_number?: string;
+    employee_id?: string;
     officer_position?: string;
     course?: string;
     year_level?: string;
@@ -370,6 +371,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     course_id?: number;
     displayName: string;
     officer_position: string;
+    employee_id?: string;
   } | null>(null);
 
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
@@ -2409,6 +2411,7 @@ ${error.message}`); return; }
     department: DepartmentCode;
     course_id?: number;
     student_number?: string;
+    employee_id?: string;
     officer_position?: string;
     course?: string;
     year_level?: string;
@@ -2442,6 +2445,10 @@ ${error.message}`); return; }
       }
     }
 
+    if (userData.role === 'employee' && !/^\d{2}-\d{5}$/.test(userData.employee_id?.trim() || '')) {
+      return { success: false, message: 'Employee ID is required in the format 00-00000 (e.g. 15-01234).' };
+    }
+
     const client = getSupabase();
     suppressAuthEventsRef.current = true;
     try {
@@ -2455,7 +2462,7 @@ ${error.message}`); return; }
     client: ReturnType<typeof getSupabase>,
     cleanEmail: string,
     userData: {
-      name: string; role: UserRole; department: DepartmentCode; course_id?: number; student_number?: string;
+      name: string; role: UserRole; department: DepartmentCode; course_id?: number; student_number?: string; employee_id?: string;
       officer_position?: string; course?: string; year_level?: string; section?: string;
       password: string; contact_number?: string;
     }
@@ -2469,7 +2476,8 @@ ${error.message}`); return; }
           full_name: userData.name.trim(),
           role: userData.role,
           department: userData.department,
-          course_id: userData.course_id ?? null
+          course_id: userData.course_id ?? null,
+          employee_id: userData.employee_id?.trim() || null
         }
       }
     });
@@ -2519,7 +2527,8 @@ ${error.message}`); return; }
         department: userData.department,
         course_id: userData.course_id,
         displayName: userData.name.trim(),
-        officer_position
+        officer_position,
+        employee_id: userData.employee_id?.trim() || undefined
       };
       return {
         success: true,
@@ -2551,6 +2560,11 @@ ${error.message}`); return; }
           : `Account created, but the student roster entry failed: ${rpcError.message}`;
         return { success: false, message: dupMessage };
       }
+    }
+
+    if (userData.role === 'employee' && userData.employee_id) {
+      const { error: empErr } = await client.rpc('set_my_employee_id', { p_employee_id: userData.employee_id.trim() });
+      if (empErr) console.warn('Could not save the Employee ID (run supabase/migrations/20261120_employee_id.sql)', empErr);
     }
 
     // Registration never auto-logs-in — sign back out (any RPC work above
@@ -2599,6 +2613,22 @@ ${error.message}`); return; }
             ? `Student ID "${pending.student_number}" is already taken. Please use a different one.`
             : `Verified, but the student roster entry failed: ${rpcError.message}`;
           return { success: false, message: dupMessage };
+        }
+      }
+
+      // Employees: save the Employee ID on the new profile (from this session's
+      // form, or from the sign-up data if the page was reloaded in between).
+      const isEmployee = (data.user.user_metadata as { role?: string } | undefined)?.role === 'employee';
+      if (isEmployee) {
+        const empId = pending && pending.email === cleanEmail ? pending.employee_id : undefined;
+        const { error: empErr } = await client.rpc('set_my_employee_id', { p_employee_id: empId ?? null });
+        if (empErr) {
+          console.warn('Could not save the Employee ID', empErr);
+          if (/already taken|23505/i.test(`${empErr.message} ${empErr.code}`)) {
+            pendingRegistrationRef.current = null;
+            await client.auth.signOut();
+            return { success: true, message: `Email verified, but Employee ID "${empId}" is already used by another account. Log in and ask the Super Admin to correct it.` };
+          }
         }
       }
 

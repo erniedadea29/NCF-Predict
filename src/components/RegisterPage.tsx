@@ -78,6 +78,9 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onGoToLogin }) => {
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [studentNumber, setStudentNumber] = useState('');
+  const [employeeId, setEmployeeId] = useState('');
+  const [employeeIdAvailable, setEmployeeIdAvailable] = useState<boolean | null>(null);
+  const [checkingEmployeeId, setCheckingEmployeeId] = useState(false);
   const [department, setDepartment] = useState<DepartmentCode>('CAF');
   const [course, setCourse] = useState<string>(DEFAULT_COURSES.CAF[0]);
   const [yearLevel, setYearLevel] = useState<string>('1st Year');
@@ -120,6 +123,20 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onGoToLogin }) => {
     return digits.length > 2 ? `${digits.slice(0, 2)}-${digits.slice(2)}` : digits;
   };
   const studentIdInvalid = studentNumber.trim() !== '' && !STUDENT_ID_PATTERN.test(studentNumber.trim());
+
+  const employeeIdInvalid = !STUDENT_ID_PATTERN.test(employeeId.trim());
+
+  const checkEmployeeIdAvailability = async (value: string) => {
+    const trimmed = value.trim();
+    if (!STUDENT_ID_PATTERN.test(trimmed)) { setEmployeeIdAvailable(null); return; }
+    setCheckingEmployeeId(true);
+    try {
+      const { data, error: rpcError } = await getSupabase().rpc('check_employee_id_available', { p_employee_id: trimmed });
+      setEmployeeIdAvailable(rpcError ? null : Boolean(data));
+    } finally {
+      setCheckingEmployeeId(false);
+    }
+  };
 
   const checkStudentIdAvailability = async (value: string) => {
     const trimmed = value.trim();
@@ -180,6 +197,14 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onGoToLogin }) => {
       setError('Password and Confirm Password do not match.');
       return;
     }
+    if (accountType === 'employee' && employeeIdInvalid) {
+      setError('Employee ID is required in the format 00-00000 (two digits, a dash, then 5 digits), e.g. 15-01234.');
+      return;
+    }
+    if (accountType === 'employee' && employeeIdAvailable === false) {
+      setError('That Employee ID is already taken. Please check your Employee ID.');
+      return;
+    }
     if (accountType === 'student' && studentIdInvalid) {
       setError('Student ID must be numbers in the format 00-00000 (two digits, a dash, then 5 digits), e.g. 22-20052.');
       return;
@@ -196,6 +221,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onGoToLogin }) => {
       role: meta.role,
       department,
       student_number: accountType === 'student' ? (studentNumber.trim() || undefined) : undefined,
+      employee_id: accountType === 'employee' ? employeeId.trim() : undefined,
       officer_position: meta.label,
       course: accountType === 'student' ? course : undefined,
       year_level: accountType === 'student' ? yearLevel : undefined,
@@ -454,6 +480,40 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onGoToLogin }) => {
                     </p>
                   )}
                   {studentIdAvailable === true && !checkingStudentId && (
+                    <p className="text-[11px] text-emerald-600 font-semibold mt-1">✓ Available</p>
+                  )}
+                </div>
+              )}
+              {accountType === 'employee' && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1">
+                    <IdCard className="w-3.5 h-3.5 text-slate-400" /> Employee ID *
+                  </label>
+                  <input type="text" value={employeeId}
+                    inputMode="numeric"
+                    maxLength={8}
+                    required
+                    onChange={(e) => { setEmployeeId(formatStudentId(e.target.value)); setEmployeeIdAvailable(null); }}
+                    onBlur={(e) => checkEmployeeIdAvailability(e.target.value)}
+                    placeholder="e.g. 15-01234"
+                    aria-invalid={(employeeId !== '' && employeeIdInvalid) || employeeIdAvailable === false}
+                    className={`w-full px-3 py-2 text-sm font-mono border rounded-xl focus:ring-2 focus:ring-[#0B3D2E] ${
+                      employeeIdAvailable === false || (employeeId !== '' && employeeIdInvalid) ? 'border-rose-400' : 'border-slate-300'
+                    }`} />
+                  {employeeId !== '' && employeeIdInvalid && (
+                    <p className="text-[11px] text-rose-600 font-semibold mt-1 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3" /> Format: 00-00000 (numbers only, e.g. 15-01234)
+                    </p>
+                  )}
+                  {checkingEmployeeId && (
+                    <p className="text-[11px] text-slate-400 mt-1">Checking availability&hellip;</p>
+                  )}
+                  {employeeIdAvailable === false && !checkingEmployeeId && (
+                    <p className="text-[11px] text-rose-600 font-semibold mt-1 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3" /> This Employee ID is already registered.
+                    </p>
+                  )}
+                  {employeeIdAvailable === true && !checkingEmployeeId && (
                     <p className="text-[11px] text-emerald-600 font-semibold mt-1">✓ Available</p>
                   )}
                 </div>
