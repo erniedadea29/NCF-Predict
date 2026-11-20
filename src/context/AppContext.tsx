@@ -1455,6 +1455,8 @@ ${error.message}`); return; }
   // ambiguous to embed safely (budget_requests has 3 separate FKs to
   // profiles) — they're set correctly by each action's own optimistic
   // update at write time, and only show blank on a fresh page reload.
+  // An embedded relation as one row, whether PostgREST returned it as a list or an object.
+  const firstRow = (rel: any) => (Array.isArray(rel) ? rel[0] : rel) || null;
   const mapProposalRow = (row: any): BudgetProposal => ({
     id: row.id,
     budget_title: row.title,
@@ -1544,14 +1546,16 @@ ${error.message}`); return; }
       dean_remarks: row.liquidation_reports[0].dean_remarks || undefined,
       notes: row.liquidation_reports[0].remarks || undefined
     } : undefined,
-    budget_return: row.budget_returns?.[0] ? {
-      id: row.budget_returns[0].id, budget_id: row.id,
-      amount_returned: Number(row.budget_returns[0].amount_returned),
-      date_returned: row.budget_returns[0].date_returned,
-      cash_in_reference: row.budget_returns[0].cash_in_reference || '',
+    // budget_returns has one row per proposal (UNIQUE), so PostgREST embeds it
+    // as an object, not a list; firstRow accepts both shapes.
+    budget_return: firstRow(row.budget_returns) ? {
+      id: firstRow(row.budget_returns).id, budget_id: row.id,
+      amount_returned: Number(firstRow(row.budget_returns).amount_returned),
+      date_returned: firstRow(row.budget_returns).date_returned,
+      cash_in_reference: firstRow(row.budget_returns).cash_in_reference || '',
       double_entry: { debit: 'Cash on Hand (SAF Vault)', credit: 'Unspent Event Budget Return' },
-      returned_by: '', received_by: row.budget_returns[0].received_by || '',
-      remarks: row.budget_returns[0].remarks || ''
+      returned_by: '', received_by: firstRow(row.budget_returns).received_by || '',
+      remarks: firstRow(row.budget_returns).remarks || ''
     } : undefined
   });
 

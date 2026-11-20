@@ -24,7 +24,7 @@ import {
   XCircle
 } from 'lucide-react';
 
-type LiquidationStatusFilter = 'ALL' | 'AWAITING_LIQUIDATION' | 'UNDER_REVIEW' | 'PENDING_RETURN' | 'RETURNED';
+type LiquidationStatusFilter = 'ALL' | 'MY_ACTION' | 'WAITING' | 'AWAITING_LIQUIDATION' | 'UNDER_REVIEW' | 'PENDING_RETURN' | 'RETURNED';
 
 interface LiquidationRow {
   proposal: BudgetProposal;
@@ -33,7 +33,7 @@ interface LiquidationRow {
   balance: number;
   hasLiquidation: boolean;
   hasReturn: boolean;
-  statusFilter: Exclude<LiquidationStatusFilter, 'ALL'>;
+  statusFilter: Exclude<LiquidationStatusFilter, 'ALL' | 'MY_ACTION' | 'WAITING'>;
 }
 
 interface LiquidationReportDashboardProps {
@@ -82,7 +82,7 @@ export const LiquidationReportDashboard: React.FC<LiquidationReportDashboardProp
       const hasReturn = Boolean(p.budget_return);
 
       // Follows the actual liquidation status: only an Audited report moves on to fund return.
-      const statusForFilter: Exclude<LiquidationStatusFilter, 'ALL'> =
+      const statusForFilter: Exclude<LiquidationStatusFilter, 'ALL' | 'MY_ACTION' | 'WAITING'> =
         hasReturn ? 'RETURNED'
         : !liq || liq.status === 'FOR_REVISION' ? 'AWAITING_LIQUIDATION'
         : liq.status === 'Audited' ? (balance > 0 ? 'PENDING_RETURN' : 'RETURNED')
@@ -135,8 +135,41 @@ export const LiquidationReportDashboard: React.FC<LiquidationReportDashboardProp
   const certifiedBudgets = rows.filter(r => isCertified(r.proposal.liquidation?.status)).length;
   const liquidationsInReview = rows.filter(r => r.proposal.liquidation && !isCertified(r.proposal.liquidation.status)).length;
 
+  // What the CURRENT user has to do on a budget (null = nothing for them),
+  // and whose turn it is otherwise. Rows that need this user come first.
+  const statusLabel = (s?: string) => ({
+    PENDING_AUDITOR: 'Pre-Audit: Auditor', PENDING_ADVISER: 'Under Review: Adviser', PENDING_DEAN: 'Under Review: Dean',
+    FOR_REVISION: 'Returned for Revision', Audited: 'Audited', Rejected: 'Rejected', Closed: 'Closed'
+  } as Record<string, string>)[s || ''] || s || '';
+  const myAction = (r: LiquidationRow): string | null => {
+    const liq = r.proposal.liquidation;
+    const sameDept = !currentUser.department || currentUser.department === r.proposal.department;
+    if (canPrepareLiquidation(r.proposal, currentUser)) {
+      if (!liq) return 'Prepare liquidation';
+      if (liq.status === 'FOR_REVISION') return 'Revise liquidation';
+      if (r.statusFilter === 'PENDING_RETURN') return `Return ${peso(r.balance)}`;
+    }
+    if (liq?.status === 'PENDING_AUDITOR' && isAuditor(currentUser) && sameDept) return 'Pre-audit report';
+    if (liq?.status === 'PENDING_ADVISER' && currentUser.role === 'csc_adviser' && sameDept) return 'Review report';
+    if (liq?.status === 'PENDING_DEAN' && currentUser.role === 'dean' && sameDept) return 'Review and certify';
+    return null;
+  };
+  const waitingOn = (r: LiquidationRow): string | null => {
+    const liq = r.proposal.liquidation;
+    if (r.statusFilter === 'RETURNED') return null;
+    if (!liq || liq.status === 'FOR_REVISION') return `Waiting for ${r.proposal.created_by_officer || 'the Treasurer'}`;
+    if (liq.status === 'PENDING_AUDITOR') return 'Waiting for the Auditor';
+    if (liq.status === 'PENDING_ADVISER') return 'Waiting for the Adviser';
+    if (liq.status === 'PENDING_DEAN') return 'Waiting for the Dean';
+    if (r.statusFilter === 'PENDING_RETURN') return `Waiting for the return by ${r.proposal.created_by_officer || 'the Treasurer'}`;
+    return null;
+  };
+  const myActionCount = rows.filter(r => myAction(r)).length;
+
   const filteredRows = rows.filter(r => {
-    if (statusFilter !== 'ALL' && r.statusFilter !== statusFilter) return false;
+    if (statusFilter === 'MY_ACTION') { if (!myAction(r)) return false; }
+    else if (statusFilter === 'WAITING') { if (myAction(r) || r.statusFilter === 'RETURNED') return false; }
+    else if (statusFilter !== 'ALL' && r.statusFilter !== statusFilter) return false;
 
     if (!isDepartmentRestricted && deptFilter !== 'ALL' && r.proposal.department !== deptFilter) return false;
 
@@ -168,12 +201,13 @@ export const LiquidationReportDashboard: React.FC<LiquidationReportDashboardProp
     }
   };
 
+  const waitingCount = rows.filter(r => !myAction(r) && r.statusFilter !== 'RETURNED').length;
+  const closedCount = rows.filter(r => r.statusFilter === 'RETURNED').length;
   const statusPills: { id: LiquidationStatusFilter; label: string }[] = [
-    { id: 'ALL', label: 'All' },
-    { id: 'AWAITING_LIQUIDATION', label: 'Awaiting Liquidation' },
-    { id: 'UNDER_REVIEW', label: 'Under Review' },
-    { id: 'PENDING_RETURN', label: 'Pending Fund Return' },
-    { id: 'RETURNED', label: 'Fully Closed' }
+    { id: 'MY_ACTION', label: `Needs my action · ${myActionCount}` },
+    { id: 'WAITING', label: `Waiting on others · ${waitingCount}` },
+    { id: 'RETURNED', label: `Closed · ${closedCount}` },
+    { id: 'ALL', label: `All · ${rows.length}` }
   ];
 
   // "+ New Liquidation Report": every approved budget, and whether this user can prepare its report now.
@@ -436,7 +470,9 @@ export const LiquidationReportDashboard: React.FC<LiquidationReportDashboardProp
             onClick={() => setStatusFilter(pill.id)}
             className={`px-4 py-2 rounded-xl text-xs font-bold transition shadow-2xs whitespace-nowrap cursor-pointer ${
               statusFilter === pill.id
-                ? 'bg-[#0B3D2E] text-white shadow-xs'
+                ? pill.id === 'MY_ACTION' ? 'bg-[#F2B705] text-[#0B3D2E] shadow-xs' : 'bg-[#0B3D2E] text-white shadow-xs'
+                : pill.id === 'MY_ACTION' && myActionCount > 0
+                ? 'bg-[#FFF8E1] hover:bg-[#FDEFC2] text-[#5C4300] border border-[#F2B705]'
                 : 'bg-white hover:bg-[#EEF4F0] text-[#0B3D2E] border border-[#0B3D2E]/20'
             }`}
           >
@@ -478,109 +514,113 @@ export const LiquidationReportDashboard: React.FC<LiquidationReportDashboardProp
         )}
       </div>
 
-      {/* Liquidation Records List */}
+      {/* Liquidation Records: one row per budget, with the next step */}
       {filteredRows.length === 0 ? (
         <div className="bg-white rounded-2xl p-12 text-center border border-slate-200 space-y-3">
           <div className="w-16 h-16 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto text-2xl">
             <ShieldCheck className="w-8 h-8" />
           </div>
           <div>
-            <h3 className="font-bold text-slate-800 text-base">No liquidation records found</h3>
+            <h3 className="font-bold text-slate-800 text-base">
+              {statusFilter === 'MY_ACTION' && releasedProposals.length > 0 ? 'Nothing needs your action' : 'No liquidation records found'}
+            </h3>
             <p className="text-xs text-slate-500 mt-1">
               {releasedProposals.length === 0
                 ? 'Fund accountability records appear here once a budget proposal is approved and released.'
+                : statusFilter === 'MY_ACTION'
+                ? 'You are all caught up. Budgets waiting on others are under "Waiting on others".'
                 : 'No records match the current filters. Try clearing the search or status filter.'}
             </p>
           </div>
         </div>
       ) : (
-        <div className="space-y-3">
-          {filteredRows.map((r) => {
-            const deptInfo = DEPARTMENTS[r.proposal.department];
-            const badge = getStatusBadge(r);
-            const StatusIcon = badge.icon;
-            const liq = r.proposal.liquidation;
-            const ret = r.proposal.budget_return;
-
-            return (
-              <div
-                key={r.proposal.id}
-                className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-2xs hover:shadow-xs transition relative overflow-hidden space-y-3"
-              >
-                <div
-                  className="absolute left-0 top-0 bottom-0 w-1.5"
-                  style={{ backgroundColor: deptInfo?.color || '#0B3D2E' }}
-                />
-
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pl-2">
-                  <div className="flex items-center gap-3">
-                    <div className={`px-2.5 py-1.5 rounded-lg text-xs font-black border ${deptInfo?.badgeBg || 'bg-slate-100 text-slate-800'}`}>
-                      {r.proposal.department}
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-sm text-slate-900">{r.proposal.budget_title}</h4>
-                      <p className="text-[11px] text-slate-400">Fund released {formatDateTime(r.proposal.updated_at)}</p>
-                    </div>
-                  </div>
-
-                  <span className={`inline-flex items-center gap-1.5 self-start sm:self-auto px-2.5 py-1 rounded-lg text-[11px] font-bold border ${badge.color}`}>
-                    <StatusIcon className="w-3.5 h-3.5" />
-                    {badge.label}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pl-2 text-xs">
-                  <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Released</span>
-                    <p className="font-black text-sm text-slate-900">{peso(r.totalReleased)}</p>
-                  </div>
-                  <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{r.hasLiquidation ? 'Liquidated' : 'Spent'}</span>
-                    <p className="font-black text-sm text-slate-900">{peso(r.totalSpent)}</p>
-                  </div>
-                  <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Balance</span>
-                    <p className={`font-black text-sm ${r.balance > 0 ? 'text-amber-700' : 'text-slate-900'}`}>{peso(r.balance)}</p>
-                  </div>
-                  <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Returned</span>
-                    <p className="font-black text-sm text-emerald-700">{peso(ret?.amount_returned || 0)}</p>
-                  </div>
-                </div>
-
-                {(liq?.auditor_remarks || liq?.notes || ret?.remarks) && (
-                  <p className="pl-2 text-[11px] text-slate-500 italic">
-                    {liq?.auditor_remarks || liq?.notes || ret?.remarks}
-                  </p>
-                )}
-
-                <div className="flex items-center justify-between pl-2 pt-2 border-t border-slate-100">
-                  <span className="text-[11px] text-slate-400">
-                    {liq
-                      ? `Submitted${liq.submitted_by ? ` by ${liq.submitted_by}` : ''} on ${liq.submitted_date} • ${liq.status}`
-                      : `No liquidation submitted yet • To be prepared by ${r.proposal.created_by_officer || 'the requesting Treasurer'}`}
-                    {ret ? ` • Returned ${ret.date_returned} (Ref: ${ret.cash_in_reference})` : ''}
-                  </span>
-
-                  {r.statusFilter !== 'RETURNED' && (
-                    <button
-                      onClick={() => onOpenLiquidationModal(r.proposal.id)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#0B3D2E] hover:bg-[#072A20] text-white text-[11px] font-bold transition cursor-pointer"
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[900px] text-left text-xs">
+              <thead className="bg-[#EEF4F0] text-[#0B3D2E] text-[11px] font-bold uppercase tracking-wider border-b border-slate-200">
+                <tr>
+                  <th className="py-3 px-4">Budget</th>
+                  <th className="py-3 px-3 text-right w-[120px]">Released</th>
+                  <th className="py-3 px-3 text-right w-[120px]">Liquidated</th>
+                  <th className="py-3 px-3 text-right w-[120px]">Balance</th>
+                  <th className="py-3 px-3 text-right w-[120px]">Returned</th>
+                  <th className="py-3 px-4 text-right w-[260px]">Next step</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {[...filteredRows].sort((a, b) => Number(Boolean(myAction(b))) - Number(Boolean(myAction(a)))).map((r) => {
+                  const liq = r.proposal.liquidation;
+                  const ret = r.proposal.budget_return;
+                  const action = myAction(r);
+                  const waiting = action ? null : waitingOn(r);
+                  const closed = r.statusFilter === 'RETURNED';
+                  const context = closed
+                    ? `Closed${ret?.date_returned ? ` ${ret.date_returned}` : ''}`
+                    : !liq
+                    ? `Released ${formatDateTime(r.proposal.updated_at)} • Not liquidated yet`
+                    : liq.status === 'Audited'
+                    ? 'Audited by the Adviser and the Dean'
+                    : `${statusLabel(liq.status)} • Submitted ${liq.submitted_date}`;
+                  const remarks = liq?.status === 'FOR_REVISION' ? (liq.auditor_remarks || liq.adviser_remarks || liq.dean_remarks) : null;
+                  const dash = <span className="text-slate-300">—</span>;
+                  return (
+                    <tr
+                      key={r.proposal.id}
+                      className={`align-middle transition ${action ? 'bg-[#FFFBEA] hover:bg-[#FFF6D6]' : 'hover:bg-[#FBFAF4]'} ${closed ? 'text-slate-500' : ''}`}
                     >
-                      <FileText className="w-3.5 h-3.5" />
-                      {r.statusFilter === 'AWAITING_LIQUIDATION' && canPrepareLiquidation(r.proposal, currentUser)
-                        ? (liq?.status === 'FOR_REVISION' ? 'Revise Liquidation Report' : 'Prepare Liquidation Report')
-                        : liq?.status === 'PENDING_AUDITOR' && isAuditor(currentUser)
-                        ? 'Pre-Audit Liquidation Report'
-                        : r.statusFilter === 'PENDING_RETURN'
-                        ? 'Process Fund Return'
-                        : 'View Liquidation Report'}
-                    </button>
-                  )}
-                </div>
-              </div>
-            );
-          })}
+                      <td className={`py-3.5 px-4 border-l-4 ${action ? 'border-[#F2B705]' : 'border-transparent'}`}>
+                        <div className="flex items-center gap-2 min-w-0">
+                          {!isDepartmentRestricted && (
+                            <span className={`shrink-0 px-1.5 py-0.5 rounded text-[10px] font-black border ${DEPARTMENTS[r.proposal.department]?.badgeBg || 'bg-slate-100 text-slate-800'}`}>
+                              {r.proposal.department}
+                            </span>
+                          )}
+                          <span className={`font-bold text-sm truncate ${closed ? 'text-slate-600' : 'text-slate-900'}`} title={r.proposal.budget_title}>
+                            {r.proposal.budget_title}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 mt-0.5">{context}</p>
+                        {remarks && <p className="text-[11px] text-red-700 mt-0.5 truncate" title={remarks}>Correction needed: {remarks}</p>}
+                      </td>
+                      <td className="py-3.5 px-3 text-right font-mono font-bold whitespace-nowrap">{peso(r.totalReleased)}</td>
+                      <td className="py-3.5 px-3 text-right font-mono whitespace-nowrap">{r.hasLiquidation ? peso(r.totalSpent) : dash}</td>
+                      <td className={`py-3.5 px-3 text-right font-mono whitespace-nowrap ${!closed && r.hasLiquidation && r.balance > 0 ? 'font-bold text-amber-700' : ''}`}>
+                        {closed ? peso(0) : r.hasLiquidation ? peso(r.balance) : dash}
+                      </td>
+                      <td className="py-3.5 px-3 text-right font-mono whitespace-nowrap">
+                        {ret ? <span className="font-bold text-[#0B3D2E]">{peso(ret.amount_returned)}</span> : dash}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <div className="flex items-center justify-end gap-2">
+                          {action ? (
+                            <button
+                              onClick={() => onOpenLiquidationModal(r.proposal.id)}
+                              className="px-3.5 py-2 rounded-xl bg-[#0B3D2E] hover:bg-[#072A20] text-white text-[11px] font-bold shadow-xs transition cursor-pointer whitespace-nowrap"
+                            >
+                              {action}
+                            </button>
+                          ) : (
+                            <>
+                              <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold ${closed ? 'text-[#0B3D2E]' : 'text-slate-600'}`}>
+                                <span className={`w-2 h-2 rounded-full ${closed ? 'bg-[#0B3D2E]' : 'bg-[#F2B705]'}`} />
+                                {closed ? 'Closed' : waiting}
+                              </span>
+                              <button
+                                onClick={() => onOpenLiquidationModal(r.proposal.id)}
+                                className="px-2.5 py-1 rounded-lg bg-white border border-[#0B3D2E]/20 hover:bg-[#EEF4F0] text-[#0B3D2E] text-[11px] font-bold transition cursor-pointer"
+                              >
+                                View
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>
